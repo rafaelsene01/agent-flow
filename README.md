@@ -1,6 +1,6 @@
 # 🌸 Hana
 
-Terminal Kanban board powered by Linear. Inspirado no [lisa](https://github.com/tarcisiopgs/lisa).
+Web Kanban board powered by Linear. Inspirado no [lisa](https://github.com/tarcisiopgs/lisa).
 
 ---
 
@@ -47,12 +47,25 @@ O wizard pergunta:
 
 ## Comandos
 
-| Comando       | Alias | Descrição                    |
-|---------------|-------|------------------------------|
-| `hana`        | —     | Abre o board (padrão)        |
-| `hana board`  | `b`   | Abre o board                 |
-| `hana init`   | —     | Wizard de configuração       |
-| `hana config` | —     | Exibe a config atual         |
+| Comando       | Alias | Descrição                                      |
+|---------------|-------|------------------------------------------------|
+| `hana`        | —     | Inicia servidor web do board na porta `5522`  |
+| `hana board`  | `b`   | Inicia servidor web do board                   |
+| `hana init`   | —     | Wizard de configuração                         |
+| `hana config` | —     | Exibe a config atual                           |
+
+### Porta do servidor web
+
+Por padrão, o board sobe na porta `5522`. Você pode alterar com `-p` ou `--port`:
+
+```bash
+hana board -p 8080
+hana board --port 7000
+```
+
+Ao iniciar, o comando exibe a URL local para acesso no navegador.
+
+> Fluxo oficial: use apenas `hana board`. A interface web e a API rodam na mesma porta.
 
 ---
 
@@ -93,12 +106,17 @@ hana/
 │   ├── config.js              ← lê/escreve .hana.json
 │   ├── commands/
 │   │   ├── init.js            ← wizard de setup
-│   │   ├── board.js           ← busca e renderiza o kanban
+│   │   ├── board.js           ← busca dados e sobe o board web
 │   │   └── config-show.js     ← exibe config atual
 │   ├── providers/
 │   │   └── linear.js          ← API GraphQL do Linear
-│   └── ui/
-│       └── kanban.js          ← renderer de colunas/cards
+│   └── server/
+│       └── board-server.js    ← servidor HTTP local + API
+├── web/
+│   ├── src/
+│   │   ├── App.jsx            ← UI web do kanban
+│   │   └── main.jsx           ← bootstrap do React
+│   └── vite.config.js         ← build do frontend
 ├── .gitignore
 ├── package.json
 └── README.md

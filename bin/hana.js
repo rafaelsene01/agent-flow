@@ -9,7 +9,7 @@ const program = new Command();
 
 program
   .name("hana")
-  .description(chalk.cyan("🌸 Hana · Terminal Kanban for Linear"))
+  .description(chalk.cyan("🌸 Hana · Web Kanban for Linear"))
   .version("1.0.0");
 
 program
@@ -20,8 +20,11 @@ program
 program
   .command("board")
   .alias("b")
-  .description("Open the Kanban board in your terminal")
-  .action(boardCommand);
+  .description("Start the web Kanban board")
+  .option("-p, --port <number>", "Port to expose the web board", "5522")
+  .action((options) => {
+    boardCommand({ port: options.port });
+  });
 
 program
   .command("config")
@@ -30,7 +33,7 @@ program
 
 // Default: if no command given, open board
 if (process.argv.length === 2) {
-  boardCommand();
+  boardCommand({ port: "5522" });
 } else {
   program.parse(process.argv);
 }

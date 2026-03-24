@@ -2,7 +2,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { requireConfig } from "../config.js";
 import * as linear from "../providers/linear.js";
-import { openKanban } from "../ui/tui.js";
+import { startBoardServer } from "../server/board-server.js";
 
 // Mapeia issues brutas do Linear para o formato que o TUI espera
 function mapIssues(issues) {
@@ -21,7 +21,7 @@ function mapIssues(issues) {
 }
 
 // Busca todos os dados do board e devolve no formato { columns, cardsByColumn }
-async function fetchBoard(config, teamId) {
+export async function fetchBoard(config, teamId) {
   const boardConfig = {
     ...config,
     pick_from: config.board_columns && config.board_columns.length > 0
@@ -64,7 +64,16 @@ async function fetchBoard(config, teamId) {
   return { columns, cardsByColumn };
 }
 
-export async function boardCommand() {
+function parsePort(input) {
+  const port = Number.parseInt(String(input ?? "5522"), 10);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Porta inválida: "${input}". Use um valor entre 1 e 65535.`);
+  }
+  return port;
+}
+
+export async function boardCommand({ port: inputPort } = {}) {
+  const port = parsePort(inputPort);
   const config = requireConfig();
 
   if (config.provider !== "linear") {
@@ -86,17 +95,15 @@ export async function boardCommand() {
       teamId = team.id;
     }
 
-    spinner.text = "Buscando issues…";
-    const { columns, cardsByColumn } = await fetchBoard(config, teamId);
-    spinner.stop();
-
-    // Abre o TUI — passa callback de refresh para polling em tempo real
-    openKanban({
-      columns,
-      cardsByColumn,
+    spinner.text = "Iniciando servidor web…";
+    const { url } = await startBoardServer({
       config,
-      onRefresh: () => fetchBoard(config, teamId),
+      teamId,
+      fetchBoard,
+      port,
     });
+    spinner.stop();
+    console.log(chalk.green(`\n  Board disponível em ${url}\n`));
 
   } catch (err) {
     spinner.fail(chalk.red("Falha ao carregar o board."));
