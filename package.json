@@ -1,24 +1,28 @@
 {
   "name": "hana",
   "version": "1.0.0",
-  "description": "🌸 Terminal Kanban board powered by Trello",
+  "description": "🌸 Web Kanban board powered by Linear",
   "main": "bin/hana.js",
   "bin": {
     "hana": "./bin/hana.js"
   },
   "type": "module",
   "scripts": {
-    "start": "node bin/hana.js"
+    "start": "node bin/hana.js",
+    "build:web": "vite build --config web/vite.config.js"
   },
   "dependencies": {
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "inquirer": "^9.2.23",
     "ora": "^8.0.1",
-    "boxen": "^8.0.1",
-    "wrap-ansi": "^9.0.0",
-    "string-width": "^7.2.0",
-    "blessed": "^0.1.81"
+    "express": "^5.1.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.4",
+    "vite": "^7.1.9"
   },
   "engines": {
     "node": ">=18.0.0"
