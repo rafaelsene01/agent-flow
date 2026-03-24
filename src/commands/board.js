@@ -44,6 +44,16 @@ async function fetchBoard(config, teamId) {
     ? allStates.filter((state) => selectedStateNames.has((state.name || "").toLowerCase()))
     : allStates;
 
+  // Mantém a coluna de concluído no fim, quando configurada.
+  if (config.done) {
+    const doneName = config.done.toLowerCase();
+    const doneIndex = columns.findIndex((state) => (state.name || "").toLowerCase() === doneName);
+    if (doneIndex >= 0 && doneIndex !== columns.length - 1) {
+      const [doneColumn] = columns.splice(doneIndex, 1);
+      columns.push(doneColumn);
+    }
+  }
+
   const cardsByColumn = {};
   for (const state of columns) {
     cardsByColumn[state.id] = mapIssues(

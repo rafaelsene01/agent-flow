@@ -35,13 +35,13 @@ export async function initCommand() {
   ]);
 
   const config = { provider };
-  await setupLinear(config);
+  await setupLinear(config, existing);
 
   console.log(chalk.green(`\n  ✅  Config saved to ${getConfigPath()}\n`));
   console.log(chalk.gray(`  Run ${chalk.white("hana board")} to open your Kanban.\n`));
 }
 
-async function setupLinear(config) {
+async function setupLinear(config, existingConfig = null) {
   console.log(
     "\n" +
       chalk.cyan("  Linear Setup\n") +
@@ -57,6 +57,7 @@ async function setupLinear(config) {
       name: "api_key",
       message: "Linear API Key:",
       mask: "•",
+      default: existingConfig?.api_key || undefined,
       validate: (v) => v.trim().length > 0 || "API key is required",
     },
   ]);
