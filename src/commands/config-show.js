@@ -21,7 +21,8 @@ export function configShowCommand() {
   const rows = [
     ["provider",      config.provider],
     ["scope (team)",  config.scope],
-    ["pick_from",     config.pick_from ? config.pick_from.join(", ") : chalk.gray("(all states)")],
+    ["board_columns", config.board_columns ? config.board_columns.join(", ") : chalk.gray("(all states)")],
+    ["pick_from",     config.pick_from ? config.pick_from.join(", ") : chalk.gray("(all states for AI)")],
     ["in_progress",   config.in_progress || chalk.gray("(not set)")],
     ["done",          config.done        || chalk.gray("(not set)")],
     ["label",         config.label       || chalk.gray("(not set)")],

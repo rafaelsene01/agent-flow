@@ -22,13 +22,27 @@ function mapIssues(issues) {
 
 // Busca todos os dados do board e devolve no formato { columns, cardsByColumn }
 async function fetchBoard(config, teamId) {
+  const boardConfig = {
+    ...config,
+    pick_from: config.board_columns && config.board_columns.length > 0
+      ? config.board_columns
+      : config.pick_from,
+  };
+
   const [allStates, issues] = await Promise.all([
     linear.getWorkflowStates(config, teamId),
-    linear.getIssues(config, teamId),
+    linear.getIssues(boardConfig, teamId),
   ]);
 
-  // Todos os estados viram colunas — sem filtro de pick_from aqui
-  const columns = allStates;
+  const selectedStateNames = config.board_columns && config.board_columns.length > 0
+    ? new Set(config.board_columns.map((name) => name.toLowerCase()))
+    : null;
+
+  // Se houver seleção de colunas no init, mostra apenas essas colunas.
+  // Caso contrário, mantém todos os estados do time.
+  const columns = selectedStateNames
+    ? allStates.filter((state) => selectedStateNames.has((state.name || "").toLowerCase()))
+    : allStates;
 
   const cardsByColumn = {};
   for (const state of columns) {

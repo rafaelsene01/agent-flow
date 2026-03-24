@@ -35,10 +35,11 @@ O wizard pergunta:
 1. **Provider** → Linear
 2. **API Key** — obtenha em: https://linear.app/settings/api
 3. **Team** (`scope`) — qual time usar
-4. **States visíveis** (`pick_from`) — quais colunas aparecem no kanban
-5. **In Progress** — estado de trabalho em andamento
-6. **Done** — estado de concluído
-7. **Label** — filtro opcional por etiqueta
+4. **States visíveis do board** (`board_columns`) — quais colunas aparecem no kanban
+5. **States para IA** (`pick_from`) — de onde a IA pode ler atividades
+6. **In Progress** — estado de trabalho em andamento
+7. **Done** — estado de concluído
+8. **Label** — filtro opcional por etiqueta
 
 > ⚠️ Adicione `.hana.json` ao `.gitignore` — ele contém sua API key.
 
@@ -63,6 +64,7 @@ O wizard pergunta:
   "api_key": "lin_api_xxxx",
   "scope": "Nome do Time",
   "_team_id": "id-cacheado",
+  "board_columns": ["Todo", "In Progress", "Done"],
   "pick_from": ["Todo", "In Progress", "Done"],
   "in_progress": "In Progress",
   "done": "Done",
@@ -73,7 +75,8 @@ O wizard pergunta:
 | Campo         | Descrição                                        |
 |---------------|--------------------------------------------------|
 | `scope`       | Nome do time no Linear                           |
-| `pick_from`   | States a exibir como colunas (omitir = todos)    |
+| `board_columns` | States exibidos como colunas no board (omitir = todos) |
+| `pick_from`   | States que a IA usa como origem de atividades (omitir = todos) |
 | `in_progress` | Nome do state "Em andamento"                     |
 | `done`        | Nome do state "Concluído"                        |
 | `label`       | Só exibe issues com essa etiqueta                |

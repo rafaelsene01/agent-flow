@@ -101,7 +101,15 @@ export function openKanban({ columns: initColumns, cardsByColumn: initCards, con
     title: "Hana",
     fullUnicode: true,
     forceUnicode: true,
+    autoPadding: false,
+    dockBorders: true,
   });
+
+  // Em alguns terminais (especialmente no Windows), alternar buffer explicitamente
+  // evita "vazamento" de render para o scrollback do terminal.
+  if (screen.program && typeof screen.program.alternateBuffer === "function") {
+    screen.program.alternateBuffer();
+  }
 
   // ── sidebar ──────────────────────────────────────────────────────────────────
   const sidebar = blessed.box({
@@ -157,6 +165,18 @@ export function openKanban({ columns: initColumns, cardsByColumn: initCards, con
   });
   screen.append(syncFlash);
 
+  function applyLayout() {
+    sidebar.width = SIDEBAR_W;
+    sidebar.height = Math.max(1, screen.height - 1);
+
+    statusBar.left = 0;
+    statusBar.width = screen.width;
+
+    detailBox.left = SIDEBAR_W + 1;
+    detailBox.width = Math.max(20, screen.width - SIDEBAR_W - 2);
+    detailBox.height = Math.max(6, screen.height - 4);
+  }
+
   // ─── sidebar content ─────────────────────────────────────────────────────────
   function renderSidebar() {
     const total    = columns.reduce((n, c) => n + (cardsByColumn[c.id]?.length || 0), 0);
@@ -207,8 +227,8 @@ export function openKanban({ columns: initColumns, cardsByColumn: initCards, con
     colBoxes.forEach((b) => b.detach());
     colBoxes.length = 0;
 
-    const availW = screen.width - SIDEBAR_W;
-    const colW   = Math.max(24, Math.floor(availW / Math.max(1, columns.length)));
+    const availW = Math.max(20, screen.width - SIDEBAR_W);
+    const baseColW = Math.max(14, Math.floor(availW / Math.max(1, columns.length)));
 
     columns.forEach((col, ci) => {
       const cards    = cardsByColumn[col.id] || [];
@@ -217,8 +237,10 @@ export function openKanban({ columns: initColumns, cardsByColumn: initCards, con
 
       const box = blessed.box({
         top: 0,
-        left: SIDEBAR_W + ci * colW,
-        width: colW,
+        left: SIDEBAR_W + ci * baseColW,
+        width: ci === columns.length - 1
+          ? Math.max(14, availW - (baseColW * ci))
+          : baseColW,
         height: "100%-1",
         tags: true,
         scrollable: true,
@@ -235,7 +257,7 @@ export function openKanban({ columns: initColumns, cardsByColumn: initCards, con
         padding: { left: 1, right: 1, top: 0, bottom: 0 },
       });
 
-      const innerW = colW - 4;
+      const innerW = Math.max(8, Number(box.width) - 4);
 
       let content = "";
       if (cards.length === 0) {
@@ -373,6 +395,9 @@ export function openKanban({ columns: initColumns, cardsByColumn: initCards, con
   screen.key(["q", "C-c"], () => {
     clearInterval(pollTimer);
     clearTimeout(syncTimer);
+    if (screen.program && typeof screen.program.normalBuffer === "function") {
+      screen.program.normalBuffer();
+    }
     screen.destroy();
     process.exit(0);
   });
@@ -415,10 +440,7 @@ export function openKanban({ columns: initColumns, cardsByColumn: initCards, con
   });
 
   screen.on("resize", () => {
-    if (mode === "detail") {
-      detailBox.width  = screen.width - SIDEBAR_W - 2;
-      detailBox.height = screen.height - 4;
-    }
+    applyLayout();
     refresh();
   });
 
@@ -430,6 +452,7 @@ export function openKanban({ columns: initColumns, cardsByColumn: initCards, con
     screen.render();
   }
 
+  applyLayout();
   refresh();
   schedulePoll();
 }

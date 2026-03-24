@@ -97,24 +97,46 @@ async function setupLinear(config) {
   config.scope = selectedTeam.name;
   config._team_id = teamId;
 
-  // Step 3: Workflow states → pick_from
+  // Step 3: Workflow states (board columns)
   const statesSpinner = ora("Fetching workflow states…").start();
   const states = await linear.getWorkflowStates(config, teamId);
   statesSpinner.stop();
 
-  const { pickFrom } = await inquirer.prompt([
+  const { boardColumns } = await inquirer.prompt([
     {
       type: "checkbox",
-      name: "pickFrom",
-      message: "Which states to show? (pick_from — leave empty for all)",
+      name: "boardColumns",
+      message: "Which states should appear as board columns? (board_columns)",
       choices: states.map((s) => ({ name: s.name, value: s.name })),
+      default: states.map((s) => s.name),
       pageSize: 14,
     },
   ]);
 
+  if (boardColumns.length === 0) {
+    console.log(chalk.red("  Select at least one column state."));
+    process.exit(1);
+  }
+  if (boardColumns.length < states.length) {
+    config.board_columns = boardColumns;
+  }
+
+  const boardStateSet = new Set(boardColumns.map((name) => name.toLowerCase()));
+  const boardStates = states.filter((s) => boardStateSet.has((s.name || "").toLowerCase()));
+
+  // Step 4: Source states for AI
+  const { pickFrom } = await inquirer.prompt([
+    {
+      type: "checkbox",
+      name: "pickFrom",
+      message: "Which states can AI read activities from? (pick_from — leave empty for all)",
+      choices: boardStates.map((s) => ({ name: s.name, value: s.name })),
+      pageSize: 14,
+    },
+  ]);
   if (pickFrom.length > 0) config.pick_from = pickFrom;
 
-  // Step 4: In Progress state
+  // Step 5: In Progress state
   const { inProgress } = await inquirer.prompt([
     {
       type: "list",
@@ -122,13 +144,13 @@ async function setupLinear(config) {
       message: "Which state is 'In Progress'? (in_progress)",
       choices: [
         { name: chalk.gray("(skip)"), value: null },
-        ...states.map((s) => ({ name: s.name, value: s.name })),
+        ...boardStates.map((s) => ({ name: s.name, value: s.name })),
       ],
     },
   ]);
   if (inProgress) config.in_progress = inProgress;
 
-  // Step 5: Done state
+  // Step 6: Done state
   const { done } = await inquirer.prompt([
     {
       type: "list",
@@ -136,13 +158,13 @@ async function setupLinear(config) {
       message: "Which state is 'Done'? (done)",
       choices: [
         { name: chalk.gray("(skip)"), value: null },
-        ...states.map((s) => ({ name: s.name, value: s.name })),
+        ...boardStates.map((s) => ({ name: s.name, value: s.name })),
       ],
     },
   ]);
   if (done) config.done = done;
 
-  // Step 6: Label filter (optional)
+  // Step 7: Label filter (optional)
   const labelsSpinner = ora("Fetching labels…").start();
   const labels = await linear.getLabels(config, teamId);
   labelsSpinner.stop();
