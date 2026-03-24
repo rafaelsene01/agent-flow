@@ -9,7 +9,7 @@ const program = new Command();
 
 program
   .name("hana")
-  .description(chalk.cyan("🌸 Hana · Terminal Kanban for Trello"))
+  .description(chalk.cyan("🌸 Hana · Terminal Kanban for Linear"))
   .version("1.0.0");
 
 program
