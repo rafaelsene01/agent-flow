@@ -95,6 +95,7 @@ export async function getIssues(config, teamId) {
           priority
           url
           dueDate
+          description
           state { id name type }
           assignee { id name displayName }
           labels { nodes { id name color } }
