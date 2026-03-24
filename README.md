@@ -4,85 +4,48 @@ Terminal Kanban board powered by Trello. Inspirado no [lisa](https://github.com/
 
 ---
 
-## Instalação (via Node.js)
+## Instalação global (recomendado)
+
+Igual instalar qualquer ferramenta de linha de comando via npm:
 
 ```bash
+# Dentro da pasta do projeto
 npm install
-node bin/hana.js --help
-# ou instalar globalmente
-npm link
+npm install -g .
+```
+
+Pronto. O comando `hana` fica disponível em qualquer terminal:
+
+```
 hana --help
+hana init
+hana board
+```
+
+### Desinstalar
+
+```bash
+npm uninstall -g hana
 ```
 
 ---
 
-## Build — Binário standalone Linux
-
-Nenhum Node.js necessário na máquina destino após o build.
-
-### Pré-requisitos (apenas quem faz o build)
-
-- Node.js >= 18
-- npm
-
-### Comandos de build
-
-```bash
-npm install
-
-# Linux x64 (padrão)  →  dist/hana
-npm run build
-
-# Linux arm64          →  dist/hana-arm64
-npm run build:arm
-
-# Todos os alvos       →  dist/hana, hana-arm64, hana-macos, hana.exe
-npm run build:all
-```
-
-#### Pipeline interno
-
-```
-bin/hana.js + src/**
-      │
-      ▼
-  esbuild     →  bundle ESM → CJS único (dist/.bundle.cjs)
-      │
-      ▼
-  pkg         →  CJS + Node runtime → binário estático
-      │
-      ▼
-  dist/hana   →  ~40 MB, sem dependências externas
-```
-
-### Usando o binário
-
-```bash
-chmod +x dist/hana
-./dist/hana --help
-
-# mover para o PATH (opcional)
-sudo cp dist/hana /usr/local/bin/hana
-hana --help
-```
-
----
-
-## Configuração
+## Primeira configuração
 
 Rode uma vez por projeto para criar o `.hana.json` local:
 
 ```bash
+cd meu-projeto/
 hana init
 ```
 
 O wizard pergunta:
 
 1. **Provider** → Trello
-2. **API Key** — https://trello.com/app-key
+2. **API Key** — obtenha em: https://trello.com/app-key
 3. **Token** — mesma página, clique em "Token"
 4. **Board** (`scope`) — qual quadro usar
-5. **Listas visíveis** (`pick_from`) — quais colunas aparecem
+5. **Listas visíveis** (`pick_from`) — quais colunas aparecem no kanban
 6. **In Progress** — coluna de trabalho em andamento
 7. **Done** — coluna de concluídos
 8. **Label** — filtro opcional por etiqueta
@@ -144,9 +107,6 @@ hana/
 │   │   └── trello.js          ← API do Trello
 │   └── ui/
 │       └── kanban.js          ← renderer de colunas/cards
-├── scripts/
-│   └── bundle.js              ← pipeline esbuild + pkg
-├── dist/                      ← binários gerados (gitignored)
 ├── .gitignore
 ├── package.json
 └── README.md
