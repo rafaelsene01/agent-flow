@@ -1,25 +1,16 @@
 # 🌸 Hana
 
-Terminal Kanban board powered by Trello. Inspirado no [lisa](https://github.com/tarcisiopgs/lisa).
+Terminal Kanban board powered by Linear. Inspirado no [lisa](https://github.com/tarcisiopgs/lisa).
 
 ---
 
-## Instalação global (recomendado)
-
-Igual instalar qualquer ferramenta de linha de comando via npm:
+## Instalação global
 
 ```bash
-# Dentro da pasta do projeto
 npm install
 npm install -g .
-```
 
-Pronto. O comando `hana` fica disponível em qualquer terminal:
-
-```
 hana --help
-hana init
-hana board
 ```
 
 ### Desinstalar
@@ -41,14 +32,13 @@ hana init
 
 O wizard pergunta:
 
-1. **Provider** → Trello
-2. **API Key** — obtenha em: https://trello.com/app-key
-3. **Token** — mesma página, clique em "Token"
-4. **Board** (`scope`) — qual quadro usar
-5. **Listas visíveis** (`pick_from`) — quais colunas aparecem no kanban
-6. **In Progress** — coluna de trabalho em andamento
-7. **Done** — coluna de concluídos
-8. **Label** — filtro opcional por etiqueta
+1. **Provider** → Linear
+2. **API Key** — obtenha em: https://linear.app/settings/api
+3. **Team** (`scope`) — qual time usar
+4. **States visíveis** (`pick_from`) — quais colunas aparecem no kanban
+5. **In Progress** — estado de trabalho em andamento
+6. **Done** — estado de concluído
+7. **Label** — filtro opcional por etiqueta
 
 > ⚠️ Adicione `.hana.json` ao `.gitignore` — ele contém sua API key.
 
@@ -69,25 +59,24 @@ O wizard pergunta:
 
 ```json
 {
-  "provider": "trello",
-  "api_key": "sua-api-key",
-  "api_token": "seu-token",
-  "scope": "Nome do Board",
-  "_board_id": "id-cacheado",
-  "pick_from": ["To Do", "In Progress", "Done"],
+  "provider": "linear",
+  "api_key": "lin_api_xxxx",
+  "scope": "Nome do Time",
+  "_team_id": "id-cacheado",
+  "pick_from": ["Todo", "In Progress", "Done"],
   "in_progress": "In Progress",
   "done": "Done",
   "label": "sprint-1"
 }
 ```
 
-| Campo         | Descrição                              |
-|---------------|----------------------------------------|
-| `scope`       | Nome do board Trello                   |
-| `pick_from`   | Listas a exibir (omitir = todas)       |
-| `in_progress` | Nome da coluna "Em andamento"          |
-| `done`        | Nome da coluna "Concluído"             |
-| `label`       | Só exibe cards com essa etiqueta       |
+| Campo         | Descrição                                        |
+|---------------|--------------------------------------------------|
+| `scope`       | Nome do time no Linear                           |
+| `pick_from`   | States a exibir como colunas (omitir = todos)    |
+| `in_progress` | Nome do state "Em andamento"                     |
+| `done`        | Nome do state "Concluído"                        |
+| `label`       | Só exibe issues com essa etiqueta                |
 
 ---
 
@@ -104,7 +93,7 @@ hana/
 │   │   ├── board.js           ← busca e renderiza o kanban
 │   │   └── config-show.js     ← exibe config atual
 │   ├── providers/
-│   │   └── trello.js          ← API do Trello
+│   │   └── linear.js          ← API GraphQL do Linear
 │   └── ui/
 │       └── kanban.js          ← renderer de colunas/cards
 ├── .gitignore
