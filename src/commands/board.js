@@ -13,6 +13,7 @@ function mapIssues(issues) {
     priority:        i.priority,
     url:             i.url,
     dueDate:         i.dueDate || null,
+    completedAt:     i.completedAt || null,
     description:     i.description || "",
     assigneeDisplay: i.assignee?.displayName || i.assignee?.name || null,
     rawLabels:       i.labels?.nodes || [],
@@ -46,9 +47,26 @@ export async function fetchBoard(config, teamId) {
     }
   }
 
+  // done_days filter: only apply to the "done" column
+  const doneDays = Number(config.done_days ?? 0);
+  const doneColName = (config.done || "").toLowerCase();
+  const cutoff = doneDays > 0
+    ? new Date(Date.now() - doneDays * 24 * 60 * 60 * 1000)
+    : null;
+
   const cardsByColumn = {};
   for (const state of columns) {
-    cardsByColumn[state.id] = mapIssues(issues.filter((i) => i.state.id === state.id));
+    let cards = mapIssues(issues.filter((i) => i.state.id === state.id));
+
+    // Apply done_days filter only to the configured done column
+    if (cutoff && doneColName && state.name.toLowerCase() === doneColName) {
+      cards = cards.filter((c) => {
+        if (!c.completedAt) return false;
+        return new Date(c.completedAt) >= cutoff;
+      });
+    }
+
+    cardsByColumn[state.id] = cards;
   }
 
   return { columns, cardsByColumn };

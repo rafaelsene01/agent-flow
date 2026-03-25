@@ -660,3 +660,27 @@ select.sf-input option { background: #1c2333; }
 .empty-board h2 { font-size: 20px; font-weight: 600; color: var(--text); }
 .empty-board p  { font-size: 14px; color: var(--text-muted); margin: 0; }
 .empty-board .btn-primary { margin-top: 8px; padding: 10px 24px; font-size: 14px; }
+
+/* ── done days input ───────────────────────────────────────────────────────── */
+.sf-input.sf-input-number {
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
+  flex: 0 0 90px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+.sf-input-number::-webkit-outer-spin-button,
+.sf-input-number::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.sf-unit {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.sf-unit-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
