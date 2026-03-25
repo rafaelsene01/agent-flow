@@ -100,6 +100,7 @@ export default function SettingsModal({ onClose, onSaved }) {
   const [boardColumns, setBoardColumns] = useState([]);
   const [inProgress, setInProgress]     = useState("");
   const [done, setDone]         = useState("");
+  const [doneDays, setDoneDays] = useState("0");
 
   const [labels, setLabels]     = useState([]);
   const [label, setLabel]       = useState("");
@@ -121,6 +122,7 @@ export default function SettingsModal({ onClose, onSaved }) {
         setBoardColumns(c.board_columns || []);
         setInProgress(c.in_progress || "");
         setDone(c.done || "");
+        setDoneDays(String(c.done_days ?? "0"));
         setLabel(c.label || "");
         // if key exists, mark as ok immediately and load downstream
         if (c.api_key) {
@@ -235,6 +237,7 @@ export default function SettingsModal({ onClose, onSaved }) {
         board_columns: boardColumns.length ? boardColumns : undefined,
         in_progress: inProgress || undefined,
         done: done || undefined,
+        done_days: doneDays !== "" && Number(doneDays) > 0 ? Number(doneDays) : undefined,
         label: label || undefined,
       };
       // strip undefined keys
@@ -363,6 +366,41 @@ export default function SettingsModal({ onClose, onSaved }) {
               />
             </Field>
           </div>
+
+          {/* done_days — only visible when a done state is selected */}
+          {done && (
+            <Field
+              label="Dias visíveis no Done"
+              hint={
+                doneDays === "0" || doneDays === ""
+                  ? "Mostrando todos os cards concluídos."
+                  : `Mostrando apenas cards finalizados nos últimos ${doneDays} dia${Number(doneDays) !== 1 ? "s" : ""} (a partir de ${(() => { const d = new Date(); d.setDate(d.getDate() - Number(doneDays)); return d.toLocaleDateString("pt-BR"); })()}).`
+              }
+            >
+              <div className="sf-row">
+                <input
+                  className="sf-input sf-input-number"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={doneDays}
+                  onFocus={() => {
+                    // Limpa sempre que o usuário clicar/entrar no campo.
+                    setDoneDays("");
+                  }}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || (Number.isInteger(Number(v)) && Number(v) >= 0)) setDoneDays(v);
+                  }}
+                  placeholder="0"
+                />
+                <span className="sf-unit">dias</span>
+                {(doneDays === "0" || doneDays === "") && (
+                  <span className="sf-unit-hint">0 = sem filtro</span>
+                )}
+              </div>
+            </Field>
+          )}
 
           {/* label filter */}
           <Field label="Filtro por label" hint="Opcional. Exibe apenas issues com esta etiqueta.">
