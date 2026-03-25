@@ -1,7 +1,7 @@
 {
-  "name": "hana",
+  "name": "hana-board",
   "version": "1.0.0",
-  "description": "🌸 Web Kanban board powered by Linear",
+  "description": "🌸 Terminal Kanban board for Linear — open source, runs locally",
   "main": "bin/hana.js",
   "bin": {
     "hana": "./bin/hana.js"
@@ -10,22 +10,33 @@
   "scripts": {
     "start": "node bin/hana.js",
     "build:web": "vite build --config web/vite.config.js",
-    "dev": "vite --config web/vite.config.js"
+    "dev:web": "vite --config web/vite.config.js",
+    "prepare": "npm run build:web"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "web/dist/",
+    "web/index.html",
+    "web/vite.config.js",
+    "README.md"
+  ],
   "dependencies": {
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "inquirer": "^9.2.23",
     "ora": "^8.0.1",
-    "express": "^5.1.0",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
     "vite": "^7.1.9"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "keywords": ["linear", "kanban", "board", "cli", "productivity"],
+  "license": "MIT"
 }

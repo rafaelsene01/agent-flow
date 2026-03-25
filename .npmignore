@@ -1,0 +1,8 @@
+# source do frontend — só o dist vai para o pacote
+web/src/
+web/node_modules/
+
+# dev
+node_modules/
+.hana.json
+*.log
