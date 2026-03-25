@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import { requireConfig } from "../config.js";
+import { readConfig, getConfigPath } from "../config.js";
 import * as linear from "../providers/linear.js";
 import { startBoardServer } from "../server/board-server.js";
 
-// Mapeia issues brutas do Linear para o formato que o TUI espera
 function mapIssues(issues) {
   return issues.map((i) => ({
     id:              i.id,
@@ -20,13 +19,10 @@ function mapIssues(issues) {
   }));
 }
 
-// Busca todos os dados do board e devolve no formato { columns, cardsByColumn }
 export async function fetchBoard(config, teamId) {
   const boardConfig = {
     ...config,
-    pick_from: config.board_columns && config.board_columns.length > 0
-      ? config.board_columns
-      : config.pick_from,
+    pick_from: config.board_columns?.length ? config.board_columns : config.pick_from,
   };
 
   const [allStates, issues] = await Promise.all([
@@ -34,31 +30,25 @@ export async function fetchBoard(config, teamId) {
     linear.getIssues(boardConfig, teamId),
   ]);
 
-  const selectedStateNames = config.board_columns && config.board_columns.length > 0
-    ? new Set(config.board_columns.map((name) => name.toLowerCase()))
+  const selectedNames = config.board_columns?.length
+    ? new Set(config.board_columns.map((n) => n.toLowerCase()))
     : null;
 
-  // Se houver seleção de colunas no init, mostra apenas essas colunas.
-  // Caso contrário, mantém todos os estados do time.
-  const columns = selectedStateNames
-    ? allStates.filter((state) => selectedStateNames.has((state.name || "").toLowerCase()))
-    : allStates;
+  let columns = selectedNames
+    ? allStates.filter((s) => selectedNames.has(s.name.toLowerCase()))
+    : [...allStates];
 
-  // Mantém a coluna de concluído no fim, quando configurada.
   if (config.done) {
     const doneName = config.done.toLowerCase();
-    const doneIndex = columns.findIndex((state) => (state.name || "").toLowerCase() === doneName);
-    if (doneIndex >= 0 && doneIndex !== columns.length - 1) {
-      const [doneColumn] = columns.splice(doneIndex, 1);
-      columns.push(doneColumn);
+    const idx = columns.findIndex((s) => s.name.toLowerCase() === doneName);
+    if (idx >= 0 && idx !== columns.length - 1) {
+      columns.push(columns.splice(idx, 1)[0]);
     }
   }
 
   const cardsByColumn = {};
   for (const state of columns) {
-    cardsByColumn[state.id] = mapIssues(
-      issues.filter((i) => i.state.id === state.id)
-    );
+    cardsByColumn[state.id] = mapIssues(issues.filter((i) => i.state.id === state.id));
   }
 
   return { columns, cardsByColumn };
@@ -73,41 +63,46 @@ function parsePort(input) {
 }
 
 export async function boardCommand({ port: inputPort } = {}) {
-  const port = parsePort(inputPort);
-  const config = requireConfig();
+  const port       = parsePort(inputPort);
+  const config     = readConfig();     // null if no .hana.json — that's fine
+  const configPath = getConfigPath();
 
-  if (config.provider !== "linear") {
-    console.error(chalk.red(`\n  Provider "${config.provider}" não é suportado.\n`));
-    process.exit(1);
-  }
+  // If config exists, resolve teamId upfront so the first board load is fast.
+  // If no config, the server still starts; the frontend will show the setup modal.
+  let teamId = null;
 
-  const spinner = ora("Conectando ao Linear…").start();
-
-  try {
-    // Resolve team ID
-    let teamId = config._team_id;
-    if (!teamId) {
-      const team = await linear.getTeamByName(config, config.scope);
-      if (!team) {
-        spinner.fail(chalk.red(`Time "${config.scope}" não encontrado.`));
-        process.exit(1);
-      }
-      teamId = team.id;
+  if (config) {
+    if (config.provider && config.provider !== "linear") {
+      console.error(chalk.red(`\n  Provider "${config.provider}" não é suportado.\n`));
+      process.exit(1);
     }
 
-    spinner.text = "Iniciando servidor web…";
-    const { url } = await startBoardServer({
-      config,
-      teamId,
-      fetchBoard,
-      port,
-    });
-    spinner.stop();
-    console.log(chalk.green(`\n  Board disponível em ${url}\n`));
+    teamId = config._team_id;
+    if (!teamId && config.api_key && config.scope) {
+      const spinner = ora("Conectando ao Linear…").start();
+      try {
+        const team = await linear.getTeamByName(config, config.scope);
+        if (team) { teamId = team.id; }
+        spinner.stop();
+      } catch {
+        spinner.stop();
+      }
+    }
+  }
 
+  try {
+    const spinner = ora("Iniciando Hana…").start();
+    const { url } = await startBoardServer({ config, teamId, fetchBoard, port, configPath });
+    spinner.stop();
+
+    console.log(`\n  🌸  ${chalk.bold.cyan("Hana Board")}`);
+    console.log(`  ${chalk.green("►")} ${chalk.underline(url)}\n`);
+
+    if (!config) {
+      console.log(chalk.yellow("  Nenhum .hana.json encontrado — abrindo configuração no browser.\n"));
+    }
   } catch (err) {
-    spinner.fail(chalk.red("Falha ao carregar o board."));
-    console.error(chalk.red("\n  " + err.message + "\n"));
+    console.error(chalk.red("\n  Erro: " + err.message + "\n"));
     process.exit(1);
   }
 }

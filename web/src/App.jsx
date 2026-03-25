@@ -1,47 +1,32 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import SettingsModal from "./SettingsModal.jsx";
 
 const POLL_MS = 30_000;
 
 const PRIORITY_LABEL = { 0: "No priority", 1: "Urgent", 2: "High", 3: "Medium", 4: "Low" };
-const PRIORITY_CLASS = { 0: "p-none", 1: "p-urgent", 2: "p-high", 3: "p-medium", 4: "p-low" };
-
-// Linear state type → accent token
+const PRIORITY_CLASS  = { 0: "p-none", 1: "p-urgent", 2: "p-high", 3: "p-medium", 4: "p-low" };
 const STATE_TYPE_CLASS = {
-  triage:    "st-triage",
-  backlog:   "st-backlog",
-  unstarted: "st-unstarted",
-  started:   "st-started",
-  completed: "st-completed",
-  cancelled: "st-cancelled",
+  triage: "st-triage", backlog: "st-backlog", unstarted: "st-unstarted",
+  started: "st-started", completed: "st-completed", cancelled: "st-cancelled",
 };
-
 const STATE_TYPE_ICON = {
-  triage:    "?",
-  backlog:   "○",
-  unstarted: "◌",
-  started:   "◑",
-  completed: "●",
-  cancelled: "✕",
+  triage: "?", backlog: "○", unstarted: "◌", started: "◑", completed: "●", cancelled: "✕",
 };
 
 function fmtDate(d) {
   if (!d) return null;
-  return new Date(d.includes("T") ? d : `${d}T00:00:00Z`).toLocaleDateString("pt-BR", {
-    day: "2-digit", month: "short",
-  });
+  return new Date(d.includes("T") ? d : `${d}T00:00:00Z`)
+    .toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
-
 function isOverdue(d) {
   if (!d) return false;
   return new Date(d.includes("T") ? d : `${d}T00:00:00Z`) < new Date();
 }
 
-// ── Card ─────────────────────────────────────────────────────────────────────
-function Card({ card, stateType, onClick }) {
-  const pClass = PRIORITY_CLASS[card.priority] ?? "p-none";
-  const due    = card.dueDate;
-  const overdue = isOverdue(due);
-
+// ── Card ──────────────────────────────────────────────────────────────────────
+function Card({ card, onClick }) {
+  const pClass  = PRIORITY_CLASS[card.priority] ?? "p-none";
+  const overdue = isOverdue(card.dueDate);
   return (
     <button className={`card ${pClass}`} type="button" onClick={onClick}>
       <div className="card-top">
@@ -53,18 +38,14 @@ function Card({ card, stateType, onClick }) {
       <p className="card-title">{card.rawTitle || card.title}</p>
       {(card.rawLabels || []).length > 0 && (
         <div className="card-labels">
-          {card.rawLabels.map((l) => (
-            <span key={l.name} className="label-chip">{l.name}</span>
-          ))}
+          {card.rawLabels.map((l) => <span key={l.name} className="label-chip">{l.name}</span>)}
         </div>
       )}
       <div className="card-footer">
-        {card.assigneeDisplay && (
-          <span className="assignee">@{card.assigneeDisplay}</span>
-        )}
-        {due && (
+        {card.assigneeDisplay && <span className="assignee">@{card.assigneeDisplay}</span>}
+        {card.dueDate && (
           <span className={`due ${overdue ? "overdue" : "ok"}`}>
-            {overdue ? "⚠" : "⏰"} {fmtDate(due)}
+            {overdue ? "⚠" : "⏰"} {fmtDate(card.dueDate)}
           </span>
         )}
       </div>
@@ -75,8 +56,7 @@ function Card({ card, stateType, onClick }) {
 // ── Column ────────────────────────────────────────────────────────────────────
 function Column({ column, cards, onCardClick }) {
   const stClass = STATE_TYPE_CLASS[column.type] ?? "st-unstarted";
-  const icon    = STATE_TYPE_ICON[column.type] ?? "○";
-
+  const icon    = STATE_TYPE_ICON[column.type]  ?? "○";
   return (
     <section className={`column ${stClass}`}>
       <header className="col-header">
@@ -85,18 +65,10 @@ function Column({ column, cards, onCardClick }) {
         <span className="col-count">{cards.length}</span>
       </header>
       <div className="col-cards">
-        {cards.length === 0 ? (
-          <p className="col-empty">Nenhuma issue</p>
-        ) : (
-          cards.map((card) => (
-            <Card
-              key={card.id}
-              card={card}
-              stateType={column.type}
-              onClick={() => onCardClick(card, column)}
-            />
-          ))
-        )}
+        {cards.length === 0
+          ? <p className="col-empty">Nenhuma issue</p>
+          : cards.map((c) => <Card key={c.id} card={c} onClick={() => onCardClick(c, column)} />)
+        }
       </div>
     </section>
   );
@@ -105,15 +77,13 @@ function Column({ column, cards, onCardClick }) {
 // ── Detail Modal ──────────────────────────────────────────────────────────────
 function DetailModal({ card, column, onClose }) {
   const pClass  = PRIORITY_CLASS[card.priority] ?? "p-none";
-  const stClass = STATE_TYPE_CLASS[column.type] ?? "st-unstarted";
-  const due     = card.dueDate;
-  const overdue = isOverdue(due);
+  const stClass = STATE_TYPE_CLASS[column.type]  ?? "st-unstarted";
+  const overdue = isOverdue(card.dueDate);
 
-  // Close on Escape
   useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
   return (
@@ -126,11 +96,9 @@ function DetailModal({ card, column, onClose }) {
             </span>
             <span className="modal-id">{card.identifier}</span>
           </div>
-          <button className="modal-close" type="button" onClick={onClose} aria-label="Fechar">✕</button>
+          <button className="modal-close" type="button" onClick={onClose}>✕</button>
         </div>
-
         <h2 className="modal-title">{card.rawTitle || card.title}</h2>
-
         <div className="modal-meta">
           <div className="meta-row">
             <span className="meta-label">Prioridade</span>
@@ -142,17 +110,15 @@ function DetailModal({ card, column, onClose }) {
           </div>
           <div className="meta-row">
             <span className="meta-label">Vencimento</span>
-            <span className={`meta-value ${due ? (overdue ? "overdue" : "ok") : ""}`}>
-              {due ? `${overdue ? "⚠ " : ""}${fmtDate(due)}` : "—"}
+            <span className={`meta-value ${card.dueDate ? (overdue ? "overdue" : "ok") : ""}`}>
+              {card.dueDate ? `${overdue ? "⚠ " : ""}${fmtDate(card.dueDate)}` : "—"}
             </span>
           </div>
           {(card.rawLabels || []).length > 0 && (
             <div className="meta-row">
               <span className="meta-label">Labels</span>
               <div className="card-labels">
-                {card.rawLabels.map((l) => (
-                  <span key={l.name} className="label-chip">{l.name}</span>
-                ))}
+                {card.rawLabels.map((l) => <span key={l.name} className="label-chip">{l.name}</span>)}
               </div>
             </div>
           )}
@@ -163,7 +129,6 @@ function DetailModal({ card, column, onClose }) {
             </a>
           </div>
         </div>
-
         {card.description?.trim() && (
           <div className="modal-description">
             <h3>Descrição</h3>
@@ -175,17 +140,35 @@ function DetailModal({ card, column, onClose }) {
   );
 }
 
+// ── Empty / unconfigured state ────────────────────────────────────────────────
+function EmptyBoard({ onOpenSettings }) {
+  return (
+    <div className="empty-board">
+      <div className="empty-board-inner">
+        <span className="empty-logo">🌸</span>
+        <h2>Bem-vindo ao Hana</h2>
+        <p>Nenhuma configuração encontrada neste diretório.</p>
+        <p>Configure sua API key e escolha um time para começar.</p>
+        <button className="btn-primary" type="button" onClick={onOpenSettings}>
+          Configurar agora
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [data, setData]           = useState({ columns: [], cardsByColumn: {} });
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState("");
-  const [selected, setSelected]   = useState(null); // { card, column }
-  const [lastSync, setLastSync]   = useState(null);
-  const [syncing, setSyncing]     = useState(false);
+  const [data, setData]               = useState({ columns: [], cardsByColumn: {}, unconfigured: false });
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState("");
+  const [selected, setSelected]       = useState(null);
+  const [lastSync, setLastSync]       = useState(null);
+  const [syncing, setSyncing]         = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const totalCards = useMemo(
-    () => Object.values(data.cardsByColumn || {}).reduce((n, arr) => n + arr.length, 0),
+    () => Object.values(data.cardsByColumn || {}).reduce((n, a) => n + a.length, 0),
     [data]
   );
 
@@ -201,6 +184,8 @@ export default function App() {
       setData(payload);
       setError("");
       setLastSync(new Date());
+      // Auto-open settings if server has no config
+      if (payload.unconfigured) setShowSettings(true);
     } catch (err) {
       setError(err.message || "Erro ao carregar board.");
     } finally {
@@ -215,44 +200,56 @@ export default function App() {
     return () => clearInterval(t);
   }, [refresh]);
 
+  const isUnconfigured = data.unconfigured && !loading;
+
   return (
     <div className="app">
-      {/* ── top bar ─────────────────────────────────────────────────────── */}
+      {/* ── top bar ──────────────────────────────────────────────────────── */}
       <header className="topbar">
         <div className="topbar-left">
           <span className="logo">🌸</span>
           <div>
             <h1>Hana Board</h1>
-            <p className="topbar-sub">
-              {data.columns.length} colunas · {totalCards} issues
-            </p>
+            {!isUnconfigured && (
+              <p className="topbar-sub">{data.columns.length} colunas · {totalCards} issues</p>
+            )}
           </div>
         </div>
         <div className="topbar-right">
-          <span className="sync-time">
-            {lastSync ? `Sync ${lastSync.toLocaleTimeString("pt-BR")}` : "—"}
-          </span>
+          {!isUnconfigured && (
+            <>
+              <span className="sync-time">
+                {lastSync ? `Sync ${lastSync.toLocaleTimeString("pt-BR")}` : "—"}
+              </span>
+              <button
+                className={`btn-refresh ${syncing ? "spinning" : ""}`}
+                type="button"
+                onClick={() => refresh(true)}
+                disabled={syncing}
+              >
+                ↻ Atualizar
+              </button>
+            </>
+          )}
           <button
-            className={`btn-refresh ${syncing ? "spinning" : ""}`}
+            className="btn-settings"
             type="button"
-            onClick={() => refresh(true)}
-            disabled={syncing}
+            onClick={() => setShowSettings(true)}
+            title="Configurações"
           >
-            ↻ Atualizar
+            ⚙
           </button>
         </div>
       </header>
 
-      {/* ── error ───────────────────────────────────────────────────────── */}
       {error && <div className="error-bar">{error}</div>}
 
-      {/* ── board ───────────────────────────────────────────────────────── */}
       {loading ? (
         <div className="loader">
-          <span className="loader-dot" />
-          <span className="loader-dot" />
-          <span className="loader-dot" />
+          <span className="loader-dot" /><span className="loader-dot" /><span className="loader-dot" />
         </div>
+      ) : isUnconfigured ? (
+        <EmptyBoard onOpenSettings={() => setShowSettings(true)} />
       ) : (
         <main className="board">
           {data.columns.map((col) => (
@@ -266,12 +263,21 @@ export default function App() {
         </main>
       )}
 
-      {/* ── detail modal ────────────────────────────────────────────────── */}
-      {selected && (
+      {selected && !showSettings && (
         <DetailModal
           card={selected.card}
           column={selected.column}
           onClose={() => setSelected(null)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          onSaved={() => {
+            setShowSettings(false);
+            setTimeout(() => refresh(true), 300);
+          }}
         />
       )}
     </div>
