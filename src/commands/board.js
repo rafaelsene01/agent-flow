@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import ora from "ora";
 import { readConfig, getConfigPath } from "../config.js";
-import * as linear from "../providers/linear.js";
+import * as linear from "../sources/linear.js";
 import { startBoardServer } from "../server/board-server.js";
 
 function mapIssues(issues) {
