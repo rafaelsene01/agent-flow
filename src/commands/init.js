@@ -2,7 +2,7 @@ import inquirer from "inquirer";
 import chalk from "chalk";
 import ora from "ora";
 import { writeConfig, readConfig, getConfigPath } from "../config.js";
-import * as linear from "../providers/linear.js";
+import * as linear from "../sources/linear.js";
 
 export async function initCommand() {
   const existing = readConfig();

@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
+import * as github from "../git/github.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -127,6 +128,18 @@ export async function startBoardServer({ config: initialConfig, teamId: initialT
     if (!api_key || !team_id) return res.status(400).json({ error: "api_key e team_id obrigatórios." });
     try { res.json(await linearLabels(api_key, team_id)); }
     catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // ── /api/git/github/* ────────────────────────────────────────────────────────
+  app.post("/api/git/github/validate", async (req, res) => {
+    const { token } = req.body || {};
+    if (!token) return res.status(400).json({ error: "token obrigatório." });
+    try {
+      const user = await github.validateToken(token);
+      res.json({ ok: true, login: user.login, name: user.name, avatar_url: user.avatar_url });
+    } catch {
+      res.status(401).json({ ok: false, error: "Token inválido." });
+    }
   });
 
   // ── static + SPA ─────────────────────────────────────────────────────────────

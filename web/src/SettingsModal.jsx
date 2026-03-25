@@ -105,6 +105,13 @@ export default function SettingsModal({ onClose, onSaved }) {
   const [labels, setLabels]     = useState([]);
   const [label, setLabel]       = useState("");
 
+  // git state
+  const [gitProvider, setGitProvider]   = useState("");   // "" | "github"
+  const [githubToken, setGithubToken]   = useState("");
+  const [githubStatus, setGithubStatus] = useState(null); // null | loading | ok | error
+  const [githubUser, setGithubUser]     = useState("");
+  const githubDebounce = useRef(null);
+
   const [saving, setSaving]     = useState(false);
   const [saveMsg, setSaveMsg]   = useState("");
 
@@ -124,6 +131,12 @@ export default function SettingsModal({ onClose, onSaved }) {
         setDone(c.done || "");
         setDoneDays(String(c.done_days ?? "0"));
         setLabel(c.label || "");
+        setGitProvider(c.git_provider || "");
+        setGithubToken(c.git_github_token || "");
+        if (c.git_github_token) {
+          setGithubStatus("ok");
+          setGithubUser(c.git_github_user || "");
+        }
         // if key exists, mark as ok immediately and load downstream
         if (c.api_key) {
           setKeyStatus("ok");
@@ -170,6 +183,31 @@ export default function SettingsModal({ onClose, onSaved }) {
   }
 
   // ── load teams ─────────────────────────────────────────────────────────────
+  // ── validate github token (debounced) ────────────────────────────────────
+  useEffect(() => {
+    if (gitProvider !== "github") { setGithubStatus(null); setGithubUser(""); return; }
+    if (!githubToken) { setGithubStatus(null); setGithubUser(""); return; }
+    clearTimeout(githubDebounce.current);
+    githubDebounce.current = setTimeout(() => validateGithubToken(githubToken), 700);
+    return () => clearTimeout(githubDebounce.current);
+  }, [githubToken, gitProvider]);
+
+  async function validateGithubToken(token) {
+    setGithubStatus("loading");
+    setGithubUser("");
+    try {
+      const r = await api("/api/git/github/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      setGithubStatus("ok");
+      setGithubUser(r.name ? `${r.name} (@${r.login})` : `@${r.login}`);
+    } catch {
+      setGithubStatus("error");
+    }
+  }
+
   async function loadTeams(key, currentTeamId) {
     setTeamsStatus("loading");
     try {
@@ -239,6 +277,9 @@ export default function SettingsModal({ onClose, onSaved }) {
         done: done || undefined,
         done_days: doneDays !== "" && Number(doneDays) > 0 ? Number(doneDays) : undefined,
         label: label || undefined,
+        git_provider: gitProvider || undefined,
+        git_github_token: gitProvider === "github" && githubToken ? githubToken : undefined,
+        git_github_user: gitProvider === "github" && githubUser ? githubUser : undefined,
       };
       // strip undefined keys
       Object.keys(next).forEach((k) => next[k] === undefined && delete next[k]);
@@ -287,7 +328,42 @@ export default function SettingsModal({ onClose, onSaved }) {
 
         <div className="sf-body">
 
-          {/* provider */}
+          {/* ── Git ──────────────────────────────────────────────────────── */}
+          <div className="sf-section-title">Git</div>
+
+          <Field label="Provedor Git" hint="Opcional. Conecte um repositório ao board.">
+            <Select
+              value={gitProvider}
+              onChange={(v) => { setGitProvider(v); setGithubToken(""); setGithubStatus(null); setGithubUser(""); }}
+              options={[{ value: "github", label: "GitHub" }]}
+              placeholder="(nenhum)"
+            />
+          </Field>
+
+          {gitProvider === "github" && (
+            <Field
+              label="GitHub Token"
+              hint="Crie em github.com/settings/tokens — permissão repo."
+            >
+              <div className="sf-row">
+                <Input
+                  type="password"
+                  value={githubToken}
+                  onChange={setGithubToken}
+                  placeholder="ghp_xxxxxxxxxxxx"
+                  monospace
+                />
+                <StatusChip status={githubStatus} />
+              </div>
+              {githubStatus === "ok"    && <p className="sf-hint ok">{githubUser}</p>}
+              {githubStatus === "error" && <p className="sf-hint err">Token inválido</p>}
+            </Field>
+          )}
+
+          {/* ── Source ───────────────────────────────────────────────────── */}
+          <div className="sf-section-title">Source</div>
+
+          {/* source */}
           <Field label="Provider">
             <Select
               value={provider}
