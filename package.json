@@ -9,7 +9,8 @@
   "type": "module",
   "scripts": {
     "start": "node bin/hana.js",
-    "build:web": "vite build --config web/vite.config.js"
+    "build:web": "vite build --config web/vite.config.js",
+    "dev": "vite --config web/vite.config.js"
   },
   "dependencies": {
     "chalk": "^5.3.0",

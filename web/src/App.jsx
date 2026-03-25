@@ -1,160 +1,279 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const POLL_MS = 30_000;
 
-function formatDueDate(dateString) {
-  if (!dateString) return "—";
-  const dt = new Date(dateString.includes("T") ? dateString : `${dateString}T00:00:00Z`);
-  return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+const PRIORITY_LABEL = { 0: "No priority", 1: "Urgent", 2: "High", 3: "Medium", 4: "Low" };
+const PRIORITY_CLASS = { 0: "p-none", 1: "p-urgent", 2: "p-high", 3: "p-medium", 4: "p-low" };
+
+// Linear state type → accent token
+const STATE_TYPE_CLASS = {
+  triage:    "st-triage",
+  backlog:   "st-backlog",
+  unstarted: "st-unstarted",
+  started:   "st-started",
+  completed: "st-completed",
+  cancelled: "st-cancelled",
+};
+
+const STATE_TYPE_ICON = {
+  triage:    "?",
+  backlog:   "○",
+  unstarted: "◌",
+  started:   "◑",
+  completed: "●",
+  cancelled: "✕",
+};
+
+function fmtDate(d) {
+  if (!d) return null;
+  return new Date(d.includes("T") ? d : `${d}T00:00:00Z`).toLocaleDateString("pt-BR", {
+    day: "2-digit", month: "short",
+  });
 }
 
-function isOverdue(dateString) {
-  if (!dateString) return false;
-  const dt = new Date(dateString.includes("T") ? dateString : `${dateString}T00:00:00Z`);
-  return dt < new Date();
+function isOverdue(d) {
+  if (!d) return false;
+  return new Date(d.includes("T") ? d : `${d}T00:00:00Z`) < new Date();
 }
 
+// ── Card ─────────────────────────────────────────────────────────────────────
+function Card({ card, stateType, onClick }) {
+  const pClass = PRIORITY_CLASS[card.priority] ?? "p-none";
+  const due    = card.dueDate;
+  const overdue = isOverdue(due);
+
+  return (
+    <button className={`card ${pClass}`} type="button" onClick={onClick}>
+      <div className="card-top">
+        <span className="card-id">{card.identifier}</span>
+        {card.priority != null && (
+          <span className={`priority-badge ${pClass}`}>{PRIORITY_LABEL[card.priority]}</span>
+        )}
+      </div>
+      <p className="card-title">{card.rawTitle || card.title}</p>
+      {(card.rawLabels || []).length > 0 && (
+        <div className="card-labels">
+          {card.rawLabels.map((l) => (
+            <span key={l.name} className="label-chip">{l.name}</span>
+          ))}
+        </div>
+      )}
+      <div className="card-footer">
+        {card.assigneeDisplay && (
+          <span className="assignee">@{card.assigneeDisplay}</span>
+        )}
+        {due && (
+          <span className={`due ${overdue ? "overdue" : "ok"}`}>
+            {overdue ? "⚠" : "⏰"} {fmtDate(due)}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+// ── Column ────────────────────────────────────────────────────────────────────
+function Column({ column, cards, onCardClick }) {
+  const stClass = STATE_TYPE_CLASS[column.type] ?? "st-unstarted";
+  const icon    = STATE_TYPE_ICON[column.type] ?? "○";
+
+  return (
+    <section className={`column ${stClass}`}>
+      <header className="col-header">
+        <span className="col-icon">{icon}</span>
+        <h2 className="col-name">{column.name}</h2>
+        <span className="col-count">{cards.length}</span>
+      </header>
+      <div className="col-cards">
+        {cards.length === 0 ? (
+          <p className="col-empty">Nenhuma issue</p>
+        ) : (
+          cards.map((card) => (
+            <Card
+              key={card.id}
+              card={card}
+              stateType={column.type}
+              onClick={() => onCardClick(card, column)}
+            />
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ── Detail Modal ──────────────────────────────────────────────────────────────
+function DetailModal({ card, column, onClose }) {
+  const pClass  = PRIORITY_CLASS[card.priority] ?? "p-none";
+  const stClass = STATE_TYPE_CLASS[column.type] ?? "st-unstarted";
+  const due     = card.dueDate;
+  const overdue = isOverdue(due);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div className="backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-id-row">
+            <span className={`modal-state-chip ${stClass}`}>
+              {STATE_TYPE_ICON[column.type]} {column.name}
+            </span>
+            <span className="modal-id">{card.identifier}</span>
+          </div>
+          <button className="modal-close" type="button" onClick={onClose} aria-label="Fechar">✕</button>
+        </div>
+
+        <h2 className="modal-title">{card.rawTitle || card.title}</h2>
+
+        <div className="modal-meta">
+          <div className="meta-row">
+            <span className="meta-label">Prioridade</span>
+            <span className={`priority-badge ${pClass}`}>{PRIORITY_LABEL[card.priority] ?? "—"}</span>
+          </div>
+          <div className="meta-row">
+            <span className="meta-label">Assignee</span>
+            <span className="meta-value">{card.assigneeDisplay ? `@${card.assigneeDisplay}` : "—"}</span>
+          </div>
+          <div className="meta-row">
+            <span className="meta-label">Vencimento</span>
+            <span className={`meta-value ${due ? (overdue ? "overdue" : "ok") : ""}`}>
+              {due ? `${overdue ? "⚠ " : ""}${fmtDate(due)}` : "—"}
+            </span>
+          </div>
+          {(card.rawLabels || []).length > 0 && (
+            <div className="meta-row">
+              <span className="meta-label">Labels</span>
+              <div className="card-labels">
+                {card.rawLabels.map((l) => (
+                  <span key={l.name} className="label-chip">{l.name}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="meta-row">
+            <span className="meta-label">URL</span>
+            <a className="meta-link" href={card.url} target="_blank" rel="noreferrer">
+              Abrir no Linear ↗
+            </a>
+          </div>
+        </div>
+
+        {card.description?.trim() && (
+          <div className="modal-description">
+            <h3>Descrição</h3>
+            <pre>{card.description.trim()}</pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [data, setData] = useState({ columns: [], cardsByColumn: {} });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [selectedCard, setSelectedCard] = useState(null);
-  const [lastSync, setLastSync] = useState(null);
+  const [data, setData]           = useState({ columns: [], cardsByColumn: {} });
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState("");
+  const [selected, setSelected]   = useState(null); // { card, column }
+  const [lastSync, setLastSync]   = useState(null);
+  const [syncing, setSyncing]     = useState(false);
 
   const totalCards = useMemo(
-    () => Object.values(data.cardsByColumn || {}).reduce((acc, cards) => acc + cards.length, 0),
+    () => Object.values(data.cardsByColumn || {}).reduce((n, arr) => n + arr.length, 0),
     [data]
   );
 
-  async function refreshBoard() {
+  const refresh = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setSyncing(true);
     try {
-      const response = await fetch("/api/board");
-      const contentType = response.headers.get("content-type") || "";
-
-      if (!contentType.includes("application/json")) {
-        const body = await response.text();
-        const preview = body.slice(0, 120).replace(/\s+/g, " ").trim();
-        throw new Error(
-          `Resposta inválida da API (esperado JSON). Prévia: ${preview || "(vazio)"}`
-        );
+      const res = await fetch("/api/board");
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `HTTP ${res.status}`);
       }
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.error || "Falha ao carregar board.");
-      }
+      const payload = await res.json();
       setData(payload);
       setError("");
       setLastSync(new Date());
-    } catch (fetchError) {
-      setError(fetchError.message || "Erro inesperado.");
+    } catch (err) {
+      setError(err.message || "Erro ao carregar board.");
     } finally {
       setLoading(false);
+      setSyncing(false);
     }
-  }
-
-  useEffect(() => {
-    refreshBoard();
-    const timer = setInterval(refreshBoard, POLL_MS);
-    return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    refresh(true);
+    const t = setInterval(() => refresh(false), POLL_MS);
+    return () => clearInterval(t);
+  }, [refresh]);
+
   return (
-    <div className="page">
+    <div className="app">
+      {/* ── top bar ─────────────────────────────────────────────────────── */}
       <header className="topbar">
-        <div>
-          <h1>Hana Board</h1>
-          <p>
-            {data.columns.length} colunas · {totalCards} issues
-          </p>
+        <div className="topbar-left">
+          <span className="logo">🌸</span>
+          <div>
+            <h1>Hana Board</h1>
+            <p className="topbar-sub">
+              {data.columns.length} colunas · {totalCards} issues
+            </p>
+          </div>
         </div>
-        <div className="actions">
-          <button onClick={refreshBoard} type="button">
-            Atualizar
+        <div className="topbar-right">
+          <span className="sync-time">
+            {lastSync ? `Sync ${lastSync.toLocaleTimeString("pt-BR")}` : "—"}
+          </span>
+          <button
+            className={`btn-refresh ${syncing ? "spinning" : ""}`}
+            type="button"
+            onClick={() => refresh(true)}
+            disabled={syncing}
+          >
+            ↻ Atualizar
           </button>
-          <span>Sync: {lastSync ? lastSync.toLocaleTimeString("pt-BR") : "—"}</span>
         </div>
       </header>
 
-      {error ? <div className="error">{error}</div> : null}
+      {/* ── error ───────────────────────────────────────────────────────── */}
+      {error && <div className="error-bar">{error}</div>}
 
+      {/* ── board ───────────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="loading">Carregando board...</div>
+        <div className="loader">
+          <span className="loader-dot" />
+          <span className="loader-dot" />
+          <span className="loader-dot" />
+        </div>
       ) : (
         <main className="board">
-          {data.columns.map((column) => {
-            const cards = data.cardsByColumn[column.id] || [];
-            return (
-              <section key={column.id} className="column">
-                <header className="columnHeader">
-                  <h2>{column.name}</h2>
-                  <span>{cards.length}</span>
-                </header>
-                <div className="cards">
-                  {cards.length === 0 ? (
-                    <p className="empty">(vazio)</p>
-                  ) : (
-                    cards.map((card) => (
-                      <button
-                        key={card.id}
-                        className="card"
-                        type="button"
-                        onClick={() => setSelectedCard({ ...card, stateName: column.name })}
-                      >
-                        <strong>{card.title}</strong>
-                        <small>{card.identifier}</small>
-                        {card.assigneeDisplay ? <small>@{card.assigneeDisplay}</small> : null}
-                        {card.dueDate ? (
-                          <small className={isOverdue(card.dueDate) ? "overdue" : "ok"}>
-                            Vence: {formatDueDate(card.dueDate)}
-                          </small>
-                        ) : null}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </section>
-            );
-          })}
+          {data.columns.map((col) => (
+            <Column
+              key={col.id}
+              column={col}
+              cards={data.cardsByColumn[col.id] || []}
+              onCardClick={(card, column) => setSelected({ card, column })}
+            />
+          ))}
         </main>
       )}
 
-      {selectedCard ? (
-        <div className="modalBackdrop" onClick={() => setSelectedCard(null)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <div className="modalHeader">
-              <h3>
-                {selectedCard.identifier} · {selectedCard.title}
-              </h3>
-              <button type="button" onClick={() => setSelectedCard(null)}>
-                Fechar
-              </button>
-            </div>
-            <p>
-              <strong>Estado:</strong> {selectedCard.stateName}
-            </p>
-            <p>
-              <strong>Prioridade:</strong> {selectedCard.priority ?? "—"}
-            </p>
-            <p>
-              <strong>Assignee:</strong> {selectedCard.assigneeDisplay || "não atribuído"}
-            </p>
-            <p>
-              <strong>Vencimento:</strong> {formatDueDate(selectedCard.dueDate)}
-            </p>
-            <p>
-              <strong>URL:</strong>{" "}
-              <a href={selectedCard.url} target="_blank" rel="noreferrer">
-                abrir issue
-              </a>
-            </p>
-            <div className="description">
-              <strong>Descrição</strong>
-              <p>{selectedCard.description?.trim() || "(sem descrição)"}</p>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* ── detail modal ────────────────────────────────────────────────── */}
+      {selected && (
+        <DetailModal
+          card={selected.card}
+          column={selected.column}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
