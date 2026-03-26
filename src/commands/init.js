@@ -24,7 +24,6 @@ export async function initCommand() {
     }
   }
 
-  // Provider — only Linear for now
   const { provider } = await inquirer.prompt([
     {
       type: "list",
@@ -64,7 +63,6 @@ async function setupLinear(config, existingConfig = null) {
 
   config.api_key = api_key.trim();
 
-  // Validate
   const spinner = ora("Validating credentials…").start();
   const valid = await linear.validateCredentials(config);
   if (!valid) {
@@ -74,7 +72,6 @@ async function setupLinear(config, existingConfig = null) {
   const member = await linear.getMemberInfo(config);
   spinner.succeed(chalk.green(`Connected as ${chalk.bold(member.name)} (${member.email})`));
 
-  // Step 2: Pick team (scope)
   const teamsSpinner = ora("Fetching teams…").start();
   const teams = await linear.getTeams(config);
   teamsSpinner.stop();
@@ -98,7 +95,6 @@ async function setupLinear(config, existingConfig = null) {
   config.scope = selectedTeam.name;
   config._team_id = teamId;
 
-  // Step 3: Workflow states (board columns)
   const statesSpinner = ora("Fetching workflow states…").start();
   const states = await linear.getWorkflowStates(config, teamId);
   statesSpinner.stop();
@@ -125,7 +121,6 @@ async function setupLinear(config, existingConfig = null) {
   const boardStateSet = new Set(boardColumns.map((name) => name.toLowerCase()));
   const boardStates = states.filter((s) => boardStateSet.has((s.name || "").toLowerCase()));
 
-  // Step 4: Source states for AI
   const { pickFrom } = await inquirer.prompt([
     {
       type: "checkbox",
@@ -137,7 +132,6 @@ async function setupLinear(config, existingConfig = null) {
   ]);
   if (pickFrom.length > 0) config.pick_from = pickFrom;
 
-  // Step 5: In Progress state
   const { inProgress } = await inquirer.prompt([
     {
       type: "list",
@@ -151,7 +145,6 @@ async function setupLinear(config, existingConfig = null) {
   ]);
   if (inProgress) config.in_progress = inProgress;
 
-  // Step 6: Done state
   const { done } = await inquirer.prompt([
     {
       type: "list",
@@ -165,7 +158,6 @@ async function setupLinear(config, existingConfig = null) {
   ]);
   if (done) config.done = done;
 
-  // Step 7: Label filter (optional)
   const labelsSpinner = ora("Fetching labels…").start();
   const labels = await linear.getLabels(config, teamId);
   labelsSpinner.stop();

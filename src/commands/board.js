@@ -47,7 +47,6 @@ export async function fetchBoard(config, teamId) {
     }
   }
 
-  // done_days filter: only apply to the "done" column
   const doneDays = Number(config.done_days ?? 0);
   const doneColName = (config.done || "").toLowerCase();
   const cutoff = doneDays > 0
@@ -58,7 +57,6 @@ export async function fetchBoard(config, teamId) {
   for (const state of columns) {
     let cards = mapIssues(issues.filter((i) => i.state.id === state.id));
 
-    // Apply done_days filter only to the configured done column
     if (cutoff && doneColName && state.name.toLowerCase() === doneColName) {
       cards = cards.filter((c) => {
         if (!c.completedAt) return false;
@@ -82,11 +80,9 @@ function parsePort(input) {
 
 export async function boardCommand({ port: inputPort } = {}) {
   const port       = parsePort(inputPort);
-  const config     = readConfig();     // null if no .hana.json — that's fine
+  const config     = readConfig();
   const configPath = getConfigPath();
 
-  // If config exists, resolve teamId upfront so the first board load is fast.
-  // If no config, the server still starts; the frontend will show the setup modal.
   let teamId = null;
 
   if (config) {
