@@ -113,3 +113,18 @@ export async function getTeamByName(config, name) {
   const teams = await getTeams(config);
   return teams.find((t) => t.name.toLowerCase() === name.toLowerCase()) || null;
 }
+
+export async function updateIssueState(config, issueId, stateId) {
+  const data = await query(
+    config.api_key,
+    `mutation($issueId: String!, $stateId: String!) {
+      issueUpdate(id: $issueId, input: { stateId: $stateId }) {
+        success
+        issue { id state { id name type } }
+      }
+    }`,
+    { issueId, stateId }
+  );
+  if (!data.issueUpdate.success) throw new Error("Falha ao atualizar o estado da issue.");
+  return data.issueUpdate.issue;
+}

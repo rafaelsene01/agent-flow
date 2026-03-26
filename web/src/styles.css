@@ -696,3 +696,37 @@ select.sf-input option { background: #1c2333; }
   border-bottom: 1px solid var(--border2);
   margin-bottom: -4px;
 }
+
+.btn-move {
+  margin-top: 6px;
+  width: 100%;
+  padding: 5px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--c-started);
+  background: transparent;
+  color: var(--c-started);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  text-align: center;
+}
+.btn-move:hover:not(:disabled) {
+  background: var(--c-started);
+  color: #000;
+}
+.btn-move:disabled,
+.btn-move.moving {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.col-act-badge {
+  font-size: 11px;
+  color: var(--c-started);
+  background: #0e2420;
+  border: 1px solid #1a4840;
+  border-radius: 20px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}

@@ -23,7 +23,7 @@ function isOverdue(d) {
   return new Date(d.includes("T") ? d : `${d}T00:00:00Z`) < new Date();
 }
 
-function Card({ card, onClick }) {
+function Card({ card, onClick, onMove, moving }) {
   const pClass  = PRIORITY_CLASS[card.priority] ?? "p-none";
   const overdue = isOverdue(card.dueDate);
   return (
@@ -48,24 +48,68 @@ function Card({ card, onClick }) {
           </span>
         )}
       </div>
+      {onMove && (
+        <button
+          className={`btn-move ${moving ? "moving" : ""}`}
+          type="button"
+          disabled={moving}
+          onClick={(e) => { e.stopPropagation(); onMove(card.id); }}
+        >
+          {moving ? "Movendo…" : "▶ Iniciar"}
+        </button>
+      )}
     </button>
   );
 }
 
-function Column({ column, cards, onCardClick }) {
-  const stClass = STATE_TYPE_CLASS[column.type] ?? "st-unstarted";
-  const icon    = STATE_TYPE_ICON[column.type]  ?? "○";
+function Column({ column, cards, onCardClick, actOnColumn, inProgressName, onMoved }) {
+  const stClass   = STATE_TYPE_CLASS[column.type] ?? "st-unstarted";
+  const icon      = STATE_TYPE_ICON[column.type]  ?? "○";
+  const isActOn   = actOnColumn && column.name.toLowerCase() === actOnColumn.toLowerCase();
+  const [movingId, setMovingId] = useState(null);
+
+  async function handleMove(issueId) {
+    setMovingId(issueId);
+    try {
+      const res = await fetch("/api/board/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issueId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao mover card.");
+      onMoved?.();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setMovingId(null);
+    }
+  }
+
   return (
     <section className={`column ${stClass}`}>
       <header className="col-header">
         <span className="col-icon">{icon}</span>
         <h2 className="col-name">{column.name}</h2>
         <span className="col-count">{cards.length}</span>
+        {isActOn && inProgressName && (
+          <span className="col-act-badge" title={`Clique em "Iniciar" para mover para ${inProgressName}`}>
+            → {inProgressName}
+          </span>
+        )}
       </header>
       <div className="col-cards">
         {cards.length === 0
           ? <p className="col-empty">Nenhuma issue</p>
-          : cards.map((c) => <Card key={c.id} card={c} onClick={() => onCardClick(c, column)} />)
+          : cards.map((c) => (
+              <Card
+                key={c.id}
+                card={c}
+                onClick={() => onCardClick(c, column)}
+                onMove={isActOn ? handleMove : null}
+                moving={movingId === c.id}
+              />
+            ))
         }
       </div>
     </section>
@@ -161,6 +205,8 @@ export default function App() {
   const [lastSync, setLastSync]       = useState(null);
   const [syncing, setSyncing]         = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [actOnColumn, setActOnColumn] = useState("");
+  const [inProgressName, setInProgressName] = useState("");
 
   const totalCards = useMemo(
     () => Object.values(data.cardsByColumn || {}).reduce((n, a) => n + a.length, 0),
@@ -179,6 +225,12 @@ export default function App() {
       setData(payload);
       setError("");
       setLastSync(new Date());
+
+      const cfg = await fetch("/api/config").then(r => r.json()).catch(() => null);
+      if (cfg) {
+        setActOnColumn(cfg.act_on || "");
+        setInProgressName(cfg.in_progress || "");
+      }
 
       if (payload.unconfigured) setShowSettings(true);
     } catch (err) {
@@ -199,6 +251,7 @@ export default function App() {
 
   return (
     <div className="app">
+      {}
       <header className="topbar">
         <div className="topbar-left">
           <span className="logo">🌸</span>
@@ -252,6 +305,9 @@ export default function App() {
               column={col}
               cards={data.cardsByColumn[col.id] || []}
               onCardClick={(card, column) => setSelected({ card, column })}
+              actOnColumn={actOnColumn}
+              inProgressName={inProgressName}
+              onMoved={() => refresh(false)}
             />
           ))}
         </main>
