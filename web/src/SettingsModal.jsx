@@ -94,6 +94,7 @@ export default function SettingsModal({ onClose, onSaved }) {
   const [statesStatus, setStatesStatus] = useState(null);
   const [boardColumns, setBoardColumns] = useState([]);
   const [inProgress, setInProgress]     = useState("");
+  const [actOn, setActOn]               = useState("");
   const [done, setDone]         = useState("");
   const [doneDays, setDoneDays] = useState("0");
 
@@ -121,6 +122,7 @@ export default function SettingsModal({ onClose, onSaved }) {
         setTeamName(c.scope || "");
         setBoardColumns(c.board_columns || []);
         setInProgress(c.in_progress || "");
+        setActOn(c.act_on || "");
         setDone(c.done || "");
         setDoneDays(String(c.done_days ?? "0"));
         setLabel(c.label || "");
@@ -219,6 +221,7 @@ export default function SettingsModal({ onClose, onSaved }) {
     setTeamName(t?.name || "");
     setBoardColumns([]);
     setInProgress("");
+    setActOn("");
     setDone("");
     setLabel("");
     setStates([]);
@@ -261,6 +264,7 @@ export default function SettingsModal({ onClose, onSaved }) {
         _team_id: teamId,
         board_columns: boardColumns.length ? boardColumns : undefined,
         in_progress: inProgress || undefined,
+        act_on: actOn || undefined,
         done: done || undefined,
         done_days: doneDays !== "" && Number(doneDays) > 0 ? Number(doneDays) : undefined,
         label: label || undefined,
@@ -418,6 +422,23 @@ export default function SettingsModal({ onClose, onSaved }) {
               />
             </Field>
           </div>
+
+          <Field
+            label="Coluna de ação"
+            hint={
+              actOn && inProgress
+                ? `Cards em "${actOn}" terão um botão para mover para "${inProgress}".`
+                : "Coluna cujos cards terão o botão de mover para In Progress."
+            }
+          >
+            <Select
+              value={actOn}
+              onChange={setActOn}
+              options={namedOptions}
+              disabled={namedOptions.length === 0 || !inProgress}
+              placeholder={!inProgress ? "Configure In Progress primeiro" : "(nenhum)"}
+            />
+          </Field>
 
           {done && (
             <Field

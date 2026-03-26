@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
 import * as github from "../git/github.js";
+import * as linear from "../sources/linear.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -84,6 +85,23 @@ export async function startBoardServer({ config: initialConfig, teamId: initialT
     }
     try {
       res.json(await fetchBoard(liveConfig, liveTeamId));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/board/move", async (req, res) => {
+    const { issueId } = req.body || {};
+    if (!issueId) return res.status(400).json({ error: "issueId obrigatório." });
+    if (!liveConfig?.in_progress) return res.status(400).json({ error: "in_progress não configurado." });
+
+    try {
+      const states = await linear.getWorkflowStates(liveConfig, liveTeamId);
+      const target = states.find((s) => s.name.toLowerCase() === liveConfig.in_progress.toLowerCase());
+      if (!target) return res.status(404).json({ error: `Estado "${liveConfig.in_progress}" não encontrado.` });
+
+      const updated = await linear.updateIssueState(liveConfig, issueId, target.id);
+      res.json({ ok: true, issue: updated });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
