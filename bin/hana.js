@@ -31,7 +31,6 @@ program
   .description("Show the current config")
   .action(configShowCommand);
 
-// Default: if no command given, open board
 if (process.argv.length === 2) {
   boardCommand({ port: "5522" });
 } else {

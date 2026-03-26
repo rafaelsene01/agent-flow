@@ -73,7 +73,7 @@ export async function getLabels(config, teamId) {
 }
 
 export async function getIssues(config, teamId) {
-  // Build filter
+
   const filter = { team: { id: { eq: teamId } } };
 
   if (config.pick_from && config.pick_from.length > 0) {

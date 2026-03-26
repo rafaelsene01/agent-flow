@@ -7,13 +7,9 @@ import * as github from "../git/github.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-// web/dist is pre-built and shipped inside the npm package.
-// Path: <package-root>/web/dist  (this file is at <package-root>/src/server/)
 const WEB_DIST_DIR = path.resolve(__dirname, "../../web/dist");
 
 const LINEAR_GQL = "https://api.linear.app/graphql";
-
-// ── Linear helpers ────────────────────────────────────────────────────────────
 
 async function linearQuery(apiKey, gql, variables = {}) {
   const res = await fetch(LINEAR_GQL, {
@@ -50,7 +46,6 @@ async function linearLabels(apiKey, teamId) {
   return d.issueLabels.nodes;
 }
 
-// ── server ────────────────────────────────────────────────────────────────────
 
 export async function startBoardServer({ config: initialConfig, teamId: initialTeamId, fetchBoard, port, configPath }) {
   if (!fs.existsSync(WEB_DIST_DIR)) {
@@ -60,14 +55,12 @@ export async function startBoardServer({ config: initialConfig, teamId: initialT
     );
   }
 
-  // mutable live state — updated when /api/config is POSTed
   let liveConfig = initialConfig ? { ...initialConfig } : null;
   let liveTeamId = initialTeamId ?? null;
 
   const app = express();
   app.use(express.json());
 
-  // ── /api/config ─────────────────────────────────────────────────────────────
   app.get("/api/config", (_req, res) => {
     res.json(liveConfig ?? null);
   });
@@ -85,7 +78,6 @@ export async function startBoardServer({ config: initialConfig, teamId: initialT
     }
   });
 
-  // ── /api/board ───────────────────────────────────────────────────────────────
   app.get("/api/board", async (_req, res) => {
     if (!liveConfig || !liveTeamId) {
       return res.status(200).json({ columns: [], cardsByColumn: {}, unconfigured: true });
@@ -97,7 +89,6 @@ export async function startBoardServer({ config: initialConfig, teamId: initialT
     }
   });
 
-  // ── /api/linear/* ────────────────────────────────────────────────────────────
   app.post("/api/linear/validate", async (req, res) => {
     const { api_key } = req.body || {};
     if (!api_key) return res.status(400).json({ error: "api_key obrigatório." });
@@ -130,7 +121,6 @@ export async function startBoardServer({ config: initialConfig, teamId: initialT
     catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  // ── /api/git/github/* ────────────────────────────────────────────────────────
   app.post("/api/git/github/validate", async (req, res) => {
     const { token } = req.body || {};
     if (!token) return res.status(400).json({ error: "token obrigatório." });
@@ -142,11 +132,9 @@ export async function startBoardServer({ config: initialConfig, teamId: initialT
     }
   });
 
-  // ── static + SPA ─────────────────────────────────────────────────────────────
   app.use(express.static(WEB_DIST_DIR));
   app.use((_req, res) => res.sendFile(path.join(WEB_DIST_DIR, "index.html")));
 
-  // ── listen ────────────────────────────────────────────────────────────────────
   const host = "localhost";
   const server = await new Promise((resolve, reject) => {
     const s = app.listen(port, host, () => resolve(s));

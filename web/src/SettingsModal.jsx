@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// ── tiny helpers ──────────────────────────────────────────────────────────────
-
 function api(url, opts) {
   return fetch(url, opts).then(async (r) => {
     const ct = r.headers.get("content-type") || "";
@@ -77,17 +75,14 @@ function StatusChip({ status }) {
   return <span className={`sf-chip ${cls}`}>{icon}</span>;
 }
 
-// ── main ──────────────────────────────────────────────────────────────────────
-
 export default function SettingsModal({ onClose, onSaved }) {
-  // raw config
+
   const [cfg, setCfg]           = useState(null);
   const [loadErr, setLoadErr]   = useState("");
 
-  // field state
   const [provider, setProvider] = useState("linear");
   const [apiKey, setApiKey]     = useState("");
-  const [keyStatus, setKeyStatus] = useState(null); // null | loading | ok | error
+  const [keyStatus, setKeyStatus] = useState(null);
   const [keyUser, setKeyUser]   = useState("");
 
   const [teams, setTeams]       = useState([]);
@@ -105,10 +100,9 @@ export default function SettingsModal({ onClose, onSaved }) {
   const [labels, setLabels]     = useState([]);
   const [label, setLabel]       = useState("");
 
-  // git state
-  const [gitProvider, setGitProvider]   = useState("");   // "" | "github"
+  const [gitProvider, setGitProvider]   = useState("");
   const [githubToken, setGithubToken]   = useState("");
-  const [githubStatus, setGithubStatus] = useState(null); // null | loading | ok | error
+  const [githubStatus, setGithubStatus] = useState(null);
   const [githubUser, setGithubUser]     = useState("");
   const githubDebounce = useRef(null);
 
@@ -117,7 +111,6 @@ export default function SettingsModal({ onClose, onSaved }) {
 
   const keyDebounce = useRef(null);
 
-  // ── load current config ────────────────────────────────────────────────────
   useEffect(() => {
     api("/api/config")
       .then((c) => {
@@ -137,7 +130,7 @@ export default function SettingsModal({ onClose, onSaved }) {
           setGithubStatus("ok");
           setGithubUser(c.git_github_user || "");
         }
-        // if key exists, mark as ok immediately and load downstream
+
         if (c.api_key) {
           setKeyStatus("ok");
           setKeyUser(c.scope ? `Team: ${c.scope}` : "");
@@ -146,17 +139,15 @@ export default function SettingsModal({ onClose, onSaved }) {
       .catch((e) => setLoadErr(e.message));
   }, []);
 
-  // when we have key + teamId from config, load states & labels
   useEffect(() => {
     if (apiKey && teamId && keyStatus === "ok") {
       loadTeams(apiKey, teamId);
       loadStates(apiKey, teamId);
       loadLabels(apiKey, teamId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once after config loads
 
-  // ── validate key (debounced on change) ────────────────────────────────────
+  }, []);
+
   useEffect(() => {
     if (!apiKey) { setKeyStatus(null); setKeyUser(""); setTeams([]); setStates([]); setLabels([]); return; }
     clearTimeout(keyDebounce.current);
@@ -182,8 +173,6 @@ export default function SettingsModal({ onClose, onSaved }) {
     }
   }
 
-  // ── load teams ─────────────────────────────────────────────────────────────
-  // ── validate github token (debounced) ────────────────────────────────────
   useEffect(() => {
     if (gitProvider !== "github") { setGithubStatus(null); setGithubUser(""); return; }
     if (!githubToken) { setGithubStatus(null); setGithubUser(""); return; }
@@ -214,7 +203,7 @@ export default function SettingsModal({ onClose, onSaved }) {
       const list = await api(`/api/linear/teams?api_key=${encodeURIComponent(key)}`);
       setTeams(list);
       setTeamsStatus("ok");
-      // auto-select if already configured
+
       if (currentTeamId && list.find((t) => t.id === currentTeamId)) {
         loadStates(key, currentTeamId);
         loadLabels(key, currentTeamId);
@@ -224,7 +213,6 @@ export default function SettingsModal({ onClose, onSaved }) {
     }
   }
 
-  // ── team selected ──────────────────────────────────────────────────────────
   function handleTeamChange(id) {
     const t = teams.find((t) => t.id === id);
     setTeamId(id);
@@ -261,7 +249,6 @@ export default function SettingsModal({ onClose, onSaved }) {
     }
   }
 
-  // ── save ───────────────────────────────────────────────────────────────────
   async function handleSave() {
     setSaving(true);
     setSaveMsg("");
@@ -281,7 +268,7 @@ export default function SettingsModal({ onClose, onSaved }) {
         git_github_token: gitProvider === "github" && githubToken ? githubToken : undefined,
         git_github_user: gitProvider === "github" && githubUser ? githubUser : undefined,
       };
-      // strip undefined keys
+
       Object.keys(next).forEach((k) => next[k] === undefined && delete next[k]);
       await api("/api/config", {
         method: "POST",
@@ -297,25 +284,21 @@ export default function SettingsModal({ onClose, onSaved }) {
     }
   }
 
-  // ── close on Escape ────────────────────────────────────────────────────────
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
-  // ── derived ────────────────────────────────────────────────────────────────
   const stateOptions = states.map((s) => ({ value: s.name, label: s.name, type: s.type }));
   const namedStates  = states.filter((s) => boardColumns.includes(s.name));
   const namedOptions = namedStates.map((s) => ({ value: s.name, label: s.name }));
   const canSave      = keyStatus === "ok" && !!teamId && !saving;
 
-  // ── render ─────────────────────────────────────────────────────────────────
   return (
     <div className="backdrop" onClick={onClose}>
       <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
 
-        {/* header */}
         <div className="modal-header">
           <div className="modal-id-row">
             <span className="settings-icon">⚙</span>
@@ -328,7 +311,6 @@ export default function SettingsModal({ onClose, onSaved }) {
 
         <div className="sf-body">
 
-          {/* ── Git ──────────────────────────────────────────────────────── */}
           <div className="sf-section-title">Git</div>
 
           <Field label="Provedor Git" hint="Opcional. Conecte um repositório ao board.">
@@ -360,10 +342,8 @@ export default function SettingsModal({ onClose, onSaved }) {
             </Field>
           )}
 
-          {/* ── Source ───────────────────────────────────────────────────── */}
           <div className="sf-section-title">Source</div>
 
-          {/* source */}
           <Field label="Provider">
             <Select
               value={provider}
@@ -372,7 +352,6 @@ export default function SettingsModal({ onClose, onSaved }) {
             />
           </Field>
 
-          {/* api key */}
           <Field
             label="API Key"
             hint={provider === "linear" ? "Obtenha em linear.app/settings/api" : undefined}
@@ -391,7 +370,6 @@ export default function SettingsModal({ onClose, onSaved }) {
             {keyStatus === "error" && <p className="sf-hint err">API key inválida</p>}
           </Field>
 
-          {/* team */}
           <Field label="Time (scope)">
             <div className="sf-row">
               <Select
@@ -405,7 +383,6 @@ export default function SettingsModal({ onClose, onSaved }) {
             </div>
           </Field>
 
-          {/* board columns */}
           <Field
             label="Colunas do board"
             hint="Quais estados aparecem como colunas. Deixe vazio para exibir todos."
@@ -421,7 +398,6 @@ export default function SettingsModal({ onClose, onSaved }) {
             </div>
           </Field>
 
-          {/* in progress + done — only among selected columns */}
           <div className="sf-two-col">
             <Field label="Estado 'In Progress'">
               <Select
@@ -443,7 +419,6 @@ export default function SettingsModal({ onClose, onSaved }) {
             </Field>
           </div>
 
-          {/* done_days — only visible when a done state is selected */}
           {done && (
             <Field
               label="Dias visíveis no Done"
@@ -461,7 +436,7 @@ export default function SettingsModal({ onClose, onSaved }) {
                   step="1"
                   value={doneDays}
                   onFocus={() => {
-                    // Limpa sempre que o usuário clicar/entrar no campo.
+
                     setDoneDays("");
                   }}
                   onChange={(e) => {
@@ -478,7 +453,6 @@ export default function SettingsModal({ onClose, onSaved }) {
             </Field>
           )}
 
-          {/* label filter */}
           <Field label="Filtro por label" hint="Opcional. Exibe apenas issues com esta etiqueta.">
             <Select
               value={label}
@@ -489,9 +463,8 @@ export default function SettingsModal({ onClose, onSaved }) {
             />
           </Field>
 
-        </div>{/* /sf-body */}
+        </div>{}
 
-        {/* footer */}
         <div className="sf-footer">
           {saveMsg && (
             <p className={`sf-save-msg ${saveMsg.startsWith("✓") ? "ok" : "err"}`}>{saveMsg}</p>

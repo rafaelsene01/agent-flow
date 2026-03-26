@@ -17,20 +17,10 @@ async function request(path, token) {
   return res.json();
 }
 
-/**
- * Validates the token and returns the authenticated user info.
- * @param {string} token
- * @returns {{ login: string, name: string, avatar_url: string }}
- */
 export async function validateToken(token) {
   return request("/user", token);
 }
 
-/**
- * Returns the list of repositories the authenticated user has access to.
- * @param {string} token
- * @returns {Array<{ id: number, full_name: string, private: boolean }>}
- */
 export async function getRepositories(token) {
   return request("/user/repos?per_page=100&sort=updated", token);
 }

@@ -23,7 +23,6 @@ function isOverdue(d) {
   return new Date(d.includes("T") ? d : `${d}T00:00:00Z`) < new Date();
 }
 
-// ── Card ──────────────────────────────────────────────────────────────────────
 function Card({ card, onClick }) {
   const pClass  = PRIORITY_CLASS[card.priority] ?? "p-none";
   const overdue = isOverdue(card.dueDate);
@@ -53,7 +52,6 @@ function Card({ card, onClick }) {
   );
 }
 
-// ── Column ────────────────────────────────────────────────────────────────────
 function Column({ column, cards, onCardClick }) {
   const stClass = STATE_TYPE_CLASS[column.type] ?? "st-unstarted";
   const icon    = STATE_TYPE_ICON[column.type]  ?? "○";
@@ -74,7 +72,6 @@ function Column({ column, cards, onCardClick }) {
   );
 }
 
-// ── Detail Modal ──────────────────────────────────────────────────────────────
 function DetailModal({ card, column, onClose }) {
   const pClass  = PRIORITY_CLASS[card.priority] ?? "p-none";
   const stClass = STATE_TYPE_CLASS[column.type]  ?? "st-unstarted";
@@ -140,7 +137,6 @@ function DetailModal({ card, column, onClose }) {
   );
 }
 
-// ── Empty / unconfigured state ────────────────────────────────────────────────
 function EmptyBoard({ onOpenSettings }) {
   return (
     <div className="empty-board">
@@ -157,7 +153,6 @@ function EmptyBoard({ onOpenSettings }) {
   );
 }
 
-// ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const [data, setData]               = useState({ columns: [], cardsByColumn: {}, unconfigured: false });
   const [loading, setLoading]         = useState(true);
@@ -184,7 +179,7 @@ export default function App() {
       setData(payload);
       setError("");
       setLastSync(new Date());
-      // Auto-open settings if server has no config
+
       if (payload.unconfigured) setShowSettings(true);
     } catch (err) {
       setError(err.message || "Erro ao carregar board.");
@@ -204,7 +199,6 @@ export default function App() {
 
   return (
     <div className="app">
-      {/* ── top bar ──────────────────────────────────────────────────────── */}
       <header className="topbar">
         <div className="topbar-left">
           <span className="logo">🌸</span>
