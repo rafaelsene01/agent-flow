@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import express from "express";
 import * as github from "../git/github.js";
 import * as linear from "../sources/linear.js";
+import * as opencode from "../providers/opencode.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -147,6 +148,24 @@ export async function startBoardServer({ config: initialConfig, teamId: initialT
       res.json({ ok: true, login: user.login, name: user.name, avatar_url: user.avatar_url });
     } catch {
       res.status(401).json({ ok: false, error: "Token inválido." });
+    }
+  });
+
+  app.get("/api/providers/status", (_req, res) => {
+    const installed = opencode.isInstalled();
+    const version   = installed ? opencode.getVersion() : null;
+    const providers = installed ? opencode.getAllProviders() : [];
+    res.json({ installed, version, providers });
+  });
+
+  app.get("/api/providers/opencode/models", async (req, res) => {
+    const { provider_id, api_key } = req.query;
+    if (!provider_id) return res.status(400).json({ error: "provider_id obrigatório." });
+    try {
+      const models = await opencode.fetchModels(provider_id, api_key || "");
+      res.json(models);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
   });
 

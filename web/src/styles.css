@@ -730,3 +730,41 @@ select.sf-input option { background: #1c2333; }
   padding: 1px 8px;
   white-space: nowrap;
 }
+
+.sf-not-installed {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  background: #1f1a0a;
+  border: 1px solid #3d2e0a;
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.sf-not-installed-icon {
+  font-size: 16px;
+  color: var(--c-high);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.sf-not-installed p { margin: 0; line-height: 1.5; }
+
+.sf-installed-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.sf-installed-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--c-completed);
+  flex-shrink: 0;
+}
+.sf-version {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: "JetBrains Mono", monospace;
+}

@@ -107,6 +107,15 @@ export default function SettingsModal({ onClose, onSaved }) {
   const [githubUser, setGithubUser]     = useState("");
   const githubDebounce = useRef(null);
 
+  const [aiInstalled, setAiInstalled]   = useState(null);
+  const [aiVersion, setAiVersion]       = useState("");
+  const [aiProviders, setAiProviders]   = useState([]);
+  const [aiSelected, setAiSelected]     = useState("");
+  const [aiKeys, setAiKeys]             = useState({});
+  const [aiModels, setAiModels]         = useState({});
+  const [aiModelsLoading, setAiModelsLoading] = useState({});
+  const [aiChosenModel, setAiChosenModel] = useState("");
+
   const [saving, setSaving]     = useState(false);
   const [saveMsg, setSaveMsg]   = useState("");
 
@@ -115,6 +124,7 @@ export default function SettingsModal({ onClose, onSaved }) {
   useEffect(() => {
     api("/api/config")
       .then((c) => {
+        if (!c) return;
         setCfg(c);
         setProvider(c.provider || "linear");
         setApiKey(c.api_key || "");
@@ -132,13 +142,28 @@ export default function SettingsModal({ onClose, onSaved }) {
           setGithubStatus("ok");
           setGithubUser(c.git_github_user || "");
         }
-
+        setAiSelected(c.ai_provider || "");
+        setAiChosenModel(c.ai_model || "");
+        if (c.ai_keys) setAiKeys(c.ai_keys);
         if (c.api_key) {
           setKeyStatus("ok");
           setKeyUser(c.scope ? `Team: ${c.scope}` : "");
         }
       })
       .catch((e) => setLoadErr(e.message));
+
+    api("/api/providers/status")
+      .then((s) => {
+        setAiInstalled(s.installed);
+        setAiVersion(s.version || "");
+        setAiProviders(s.providers || []);
+        if (s.providers) {
+          const fromInstall = {};
+          s.providers.forEach((p) => { if (p.storedKey) fromInstall[p.id] = p.storedKey; });
+          setAiKeys((prev) => ({ ...fromInstall, ...prev }));
+        }
+      })
+      .catch(() => setAiInstalled(false));
   }, []);
 
   useEffect(() => {
@@ -196,6 +221,39 @@ export default function SettingsModal({ onClose, onSaved }) {
       setGithubUser(r.name ? `${r.name} (@${r.login})` : `@${r.login}`);
     } catch {
       setGithubStatus("error");
+    }
+  }
+
+  async function loadModels(providerId, apiKey) {
+    if (!providerId) return;
+    setAiModelsLoading((prev) => ({ ...prev, [providerId]: true }));
+    try {
+      const params = new URLSearchParams({ provider_id: providerId });
+      if (apiKey) params.set("api_key", apiKey);
+      const models = await api(`/api/providers/opencode/models?${params}`);
+      setAiModels((prev) => ({ ...prev, [providerId]: models }));
+    } catch {
+      setAiModels((prev) => ({ ...prev, [providerId]: [] }));
+    } finally {
+      setAiModelsLoading((prev) => ({ ...prev, [providerId]: false }));
+    }
+  }
+
+  function handleAiKeyChange(providerId, value) {
+    setAiKeys((prev) => ({ ...prev, [providerId]: value }));
+    if (aiChosenModel && aiSelected === providerId) setAiChosenModel("");
+    clearTimeout(handleAiKeyChange._t?.[providerId]);
+    if (!handleAiKeyChange._t) handleAiKeyChange._t = {};
+    handleAiKeyChange._t[providerId] = setTimeout(() => {
+      if (value) loadModels(providerId, value);
+    }, 800);
+  }
+
+  function handleProviderSelect(providerId) {
+    setAiSelected(providerId);
+    setAiChosenModel("");
+    if (providerId && !aiModels[providerId]) {
+      loadModels(providerId, aiKeys[providerId] || "");
     }
   }
 
@@ -271,6 +329,9 @@ export default function SettingsModal({ onClose, onSaved }) {
         git_provider: gitProvider || undefined,
         git_github_token: gitProvider === "github" && githubToken ? githubToken : undefined,
         git_github_user: gitProvider === "github" && githubUser ? githubUser : undefined,
+        ai_provider: aiSelected || undefined,
+        ai_model: aiChosenModel || undefined,
+        ai_keys: Object.keys(aiKeys).length ? aiKeys : undefined,
       };
 
       Object.keys(next).forEach((k) => next[k] === undefined && delete next[k]);
@@ -483,6 +544,98 @@ export default function SettingsModal({ onClose, onSaved }) {
               placeholder="(sem filtro)"
             />
           </Field>
+
+          <div className="sf-section-title">Providers (IA)</div>
+
+          {aiInstalled === null && (
+            <p className="sf-hint">Verificando OpenCode…</p>
+          )}
+
+          {aiInstalled === false && (
+            <div className="sf-not-installed">
+              <span className="sf-not-installed-icon">⚠</span>
+              <div>
+                <p>OpenCode não encontrado no sistema.</p>
+                <p>Instale em <a href="https://opencode.ai" target="_blank" rel="noreferrer" className="meta-link">opencode.ai</a> para habilitar IA no board.</p>
+              </div>
+            </div>
+          )}
+
+          {aiInstalled === true && (
+            <>
+              <div className="sf-installed-badge">
+                <span className="sf-installed-dot" />
+                OpenCode instalado {aiVersion && <span className="sf-version">{aiVersion}</span>}
+              </div>
+
+              <Field label="Provider de IA" hint="Selecione o provider que o OpenCode usará.">
+                <Select
+                  value={aiSelected}
+                  onChange={handleProviderSelect}
+                  options={aiProviders.map((p) => ({
+                    value: p.id,
+                    label: p.hasKey ? `${p.name} ✓` : p.name,
+                  }))}
+                  placeholder="(selecione)"
+                />
+              </Field>
+
+              {aiSelected && (() => {
+                const prov = aiProviders.find((p) => p.id === aiSelected);
+                if (!prov) return null;
+                const key    = aiKeys[aiSelected] || "";
+                const models = aiModels[aiSelected] || [];
+                const loading = aiModelsLoading[aiSelected];
+                const needsKey = prov.keyEnv !== null;
+
+                return (
+                  <>
+                    {needsKey && (
+                      <Field
+                        label={`API Key — ${prov.name}`}
+                        hint={prov.keyEnv ? `Variável de ambiente: ${prov.keyEnv}` : undefined}
+                      >
+                        <div className="sf-row">
+                          <Input
+                            type="password"
+                            value={key}
+                            onChange={(v) => handleAiKeyChange(aiSelected, v)}
+                            placeholder="sk-…"
+                            monospace
+                          />
+                          {loading && <StatusChip status="loading" />}
+                          {!loading && models.length > 0 && <StatusChip status="ok" />}
+                        </div>
+                      </Field>
+                    )}
+
+                    {(models.length > 0 || loading) && (
+                      <Field label="Modelo">
+                        <Select
+                          value={aiChosenModel}
+                          onChange={setAiChosenModel}
+                          options={models.map((m) => ({ value: m.id, label: m.name || m.id }))}
+                          disabled={loading || models.length === 0}
+                          placeholder={loading ? "Carregando modelos…" : "Selecione um modelo"}
+                        />
+                      </Field>
+                    )}
+
+                    {!needsKey && models.length > 0 && (
+                      <Field label="Modelo">
+                        <Select
+                          value={aiChosenModel}
+                          onChange={setAiChosenModel}
+                          options={models.map((m) => ({ value: m.id, label: m.name || m.id }))}
+                          placeholder="Selecione um modelo"
+                        />
+                      </Field>
+                    )}
+                  </>
+                );
+              })()}
+            </>
+          )}
 
         </div>{}
 
