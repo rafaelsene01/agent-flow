@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Header from "../components/Header.jsx";
-import SettingsModal from "../components/SettingsModal.jsx";
+import Header from "@/components/Header.jsx";
+import SettingsModal from "@/components/SettingsModal.jsx";
 
 export default function App() {
   const [initializing, setInitializing] = useState(true);

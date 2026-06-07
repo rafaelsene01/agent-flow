@@ -25,3 +25,4 @@ Ponto de entrada: `bin/agent-flow.js` → inicia o Express via `api/server.js`.
 |--------|---------|--------------|
 | Servidor | `api/server.js` | [docs/server.md](docs/server.md) |
 | Arquitetura | — | [docs/architecture.md](docs/architecture.md) |
+| Frontend (Next.js) | `web/` | [docs/web.md](docs/web.md) |
