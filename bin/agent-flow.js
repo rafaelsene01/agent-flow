@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 import chalk from "chalk";
+import { createRequire } from "module";
 import { startServer } from "../api/server.js";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
 
 const args = process.argv.slice(2);
 
 if (args.includes("--version") || args.includes("-v")) {
-  console.log("1.0.0");
+  console.log(version);
   process.exit(0);
 }
 
