@@ -424,6 +424,29 @@ body { background: var(--bg); color: var(--text); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
 
+/* ── init board button ─────────────────────────────────────────────────────── */
+.btn-init-board {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--accent);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.btn-init-board:hover { background: var(--accent); color: #000; }
+
+.btn-init-board-home {
+  width: auto; height: auto;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 22px;
+  margin-top: 8px;
+  gap: 6px;
+}
+
 /* ── settings button ───────────────────────────────────────────────────────── */
 .btn-settings {
   display: flex; align-items: center; justify-content: center;
