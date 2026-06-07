@@ -1,53 +1,85 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execSync } from "child_process";
 import express from "express";
 import * as github from "../git/github.js";
 import * as linear from "../sources/linear.js";
-import * as opencode from "../providers/opencode.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-const WEB_DIST_DIR = path.resolve(__dirname, "../../web/dist");
+const WEB_DIST_DIR = path.resolve(__dirname, "../../web/out");
 
-const LINEAR_GQL = "https://api.linear.app/graphql";
+async function getGithubStatus() {
+  // 1. Env token
+  const envToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  if (envToken) {
+    try {
+      const user = await github.validateToken(envToken);
+      return { connected: true, method: "env", user: user.login, name: user.name };
+    } catch {
+      return { connected: false, method: "env", error: "Token inválido" };
+    }
+  }
 
-async function linearQuery(apiKey, gql, variables = {}) {
-  const res = await fetch(LINEAR_GQL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: apiKey },
-    body: JSON.stringify({ query: gql, variables }),
-  });
-  if (!res.ok) throw new Error(`Linear HTTP ${res.status}`);
-  const json = await res.json();
-  if (json.errors) throw new Error(json.errors[0].message);
-  return json.data;
+  // 2. gh CLI
+  let ghInstalled = false;
+  try {
+    execSync("gh --version", { stdio: "pipe", timeout: 3000 });
+    ghInstalled = true;
+  } catch {}
+
+  if (ghInstalled) {
+    try {
+      const out = execSync("gh api user", { stdio: "pipe", encoding: "utf-8", timeout: 8000 });
+      const user = JSON.parse(out);
+      return { connected: true, method: "gh-cli", user: user.login, name: user.name };
+    } catch {
+      return { connected: false, ghInstalled: true, error: "Não autenticado" };
+    }
+  }
+
+  // 3. SSH key for github.com
+  try {
+    const out = execSync(
+      "ssh -T -o StrictHostKeyChecking=no -o BatchMode=yes git@github.com",
+      { stdio: "pipe", encoding: "utf-8", timeout: 8000 }
+    );
+    const match = (out || "").match(/Hi (.+?)!/);
+    if (match) return { connected: true, method: "ssh", user: match[1] };
+  } catch (err) {
+    // ssh returns exit code 1 even on success ("Hi user! You've authenticated...")
+    const stderr = err.stderr?.toString() || "";
+    const match = stderr.match(/Hi (.+?)!/);
+    if (match) return { connected: true, method: "ssh", user: match[1] };
+  }
+
+  return { connected: false, ghInstalled: false };
 }
 
-async function linearViewer(apiKey) {
-  const d = await linearQuery(apiKey, `{ viewer { id name email } }`);
-  return d.viewer;
+async function getClaudeStatus() {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (apiKey) {
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/models", {
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      });
+      if (res.ok) return { connected: true, method: "env" };
+      return { connected: false, method: "env", error: "API key inválida" };
+    } catch {
+      return { connected: false, method: "env", error: "Sem conexão com Anthropic" };
+    }
+  }
+  try {
+    const version = execSync("claude --version", {
+      stdio: "pipe", encoding: "utf-8", timeout: 5000,
+    }).trim();
+    return { connected: true, method: "claude-cli", version };
+  } catch {
+    return { connected: false };
+  }
 }
-async function linearTeams(apiKey) {
-  const d = await linearQuery(apiKey, `{ teams { nodes { id name key } } }`);
-  return d.teams.nodes;
-}
-async function linearStates(apiKey, teamId) {
-  const d = await linearQuery(apiKey,
-    `query($t: ID!) { workflowStates(filter:{team:{id:{eq:$t}}}){ nodes{id name type position} } }`,
-    { t: teamId }
-  );
-  return d.workflowStates.nodes.sort((a, b) => a.position - b.position);
-}
-async function linearLabels(apiKey, teamId) {
-  const d = await linearQuery(apiKey,
-    `query($t: ID!) { issueLabels(filter:{team:{id:{eq:$t}}}){ nodes{id name color} } }`,
-    { t: teamId }
-  );
-  return d.issueLabels.nodes;
-}
-
 
 export async function startBoardServer({ config: initialConfig, teamId: initialTeamId, fetchBoard, port, configPath }) {
   if (!fs.existsSync(WEB_DIST_DIR)) {
@@ -108,62 +140,13 @@ export async function startBoardServer({ config: initialConfig, teamId: initialT
     }
   });
 
-  app.post("/api/linear/validate", async (req, res) => {
-    const { api_key } = req.body || {};
-    if (!api_key) return res.status(400).json({ error: "api_key obrigatório." });
+  app.get("/api/status", async (_req, res) => {
     try {
-      const viewer = await linearViewer(api_key);
-      res.json({ ok: true, name: viewer.name, email: viewer.email });
-    } catch {
-      res.status(401).json({ ok: false, error: "API key inválida." });
-    }
-  });
-
-  app.get("/api/linear/teams", async (req, res) => {
-    const { api_key } = req.query;
-    if (!api_key) return res.status(400).json({ error: "api_key obrigatório." });
-    try { res.json(await linearTeams(api_key)); }
-    catch (err) { res.status(500).json({ error: err.message }); }
-  });
-
-  app.get("/api/linear/states", async (req, res) => {
-    const { api_key, team_id } = req.query;
-    if (!api_key || !team_id) return res.status(400).json({ error: "api_key e team_id obrigatórios." });
-    try { res.json(await linearStates(api_key, team_id)); }
-    catch (err) { res.status(500).json({ error: err.message }); }
-  });
-
-  app.get("/api/linear/labels", async (req, res) => {
-    const { api_key, team_id } = req.query;
-    if (!api_key || !team_id) return res.status(400).json({ error: "api_key e team_id obrigatórios." });
-    try { res.json(await linearLabels(api_key, team_id)); }
-    catch (err) { res.status(500).json({ error: err.message }); }
-  });
-
-  app.post("/api/git/github/validate", async (req, res) => {
-    const { token } = req.body || {};
-    if (!token) return res.status(400).json({ error: "token obrigatório." });
-    try {
-      const user = await github.validateToken(token);
-      res.json({ ok: true, login: user.login, name: user.name, avatar_url: user.avatar_url });
-    } catch {
-      res.status(401).json({ ok: false, error: "Token inválido." });
-    }
-  });
-
-  app.get("/api/providers/status", (_req, res) => {
-    const installed = opencode.isInstalled();
-    const version   = installed ? opencode.getVersion() : null;
-    const providers = installed ? opencode.getAllProviders() : [];
-    res.json({ installed, version, providers });
-  });
-
-  app.get("/api/providers/opencode/models", async (req, res) => {
-    const { provider_id, api_key } = req.query;
-    if (!provider_id) return res.status(400).json({ error: "provider_id obrigatório." });
-    try {
-      const models = await opencode.fetchModels(provider_id, api_key || "");
-      res.json(models);
+      const [githubStatus, claudeStatus] = await Promise.all([
+        getGithubStatus(),
+        getClaudeStatus(),
+      ]);
+      res.json({ platform: process.platform, github: githubStatus, claude: claudeStatus });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

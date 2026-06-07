@@ -9,16 +9,14 @@
   "type": "module",
   "scripts": {
     "start": "node bin/hana.js",
-    "build:web": "vite build --config web/vite.config.js",
-    "dev:web": "vite --config web/vite.config.js",
-    "prepare": "npm run build:web"
+    "build:web": "npm run build --prefix web",
+    "dev:web": "npm run dev --prefix web",
+    "prepare": "npm install --prefix web && npm run build --prefix web"
   },
   "files": [
     "bin/",
     "src/",
-    "web/dist/",
-    "web/index.html",
-    "web/vite.config.js",
+    "web/out/",
     "README.md"
   ],
   "dependencies": {
@@ -27,12 +25,6 @@
     "inquirer": "^9.2.23",
     "ora": "^8.0.1",
     "express": "^5.1.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^5.0.4",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "vite": "^7.1.9"
   },
   "engines": {
     "node": ">=18.0.0"

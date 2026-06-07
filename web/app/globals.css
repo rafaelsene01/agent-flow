@@ -659,7 +659,31 @@ select.sf-input option { background: #1c2333; }
 .empty-logo     { font-size: 48px; line-height: 1; }
 .empty-board h2 { font-size: 20px; font-weight: 600; color: var(--text); }
 .empty-board p  { font-size: 14px; color: var(--text-muted); margin: 0; }
-.empty-board .btn-primary { margin-top: 8px; padding: 10px 24px; font-size: 14px; }
+.empty-cmd {
+  display: inline-block;
+  margin-top: 4px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 13px;
+  padding: 6px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--accent);
+}
+
+/* ── init screen ───────────────────────────────────────────────────────────── */
+.init-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 16px;
+  background: var(--bg);
+}
+.init-logo { font-size: 48px; line-height: 1; }
+.init-msg  { font-size: 13px; color: var(--text-muted); }
+.init-screen .loader { flex: 0; padding: 0; }
 
 /* ── done days input ───────────────────────────────────────────────────────── */
 .sf-input.sf-input-number {
@@ -768,3 +792,132 @@ select.sf-input option { background: #1c2333; }
   color: var(--text-faint);
   font-family: "JetBrains Mono", monospace;
 }
+
+/* ── integration cards (settings modal) ───────────────────────────────────── */
+.intg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+}
+
+.intg-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.intg-logo {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+}
+.intg-logo.ok  { background: #0e2018; border-color: #1a4030; color: var(--c-completed); }
+.intg-logo.err { background: #200e0e; border-color: #401a1a; color: var(--c-cancelled); }
+
+.intg-body { flex: 1; min-width: 0; }
+
+.intg-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.intg-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.intg-status.ok  { color: var(--c-completed); }
+.intg-status.err { color: var(--c-cancelled); }
+
+.intg-detail {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.intg-badge {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+.intg-badge.badge-ok      { background: #0d2a1a; color: #3fb950; border: 1px solid #1a4830; }
+.intg-badge.badge-err     { background: #2a0d0d; color: #f85149; border: 1px solid #481a1a; }
+.intg-badge.badge-loading { background: var(--surface2); color: var(--text-muted); animation: pulse 1s infinite; }
+
+.intg-lock-msg {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 4px 20px 0;
+}
+
+/* ── command blocks ─────────────────────────────────────────────────────────── */
+.cmd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border2);
+}
+
+.cmd-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cmd-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.cmd-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cmd-code {
+  flex: 1;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 12px;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.cmd-copy {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.cmd-copy:hover  { color: var(--accent); border-color: var(--accent); }
+.cmd-copy.copied { color: var(--c-completed); border-color: var(--c-completed); }
