@@ -190,7 +190,7 @@ function EmptyBoard() {
         <span className="empty-logo">🌸</span>
         <h2>Sem configuração</h2>
         <p>Execute no diretório do projeto:</p>
-        <code className="empty-cmd">hana init</code>
+        <code className="empty-cmd">agent-flow init</code>
       </div>
     </div>
   );
@@ -278,7 +278,7 @@ export default function App() {
         <div className="topbar-left">
           <span className="logo">🌸</span>
           <div>
-            <h1>Hana Board</h1>
+            <h1>Agent Flow Board</h1>
             {!isUnconfigured && (
               <p className="topbar-sub">{data.columns.length} colunas · {totalCards} issues</p>
             )}

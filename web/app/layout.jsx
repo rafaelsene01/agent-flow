@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Hana Board",
+  title: "Agent Flow Board",
   description: "🌸 Web Kanban for Linear",
 };
 
