@@ -2,13 +2,12 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
-import configRoutes from "./routes/config.js";
 import statusRoutes from "./routes/status.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST_DIR = path.resolve(__dirname, "../web/out");
 
-export async function startServer({ config: initialConfig, port, configPath }) {
+export async function startServer({ port }) {
   if (!fs.existsSync(WEB_DIST_DIR)) {
     throw new Error(
       `Frontend não encontrado em ${WEB_DIST_DIR}\n` +
@@ -16,15 +15,9 @@ export async function startServer({ config: initialConfig, port, configPath }) {
     );
   }
 
-  const state = {
-    config:     initialConfig ? { ...initialConfig } : null,
-    configPath,
-  };
-
   const app = express();
   app.use(express.json());
 
-  configRoutes(app, state);
   statusRoutes(app);
 
   app.use(express.static(WEB_DIST_DIR));
