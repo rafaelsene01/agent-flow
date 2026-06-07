@@ -112,9 +112,6 @@ export async function boardCommand({ port: inputPort } = {}) {
     console.log(`\n  🌸  ${chalk.bold.cyan("Hana Board")}`);
     console.log(`  ${chalk.green("►")} ${chalk.underline(url)}\n`);
 
-    if (!config) {
-      console.log(chalk.yellow("  Nenhum .hana.json encontrado — abrindo configuração no browser.\n"));
-    }
   } catch (err) {
     console.error(chalk.red("\n  Erro: " + err.message + "\n"));
     process.exit(1);

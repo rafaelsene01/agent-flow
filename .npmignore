@@ -1,6 +1,11 @@
-# source do frontend — só o dist vai para o pacote
-web/src/
+# Next.js source — only web/out goes into the package
+web/app/
+web/components/
+web/next.config.mjs
+web/package.json
+web/package-lock.json
 web/node_modules/
+web/.next/
 
 # dev
 node_modules/

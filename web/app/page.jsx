@@ -1,5 +1,7 @@
+"use client";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import SettingsModal from "./SettingsModal.jsx";
+import SettingsModal from "../components/SettingsModal.jsx";
 
 const POLL_MS = 30_000;
 
@@ -181,23 +183,21 @@ function DetailModal({ card, column, onClose }) {
   );
 }
 
-function EmptyBoard({ onOpenSettings }) {
+function EmptyBoard() {
   return (
     <div className="empty-board">
       <div className="empty-board-inner">
         <span className="empty-logo">🌸</span>
-        <h2>Bem-vindo ao Hana</h2>
-        <p>Nenhuma configuração encontrada neste diretório.</p>
-        <p>Configure sua API key e escolha um time para começar.</p>
-        <button className="btn-primary" type="button" onClick={onOpenSettings}>
-          Configurar agora
-        </button>
+        <h2>Sem configuração</h2>
+        <p>Execute no diretório do projeto:</p>
+        <code className="empty-cmd">hana init</code>
       </div>
     </div>
   );
 }
 
 export default function App() {
+  const [initializing, setInitializing] = useState(true);
   const [data, setData]               = useState({ columns: [], cardsByColumn: {}, unconfigured: false });
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState("");
@@ -232,7 +232,6 @@ export default function App() {
         setInProgressName(cfg.in_progress || "");
       }
 
-      if (payload.unconfigured) setShowSettings(true);
     } catch (err) {
       setError(err.message || "Erro ao carregar board.");
     } finally {
@@ -247,11 +246,34 @@ export default function App() {
     return () => clearInterval(t);
   }, [refresh]);
 
+  useEffect(() => {
+    fetch("/api/status")
+      .then((r) => r.json())
+      .then((s) => {
+        if (!s.github?.connected || !s.claude?.connected) setShowSettings(true);
+      })
+      .catch(() => setShowSettings(true))
+      .finally(() => setInitializing(false));
+  }, []);
+
+  if (initializing) {
+    return (
+      <div className="init-screen">
+        <span className="init-logo">🌸</span>
+        <p className="init-msg">Verificando integrações…</p>
+        <div className="loader">
+          <span className="loader-dot" />
+          <span className="loader-dot" />
+          <span className="loader-dot" />
+        </div>
+      </div>
+    );
+  }
+
   const isUnconfigured = data.unconfigured && !loading;
 
   return (
     <div className="app">
-      {}
       <header className="topbar">
         <div className="topbar-left">
           <span className="logo">🌸</span>
@@ -296,7 +318,7 @@ export default function App() {
           <span className="loader-dot" /><span className="loader-dot" /><span className="loader-dot" />
         </div>
       ) : isUnconfigured ? (
-        <EmptyBoard onOpenSettings={() => setShowSettings(true)} />
+        <EmptyBoard />
       ) : (
         <main className="board">
           {data.columns.map((col) => (
@@ -322,13 +344,7 @@ export default function App() {
       )}
 
       {showSettings && (
-        <SettingsModal
-          onClose={() => setShowSettings(false)}
-          onSaved={() => {
-            setShowSettings(false);
-            setTimeout(() => refresh(true), 300);
-          }}
-        />
+        <SettingsModal onClose={() => setShowSettings(false)} />
       )}
     </div>
   );

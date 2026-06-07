@@ -1,0 +1,13 @@
+{
+  "name": "hana-board-web",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  }
+}
