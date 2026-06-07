@@ -8,9 +8,9 @@
   },
   "type": "module",
   "scripts": {
-    "start": "node bin/agent-flow.js",
+    "dev": "concurrently -n api,web -c cyan,magenta \"node api/dev.js\" \"npm run dev --prefix web\"",
+    "start": "npm run build:web && node bin/agent-flow.js",
     "build:web": "npm run build --prefix web",
-    "dev:web": "npm run dev --prefix web",
     "prepack": "npm install --prefix web && npm run build --prefix web"
   },
   "files": [
@@ -21,12 +21,21 @@
   ],
   "dependencies": {
     "chalk": "^5.3.0",
-    "ora": "^8.0.1",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "ora": "^8.0.1"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": ["linear", "kanban", "board", "cli", "productivity"],
-  "license": "MIT"
+  "keywords": [
+    "linear",
+    "kanban",
+    "board",
+    "cli",
+    "productivity"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
 }
