@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import ora from "ora";
-import { readConfig, getConfigPath } from "../src/config.js";
-import * as linear from "../src/sources/linear.js";
-import { startBoardServer } from "../src/server/board-server.js";
+import { readConfig, getConfigPath } from "../api/config.js";
+import * as linear from "../api/sources/linear.js";
+import { startBoardServer } from "../api/server/board-server.js";
 
 const args = process.argv.slice(2);
 

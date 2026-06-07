@@ -15,7 +15,7 @@
   },
   "files": [
     "bin/",
-    "src/",
+    "api/",
     "web/out/",
     "README.md"
   ],

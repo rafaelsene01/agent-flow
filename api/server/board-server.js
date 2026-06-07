@@ -78,13 +78,15 @@ async function fetchBoard(config, teamId) {
 }
 
 async function getGithubStatus() {
-  const envToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  const envToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || process.env.GITHUB_KEY;
+  console.log("[github] envToken present:", !!envToken);
   if (envToken) {
     try {
       const user = await github.validateToken(envToken);
+      console.log("[github] env token ok:", user.login);
       return { connected: true, method: "env", user: user.login, name: user.name };
-    } catch {
-      return { connected: false, method: "env", error: "Token inválido" };
+    } catch (err) {
+      console.log("[github] env token failed:", err.message);
     }
   }
 
@@ -93,30 +95,49 @@ async function getGithubStatus() {
     execSync("gh --version", { stdio: "pipe", timeout: 3000 });
     ghInstalled = true;
   } catch {}
+  console.log("[github] gh installed:", ghInstalled);
 
   if (ghInstalled) {
     try {
       const out = execSync("gh api user", { stdio: "pipe", encoding: "utf-8", timeout: 8000 });
       const user = JSON.parse(out);
+      console.log("[github] gh-cli ok:", user.login);
       return { connected: true, method: "gh-cli", user: user.login, name: user.name };
-    } catch {
-      return { connected: false, ghInstalled: true, error: "Não autenticado" };
+    } catch (err) {
+      // gh pode falhar por pegar o mesmo token inválido do ambiente — continua para SSH
+      console.log("[github] gh-cli failed:", err.message);
     }
   }
 
+  console.log("[github] trying ssh...");
   try {
     const out = execSync(
-      "ssh -T -o StrictHostKeyChecking=no -o BatchMode=yes git@github.com",
-      { stdio: "pipe", encoding: "utf-8", timeout: 8000 }
+      "ssh -T -o StrictHostKeyChecking=no git@github.com",
+      { stdio: "pipe", encoding: "utf-8", timeout: 10000, shell: true }
     );
+    console.log("[github] ssh stdout:", JSON.stringify(out));
     const match = (out || "").match(/Hi (.+?)!/);
     if (match) return { connected: true, method: "ssh", user: match[1] };
   } catch (err) {
-    const stderr = err.stderr?.toString() || "";
-    const match = stderr.match(/Hi (.+?)!/);
+    const combined = (err.stdout?.toString() || "") + (err.stderr?.toString() || "");
+    console.log("[github] ssh threw, combined:", JSON.stringify(combined));
+    const match = combined.match(/Hi (.+?)!/);
     if (match) return { connected: true, method: "ssh", user: match[1] };
   }
 
+  console.log("[github] trying git ls-remote...");
+  try {
+    execSync(
+      "git ls-remote git@github.com:github/gitignore.git HEAD",
+      { stdio: "pipe", timeout: 10000, shell: true }
+    );
+    console.log("[github] git ls-remote ok");
+    return { connected: true, method: "ssh" };
+  } catch (err) {
+    console.log("[github] git ls-remote failed:", err.stderr?.toString()?.trim());
+  }
+
+  console.log("[github] all methods failed");
   return { connected: false, ghInstalled: false };
 }
 
