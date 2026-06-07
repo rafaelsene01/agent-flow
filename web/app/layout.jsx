@@ -2,7 +2,7 @@ import "./globals.css";
 
 export const metadata = {
   title: "Agent Flow Board",
-  description: "🌸 Web Kanban for Linear",
+  description: "🌸 Web Kanban for GutHub",
 };
 
 export default function RootLayout({ children }) {

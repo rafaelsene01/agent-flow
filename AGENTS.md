@@ -12,11 +12,12 @@ Ponto de entrada: `bin/agent-flow.js` → inicia o Express via `api/server.js`.
 |--------|---------|--------------|
 | `GET` | `/api/status` | [docs/routes/status.md](docs/routes/status.md) |
 
-## Clientes
+## Módulos
 
 | Módulo | Caminho | Documentação |
 |--------|---------|--------------|
-| GitHub HTTP | `api/clients/github.js` | [docs/clients/github.md](docs/clients/github.md) |
+| GitHub | `api/modules/github/` | [docs/modules/github.md](docs/modules/github.md) |
+| Claude | `api/modules/claude/` | [docs/modules/claude.md](docs/modules/claude.md) |
 
 ## Core
 

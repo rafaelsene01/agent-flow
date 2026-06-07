@@ -2,7 +2,7 @@
 
 Fonte: `api/routes/status.js`
 
-Verifica conectividade do GitHub e do Claude. Chamada pelo frontend ao carregar para decidir se exibe o modal de configurações.
+Agregador — chama `getStatus()` dos módulos `github` e `claude` em paralelo e retorna resultado unificado. Sem lógica de detecção própria.
 
 ---
 
@@ -25,23 +25,9 @@ Verifica conectividade do GitHub e do Claude. Chamada pelo frontend ao carregar 
 }
 ```
 
----
+**Dependências:**
 
-## Detecção do GitHub — ordem de prioridade
-
-1. **Token de ambiente** — `GH_TOKEN` | `GITHUB_TOKEN` | `GITHUB_KEY` → valida via `GET /user`
-2. **gh CLI** — `gh api user` → parse JSON para login
-3. **SSH** — `ssh -T git@github.com` → busca `Hi <usuário>!` em stdout+stderr
-4. **git ls-remote** — fallback SSH via stack SSH nativo do git (mais confiável no Windows)
-
-Cada etapa passa adiante em caso de falha. Retorna `{ connected: false }` só se todas falharem.
-
-Valores de `method`: `"env"` | `"gh-cli"` | `"ssh"`
-
----
-
-## Detecção do Claude
-
-Único método: `claude --version` via CLI.
-
-Retorna `{ connected: true, method: "claude-cli", version: "..." }` em caso de sucesso, `{ connected: false }` se CLI não encontrado.
+| Módulo | Doc |
+|--------|-----|
+| GitHub | [docs/modules/github.md](../modules/github.md) |
+| Claude | [docs/modules/claude.md](../modules/claude.md) |
