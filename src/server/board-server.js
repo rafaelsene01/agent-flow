@@ -11,8 +11,73 @@ const __dirname  = path.dirname(__filename);
 
 const WEB_DIST_DIR = path.resolve(__dirname, "../../web/out");
 
+function mapIssues(issues) {
+  return issues.map((i) => ({
+    id:              i.id,
+    identifier:      i.identifier,
+    rawTitle:        i.title,
+    title:           i.title,
+    priority:        i.priority,
+    url:             i.url,
+    dueDate:         i.dueDate || null,
+    completedAt:     i.completedAt || null,
+    description:     i.description || "",
+    assigneeDisplay: i.assignee?.displayName || i.assignee?.name || null,
+    rawLabels:       i.labels?.nodes || [],
+  }));
+}
+
+async function fetchBoard(config, teamId) {
+  const boardConfig = {
+    ...config,
+    pick_from: config.board_columns?.length ? config.board_columns : config.pick_from,
+  };
+
+  const [allStates, issues] = await Promise.all([
+    linear.getWorkflowStates(config, teamId),
+    linear.getIssues(boardConfig, teamId),
+  ]);
+
+  const selectedNames = config.board_columns?.length
+    ? new Set(config.board_columns.map((n) => n.toLowerCase()))
+    : null;
+
+  let columns = selectedNames
+    ? allStates.filter((s) => selectedNames.has(s.name.toLowerCase()))
+    : [...allStates];
+
+  if (config.done) {
+    const doneName = config.done.toLowerCase();
+    const idx = columns.findIndex((s) => s.name.toLowerCase() === doneName);
+    if (idx >= 0 && idx !== columns.length - 1) {
+      columns.push(columns.splice(idx, 1)[0]);
+    }
+  }
+
+  const doneDays = Number(config.done_days ?? 0);
+  const doneColName = (config.done || "").toLowerCase();
+  const cutoff = doneDays > 0
+    ? new Date(Date.now() - doneDays * 24 * 60 * 60 * 1000)
+    : null;
+
+  const cardsByColumn = {};
+  for (const state of columns) {
+    let cards = mapIssues(issues.filter((i) => i.state.id === state.id));
+
+    if (cutoff && doneColName && state.name.toLowerCase() === doneColName) {
+      cards = cards.filter((c) => {
+        if (!c.completedAt) return false;
+        return new Date(c.completedAt) >= cutoff;
+      });
+    }
+
+    cardsByColumn[state.id] = cards;
+  }
+
+  return { columns, cardsByColumn };
+}
+
 async function getGithubStatus() {
-  // 1. Env token
   const envToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   if (envToken) {
     try {
@@ -23,7 +88,6 @@ async function getGithubStatus() {
     }
   }
 
-  // 2. gh CLI
   let ghInstalled = false;
   try {
     execSync("gh --version", { stdio: "pipe", timeout: 3000 });
@@ -40,7 +104,6 @@ async function getGithubStatus() {
     }
   }
 
-  // 3. SSH key for github.com
   try {
     const out = execSync(
       "ssh -T -o StrictHostKeyChecking=no -o BatchMode=yes git@github.com",
@@ -49,7 +112,6 @@ async function getGithubStatus() {
     const match = (out || "").match(/Hi (.+?)!/);
     if (match) return { connected: true, method: "ssh", user: match[1] };
   } catch (err) {
-    // ssh returns exit code 1 even on success ("Hi user! You've authenticated...")
     const stderr = err.stderr?.toString() || "";
     const match = stderr.match(/Hi (.+?)!/);
     if (match) return { connected: true, method: "ssh", user: match[1] };
@@ -81,7 +143,7 @@ async function getClaudeStatus() {
   }
 }
 
-export async function startBoardServer({ config: initialConfig, teamId: initialTeamId, fetchBoard, port, configPath }) {
+export async function startBoardServer({ config: initialConfig, teamId: initialTeamId, port, configPath }) {
   if (!fs.existsSync(WEB_DIST_DIR)) {
     throw new Error(
       `Frontend não encontrado em ${WEB_DIST_DIR}\n` +

@@ -1,4 +1,4 @@
-# 🌸 Hana
+# Agent Flow
 
 Web Kanban board powered by Linear. Inspirado no [lisa](https://github.com/tarcisiopgs/lisa).
 
@@ -10,24 +10,24 @@ Web Kanban board powered by Linear. Inspirado no [lisa](https://github.com/tarci
 npm install
 npm install -g .
 
-hana --help
+agent-flow --help
 ```
 
 ### Desinstalar
 
 ```bash
-npm uninstall -g hana
+npm uninstall -g agent-flow
 ```
 
 ---
 
 ## Primeira configuração
 
-Rode uma vez por projeto para criar o `.hana.json` local:
+Rode uma vez por projeto para criar o `.agent-flow.json` local:
 
 ```bash
 cd meu-projeto/
-hana init
+agent-flow init
 ```
 
 O wizard pergunta:
@@ -41,35 +41,35 @@ O wizard pergunta:
 7. **Done** — estado de concluído
 8. **Label** — filtro opcional por etiqueta
 
-> ⚠️ Adicione `.hana.json` ao `.gitignore` — ele contém sua API key.
+> ⚠️ Adicione `.agent-flow.json` ao `.gitignore` — ele contém sua API key.
 
 ---
 
 ## Comandos
 
-| Comando       | Alias | Descrição                                      |
-|---------------|-------|------------------------------------------------|
-| `hana`        | —     | Inicia servidor web do board na porta `5522`  |
-| `hana board`  | `b`   | Inicia servidor web do board                   |
-| `hana init`   | —     | Wizard de configuração                         |
-| `hana config` | —     | Exibe a config atual                           |
+| Comando              | Alias | Descrição                                      |
+|----------------------|-------|------------------------------------------------|
+| `agent-flow`         | —     | Inicia servidor web do board na porta `5522`  |
+| `agent-flow board`   | `b`   | Inicia servidor web do board                   |
+| `agent-flow init`    | —     | Wizard de configuração                         |
+| `agent-flow config`  | —     | Exibe a config atual                           |
 
 ### Porta do servidor web
 
 Por padrão, o board sobe na porta `5522`. Você pode alterar com `-p` ou `--port`:
 
 ```bash
-hana board -p 8080
-hana board --port 7000
+agent-flow board -p 8080
+agent-flow board --port 7000
 ```
 
 Ao iniciar, o comando exibe a URL local para acesso no navegador.
 
-> Fluxo oficial: use apenas `hana board`. A interface web e a API rodam na mesma porta.
+> Fluxo oficial: use apenas `agent-flow board`. A interface web e a API rodam na mesma porta.
 
 ---
 
-## Arquivo `.hana.json`
+## Arquivo `.agent-flow.json`
 
 ```json
 {
@@ -99,11 +99,11 @@ Ao iniciar, o comando exibe a URL local para acesso no navegador.
 ## Estrutura do projeto
 
 ```
-hana/
+agent-flow/
 ├── bin/
-│   └── hana.js                ← entry point CLI
+│   └── agent-flow.js          ← entry point CLI
 ├── src/
-│   ├── config.js              ← lê/escreve .hana.json
+│   ├── config.js              ← lê/escreve .agent-flow.json
 │   ├── commands/
 │   │   ├── init.js            ← wizard de setup
 │   │   ├── board.js           ← busca dados e sobe o board web

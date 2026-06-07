@@ -145,7 +145,7 @@ export async function fetchModels(providerId, apiKey) {
     headers["Authorization"] = `Bearer ${apiKey}`;
   } else if (providerId === "openrouter") {
     headers["Authorization"] = `Bearer ${apiKey}`;
-    headers["HTTP-Referer"]  = "https://github.com/hana-board";
+    headers["HTTP-Referer"]  = "https://github.com/agent-flow";
   } else {
     headers["Authorization"] = `Bearer ${apiKey}`;
   }

@@ -1,7 +1,7 @@
-import fs from "fs";
+﻿import fs from "fs";
 import path from "path";
 
-const CONFIG_FILE = ".hana.json";
+const CONFIG_FILE = ".agent-flow.json";
 
 export function getConfigPath() {
   return path.join(process.cwd(), CONFIG_FILE);
@@ -29,7 +29,7 @@ export function requireConfig() {
   const config = readConfig();
   if (!config) {
     console.error(
-      '\n  No config found. Run \u001b[33mhana init\u001b[0m to set up your board.\n'
+      '\n  No config found. Run \u001b[33magent-flow init\u001b[0m to set up your board.\n'
     );
     process.exit(1);
   }
