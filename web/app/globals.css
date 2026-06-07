@@ -921,3 +921,46 @@ select.sf-input option { background: #1c2333; }
 }
 .cmd-copy:hover  { color: var(--accent); border-color: var(--accent); }
 .cmd-copy.copied { color: var(--c-completed); border-color: var(--c-completed); }
+
+/* ── path editor (projects config) ─────────────────────────────────────────── */
+.path-editor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border2);
+}
+
+.path-input {
+  flex: 1;
+  padding: 7px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 12px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  outline: none;
+  transition: border-color .15s;
+  min-width: 0;
+}
+.path-input:focus { border-color: var(--accent); }
+
+.btn-browse {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 15px;
+  transition: color .15s, border-color .15s;
+}
+.btn-browse:hover { color: var(--accent); border-color: var(--accent); }
+
+.btn-secondary.saved {
+  color: var(--c-completed);
+  border-color: var(--c-completed);
+}

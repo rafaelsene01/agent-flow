@@ -120,8 +120,12 @@ function IntegrationCard({ name, logo, loading, data, commands }) {
 }
 
 export default function SettingsModal({ onClose }) {
-  const [status, setStatus]   = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus]         = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [projectsPath, setProjectsPath] = useState("");
+  const [pathInput, setPathInput]   = useState("");
+  const [pathSaving, setPathSaving] = useState(false);
+  const [pathSaved, setPathSaved]   = useState(false);
 
   const fetchStatus = useCallback(() => {
     setLoading(true);
@@ -131,7 +135,39 @@ export default function SettingsModal({ onClose }) {
       .catch(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((c) => { setProjectsPath(c.projectsPath ?? ""); setPathInput(c.projectsPath ?? ""); })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
+
+  function savePath() {
+    setPathSaving(true);
+    fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectsPath: pathInput }),
+    })
+      .then((r) => r.json())
+      .then((c) => {
+        setProjectsPath(c.projectsPath);
+        setPathInput(c.projectsPath);
+        setPathSaved(true);
+        setTimeout(() => setPathSaved(false), 2000);
+      })
+      .catch(() => {})
+      .finally(() => setPathSaving(false));
+  }
+
+  function browsePath() {
+    fetch("/api/config/browse", { method: "POST" })
+      .then((r) => r.status === 204 ? null : r.json())
+      .then((data) => { if (data?.path) setPathInput(data.path); })
+      .catch(() => {});
+  }
 
   const isLocked = loading || !status?.github?.connected || !status?.claude?.connected;
 
@@ -187,6 +223,45 @@ export default function SettingsModal({ onClose }) {
             data={status?.claude}
             commands={claudeCommands}
           />
+
+          <div className="intg-card">
+            <div className="intg-top">
+              <div className="intg-logo ok">◉</div>
+              <div className="intg-body">
+                <div className="intg-name">Projects</div>
+                <div className="intg-status ok">Configurado</div>
+                {projectsPath && (
+                  <div className="intg-detail">{projectsPath}</div>
+                )}
+              </div>
+            </div>
+            <div className="path-editor">
+              <button
+                className="btn-browse"
+                type="button"
+                title="Selecionar pasta"
+                onClick={browsePath}
+              >
+                ⊞
+              </button>
+              <input
+                className="path-input"
+                type="text"
+                value={pathInput}
+                onChange={(e) => setPathInput(e.target.value)}
+                placeholder="Caminho para a pasta projects"
+                spellCheck={false}
+              />
+              <button
+                className={`btn-secondary${pathSaved ? " saved" : ""}`}
+                type="button"
+                disabled={pathSaving || pathInput === projectsPath}
+                onClick={savePath}
+              >
+                {pathSaved ? "✓ Salvo" : pathSaving ? "…" : "Salvar"}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="sf-footer">
