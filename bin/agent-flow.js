@@ -2,8 +2,7 @@
 import chalk from "chalk";
 import ora from "ora";
 import { readConfig, getConfigPath } from "../api/config.js";
-import * as linear from "../api/sources/linear.js";
-import { startBoardServer } from "../api/server/board-server.js";
+import { startServer } from "../api/server.js";
 
 const args = process.argv.slice(2);
 
@@ -18,26 +17,9 @@ const port = Number.parseInt(portFlagIdx >= 0 ? args[portFlagIdx + 1] : "5522", 
 const config     = readConfig();
 const configPath = getConfigPath();
 
-let teamId = null;
-if (config) {
-  if (config.provider && config.provider !== "linear") {
-    console.error(chalk.red(`\n  Provider "${config.provider}" não é suportado.\n`));
-    process.exit(1);
-  }
-  teamId = config._team_id;
-  if (!teamId && config.api_key && config.scope) {
-    const spinner = ora("Conectando ao Linear…").start();
-    try {
-      const team = await linear.getTeamByName(config, config.scope);
-      if (team) teamId = team.id;
-      spinner.stop();
-    } catch { spinner.stop(); }
-  }
-}
-
 try {
   const spinner = ora("Iniciando Agent Flow…").start();
-  const { url } = await startBoardServer({ config, teamId, port, configPath });
+  const { url } = await startServer({ config, port, configPath });
   spinner.stop();
   console.log(`\n  ${chalk.bold.cyan("Agent Flow Board")}`);
   console.log(`  ${chalk.green("►")} ${chalk.underline(url)}\n`);
