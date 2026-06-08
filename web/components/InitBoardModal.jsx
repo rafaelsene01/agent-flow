@@ -195,6 +195,33 @@ export default function InitBoardModal({ onClose, onSaved }) {
               </div>
 
               <div className="sf-field">
+                <label className="sf-label">View</label>
+                {viewsLoading && (
+                  <div className="board-select-state">Carregando views…</div>
+                )}
+                {!viewsLoading && views.length === 0 && (
+                  <div className="board-select-state">Nenhuma view encontrada.</div>
+                )}
+                {!viewsLoading && views.length > 0 && (
+                  <div className="board-select-list">
+                    {views.map((v) => (
+                      <button
+                        key={v.id}
+                        className={`board-select-item${selectedView?.id === v.id ? " selected" : ""}`}
+                        type="button"
+                        onClick={() => selectView(selected, v)}
+                      >
+                        <span className="board-select-title">{v.name}</span>
+                        <span className="board-select-meta">
+                          {v.repo ?? <span style={{ color: "var(--text-faint)" }}>sem repo</span>}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="sf-field">
                 <label className="sf-label">Colunas visíveis</label>
                 {columnsLoading && (
                   <div className="board-select-state">Carregando colunas…</div>
@@ -222,33 +249,6 @@ export default function InitBoardModal({ onClose, onSaved }) {
                 )}
                 {!columnsLoading && columns.length === 0 && (
                   <div className="board-select-state">Nenhuma coluna encontrada.</div>
-                )}
-              </div>
-
-              <div className="sf-field">
-                <label className="sf-label">View</label>
-                {viewsLoading && (
-                  <div className="board-select-state">Carregando views…</div>
-                )}
-                {!viewsLoading && views.length === 0 && (
-                  <div className="board-select-state">Nenhuma view encontrada.</div>
-                )}
-                {!viewsLoading && views.length > 0 && (
-                  <div className="board-select-list">
-                    {views.map((v) => (
-                      <button
-                        key={v.id}
-                        className={`board-select-item${selectedView?.id === v.id ? " selected" : ""}`}
-                        type="button"
-                        onClick={() => selectView(selected, v)}
-                      >
-                        <span className="board-select-title">{v.name}</span>
-                        <span className="board-select-meta">
-                          {v.repo ?? <span style={{ color: "var(--text-faint)" }}>sem repo</span>}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
                 )}
               </div>
             </>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { boardSlug } from "@/lib/boardSlug.js";
 import Header from "@/components/Header.jsx";
 import SettingsModal from "@/components/SettingsModal.jsx";
@@ -9,16 +9,27 @@ import InitBoardModal from "@/components/InitBoardModal.jsx";
 import EditBoardModal from "@/components/EditBoardModal.jsx";
 import Board from "@/components/Board.jsx";
 
+function navigate(path) {
+  window.history.pushState(null, "", path);
+}
+
 function AppContent() {
-  const router   = useRouter();
   const pathname = usePathname();
 
+  const [activePath,    setActivePath]    = useState(pathname);
   const [initializing, setInitializing]   = useState(true);
   const [showSettings, setShowSettings]   = useState(false);
   const [showInitBoard, setShowInitBoard] = useState(false);
   const [showEditBoard, setShowEditBoard] = useState(false);
   const [boards, setBoards]               = useState([]);
   const [activeBoard, setActiveBoard]     = useState(null);
+
+  // Sincroniza activePath com botões de voltar/avançar do browser.
+  useEffect(() => {
+    const onPop = () => setActivePath(window.location.pathname);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -28,9 +39,19 @@ function AppContent() {
       if (!status?.github?.connected || !status?.claude?.connected) setShowSettings(true);
       const saved = config.boards ?? [];
       setBoards(saved);
-      const slug    = pathname.slice(1);
+
+      const slug    = activePath.slice(1);
       const fromUrl = slug ? saved.find((b) => boardSlug(b) === slug) : null;
-      setActiveBoard(fromUrl ?? saved[0] ?? null);
+      const initial = fromUrl ?? saved[0] ?? null;
+      setActiveBoard(initial);
+
+      // Se carregou na raiz "/", redireciona para o slug do primeiro board.
+      if (!slug && initial) {
+        const path = `/${boardSlug(initial)}`;
+        setActivePath(path);
+        window.history.replaceState(null, "", path);
+      }
+
       setInitializing(false);
     }).catch(() => {
       setInitializing(false);
@@ -39,7 +60,9 @@ function AppContent() {
 
   function selectBoard(board) {
     setActiveBoard(board);
-    router.push(`/${boardSlug(board)}`, { scroll: false });
+    const path = `/${boardSlug(board)}`;
+    setActivePath(path);
+    navigate(path);
   }
 
   function handleBoardSaved(newBoard) {
@@ -49,7 +72,7 @@ function AppContent() {
   }
 
   async function handleBoardUpdated(updatedBoard) {
-    const next = boards.map((b) => b.id === updatedBoard.id ? updatedBoard : b);
+    const next = boards.map((b) => b.viewId === updatedBoard.viewId ? updatedBoard : b);
     setBoards(next);
     setActiveBoard(updatedBoard);
     setShowEditBoard(false);
@@ -61,13 +84,15 @@ function AppContent() {
   }
 
   async function removeBoard(board) {
-    const next = boards.filter((b) => b.id !== board.id);
+    const next = boards.filter((b) => b.viewId !== board.viewId);
     setBoards(next);
 
-    if (activeBoard?.id === board.id) {
+    if (activeBoard?.viewId === board.viewId) {
       const fallback = next[0] ?? null;
       setActiveBoard(fallback);
-      router.push(fallback ? `/${boardSlug(fallback)}` : "/", { scroll: false });
+      const path = fallback ? `/${boardSlug(fallback)}` : "/";
+      setActivePath(path);
+      navigate(path);
     }
 
     await fetch("/api/config", {
@@ -97,7 +122,7 @@ function AppContent() {
         onSettings={() => setShowSettings(true)}
         onInitBoard={() => setShowInitBoard(true)}
         boards={boards}
-        activeBoard={activeBoard}
+        activePath={activePath}
         onSelectBoard={selectBoard}
         onRemoveBoard={removeBoard}
       />

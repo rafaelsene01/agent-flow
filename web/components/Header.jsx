@@ -1,6 +1,8 @@
 "use client";
 
-export default function Header({ onSettings, onInitBoard, boards = [], activeBoard, onSelectBoard, onRemoveBoard }) {
+import { boardSlug } from "@/lib/boardSlug.js";
+
+export default function Header({ onSettings, onInitBoard, boards = [], activePath = "", onSelectBoard, onRemoveBoard }) {
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -11,8 +13,8 @@ export default function Header({ onSettings, onInitBoard, boards = [], activeBoa
           <nav className="board-tabs">
             {boards.map((b) => (
               <button
-                key={b.id}
-                className={`board-tab${activeBoard?.id === b.id ? " active" : ""}`}
+                key={b.viewId ?? b.id}
+                className={`board-tab${boardSlug(b) === activePath.slice(1) ? " active" : ""}`}
                 type="button"
                 onClick={() => onSelectBoard(b)}
               >
