@@ -7,6 +7,7 @@ import Header from "@/components/Header.jsx";
 import SettingsModal from "@/components/SettingsModal.jsx";
 import InitBoardModal from "@/components/InitBoardModal.jsx";
 import EditBoardModal from "@/components/EditBoardModal.jsx";
+import Board from "@/components/Board.jsx";
 
 function AppContent() {
   const router   = useRouter();
@@ -110,6 +111,7 @@ function AppContent() {
               ✎
             </button>
           </div>
+          <Board board={activeBoard} />
         </div>
       ) : (
         <div className="empty-board">
