@@ -1,14 +1,9 @@
-import { spawnSync } from "child_process";
-import { graphQL } from "./github.client.js";
-import { getConfig } from "../config/config.service.js";
+import { graphQL, getToken } from "./github.client.js";
 
-function ghEnv() {
-  const env = { ...process.env };
-  delete env.GH_TOKEN;
-  delete env.GITHUB_TOKEN;
-  delete env.GITHUB_KEY;
-  delete env.GITHUB_AUTH_TOKEN;
-  return env;
+function requireToken() {
+  const token = getToken();
+  if (!token) throw new Error("GitHub não autenticado. Configure GH_TOKEN ou execute 'gh auth login'.");
+  return token;
 }
 
 const QUERY = `{
@@ -91,28 +86,6 @@ function parseResponse(raw) {
   return [...personal, ...orgBoards];
 }
 
-function viaGhCli() {
-  const result = spawnSync("gh", ["api", "graphql", "--input", "-"], {
-    input:    JSON.stringify({ query: QUERY }),
-    encoding: "utf-8",
-    timeout:  20000,
-    shell:    true,
-    env:      ghEnv(),
-  });
-
-  if (result.error) throw new Error(`gh CLI indisponível: ${result.error.message}`);
-
-  if (result.status !== 0) {
-    const stderr = (result.stderr || "").trim();
-    if (stderr.includes("required scopes") || stderr.includes("read:project")) {
-      throw new Error("MISSING_SCOPE:read:project");
-    }
-    throw new Error(`gh CLI: ${stderr}`);
-  }
-
-  return parseResponse(JSON.parse(result.stdout));
-}
-
 function repoFromFilter(filter) {
   if (!filter) return null;
   const m = filter.match(/repo:([^\s]+)/i);
@@ -130,30 +103,6 @@ function parseViews(raw) {
   }));
 }
 
-function viaGhCliViews(projectId) {
-  const result = spawnSync("gh", ["api", "graphql", "--input", "-"], {
-    input:    JSON.stringify({ query: VIEWS_QUERY, variables: { id: projectId } }),
-    encoding: "utf-8",
-    timeout:  20000,
-    shell:    true,
-    env:      ghEnv(),
-  });
-  if (result.error) throw new Error(`gh CLI indisponível: ${result.error.message}`);
-  if (result.status !== 0) throw new Error(`gh CLI: ${(result.stderr || "").trim()}`);
-  return parseViews(JSON.parse(result.stdout));
-}
-
-export async function listViews(projectId) {
-  const { githubMethod } = getConfig();
-  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || process.env.GITHUB_KEY;
-
-  if (githubMethod === "env" || (!githubMethod && token)) {
-    return parseViews(await graphQL(VIEWS_QUERY, token, { id: projectId }));
-  }
-
-  return viaGhCliViews(projectId);
-}
-
 function parseColumns(raw) {
   const fields = raw.data?.node?.fields?.nodes ?? [];
   const statusField =
@@ -162,47 +111,14 @@ function parseColumns(raw) {
   return (statusField?.options ?? []).map((o) => ({ id: o.id, name: o.name, color: o.color ?? null }));
 }
 
-function viaGhCliColumns(projectId) {
-  const result = spawnSync("gh", ["api", "graphql", "--input", "-"], {
-    input:    JSON.stringify({ query: COLUMNS_QUERY, variables: { id: projectId } }),
-    encoding: "utf-8",
-    timeout:  20000,
-    shell:    true,
-    env:      ghEnv(),
-  });
+export async function listBoards() {
+  return parseResponse(await graphQL(QUERY, requireToken()));
+}
 
-  if (result.error) throw new Error(`gh CLI indisponível: ${result.error.message}`);
-  if (result.status !== 0) throw new Error(`gh CLI: ${(result.stderr || "").trim()}`);
-
-  return parseColumns(JSON.parse(result.stdout));
+export async function listViews(projectId) {
+  return parseViews(await graphQL(VIEWS_QUERY, requireToken(), { id: projectId }));
 }
 
 export async function listColumns(projectId) {
-  const { githubMethod } = getConfig();
-  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || process.env.GITHUB_KEY;
-
-  if (githubMethod === "env" || (!githubMethod && token)) {
-    return parseColumns(await graphQL(COLUMNS_QUERY, token, { id: projectId }));
-  }
-
-  return viaGhCliColumns(projectId);
-}
-
-export async function listBoards() {
-  const { githubMethod } = getConfig();
-
-  if (githubMethod === "env") {
-    const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || process.env.GITHUB_KEY;
-    return parseResponse(await graphQL(QUERY, token));
-  }
-
-  if (githubMethod === "gh-cli") {
-    return viaGhCli();
-  }
-
-  // método ainda não detectado (status ainda não foi chamado)
-  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || process.env.GITHUB_KEY;
-  if (token) return parseResponse(await graphQL(QUERY, token));
-
-  return viaGhCli();
+  return parseColumns(await graphQL(COLUMNS_QUERY, requireToken(), { id: projectId }));
 }

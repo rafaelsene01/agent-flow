@@ -63,7 +63,7 @@ const GH_COLORS = {
   PURPLE: "#bf68d9",
 };
 
-function Column({ boardId, columnId, columnName, columnColor, repoName }) {
+function Column({ boardId, columnId, columnName, columnColor, viewFilter }) {
   const [items, setItems]             = useState([]);
   const [loading, setLoading]         = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -81,10 +81,10 @@ function Column({ boardId, columnId, columnName, columnColor, repoName }) {
 
     try {
       const qs = new URLSearchParams({ first: "30" });
-      if (columnId)  qs.set("columnId",  columnId);
-      else           qs.set("columnName", columnName);
-      if (repoName)  qs.set("repoName",  repoName);
-      if (cursor)    qs.set("after",     cursor);
+      if (columnId)   qs.set("columnId",   columnId);
+      else            qs.set("columnName", columnName);
+      if (viewFilter) qs.set("viewFilter", viewFilter);
+      if (cursor)     qs.set("after",      cursor);
 
       const res  = await fetch(`/api/github/boards/${encodeURIComponent(boardId)}/items?${qs}`);
       const data = await res.json();
@@ -98,7 +98,7 @@ function Column({ boardId, columnId, columnName, columnColor, repoName }) {
       fetchingRef.current = false;
       if (isFirst) setLoading(false); else setLoadingMore(false);
     }
-  }, [boardId, columnId, columnName, repoName]);
+  }, [boardId, columnId, columnName, viewFilter]);
 
   useEffect(() => {
     setItems([]);
@@ -171,7 +171,7 @@ export default function Board({ board }) {
           columnId={col.id}
           columnName={col.name}
           columnColor={col.color ?? null}
-          repoName={board.repoName ?? null}
+          viewFilter={board.viewFilter ?? null}
         />
       ))}
     </div>

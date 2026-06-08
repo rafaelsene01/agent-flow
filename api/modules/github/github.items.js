@@ -1,53 +1,4 @@
-import { spawn } from "child_process";
-import { graphQL } from "./github.client.js";
-import { getConfig } from "../config/config.service.js";
-
-function ghEnv() {
-  const env = { ...process.env };
-  delete env.GH_TOKEN;
-  delete env.GITHUB_TOKEN;
-  delete env.GITHUB_KEY;
-  delete env.GITHUB_AUTH_TOKEN;
-  return env;
-}
-
-// Versão assíncrona da chamada ao gh CLI — não bloqueia o event loop.
-function ghGraphQL(query, variables) {
-  return new Promise((resolve, reject) => {
-    const proc = spawn("gh", ["api", "graphql", "--input", "-"], {
-      shell: true,
-      env:   ghEnv(),
-    });
-
-    const out = [];
-    const err = [];
-    let settled = false;
-
-    const finish = (fn) => { if (!settled) { settled = true; fn(); } };
-
-    const timer = setTimeout(() => {
-      finish(() => { proc.kill(); reject(new Error("gh CLI: timeout")); });
-    }, 30000);
-
-    proc.stdout.on("data", (d) => out.push(d));
-    proc.stderr.on("data", (d) => err.push(d));
-    proc.on("error", (e) => finish(() => { clearTimeout(timer); reject(new Error(`gh CLI: ${e.message}`)); }));
-    proc.on("close", (code) => {
-      clearTimeout(timer);
-      finish(() => {
-        if (code !== 0) {
-          reject(new Error(`gh CLI: ${Buffer.concat(err).toString().trim()}`));
-        } else {
-          try { resolve(JSON.parse(Buffer.concat(out).toString())); }
-          catch { reject(new Error("gh CLI: resposta inválida")); }
-        }
-      });
-    });
-
-    proc.stdin.write(JSON.stringify({ query, variables }));
-    proc.stdin.end();
-  });
-}
+import { graphQL, getToken } from "./github.client.js";
 
 const ITEMS_QUERY = `query($id: ID!, $first: Int!, $after: String) {
   node(id: $id) {
@@ -62,13 +13,13 @@ const ITEMS_QUERY = `query($id: ID!, $first: Int!, $after: String) {
               title number
               repository { nameWithOwner }
               assignees(first: 3) { nodes { login } }
-              labels(first: 5) { nodes { name color } }
+              labels(first: 20) { nodes { name color } }
             }
             ... on PullRequest {
               title number
               repository { nameWithOwner }
               assignees(first: 3) { nodes { login } }
-              labels(first: 5) { nodes { name color } }
+              labels(first: 20) { nodes { name color } }
             }
             ... on DraftIssue { title }
           }
@@ -119,14 +70,20 @@ function parseItems(raw) {
 }
 
 async function fetchPage(projectId, variables) {
-  const { githubMethod } = getConfig();
-  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || process.env.GITHUB_KEY;
+  const token = getToken();
+  if (!token) throw new Error("GitHub não autenticado. Configure GH_TOKEN ou execute 'gh auth login'.");
+  return parseItems(await graphQL(ITEMS_QUERY, token, variables));
+}
 
-  if (githubMethod === "env" || (!githubMethod && token)) {
-    return parseItems(await graphQL(ITEMS_QUERY, token, variables));
-  }
+function repoMatches(itemRepo, repoFilter) {
+  if (!repoFilter || !itemRepo) return true;
+  return repoFilter.split(",").some((r) => r.trim() === itemRepo);
+}
 
-  return parseItems(await ghGraphQL(ITEMS_QUERY, variables));
+function labelsMatch(itemLabels, labelFilter) {
+  if (!labelFilter) return true;
+  const wanted = labelFilter.split(",").map((l) => l.trim().toLowerCase());
+  return wanted.some((w) => itemLabels.some((l) => l.name.toLowerCase() === w));
 }
 
 function toClientItem({ id, type, title, number, assignees, labels }) {
@@ -137,17 +94,17 @@ function toClientItemWithColumn({ id, type, title, number, assignees, labels, _s
   return { id, type, title, number, assignees, labels, columnName: _status, columnId: _statusOptionId };
 }
 
-export async function listItems(projectId, { first = 30, after = null, repoName = null } = {}) {
+export async function listItems(projectId, { first = 30, after = null, repoName = null, labels = null } = {}) {
   const page = await fetchPage(projectId, { id: projectId, first, after });
   const items = page.items
-    .filter((i) => !repoName || !i._repoName || i._repoName === repoName)
+    .filter((i) => repoMatches(i._repoName, repoName) && labelsMatch(i.labels, labels))
     .map(toClientItem);
   return { ...page, items };
 }
 
 // Busca todas as páginas de uma vez (até 10 páginas / 1000 itens).
 // Se chamado com `after`, busca apenas a próxima página (modo scroll).
-export async function listAllItems(projectId, { after = null, repoName = null } = {}) {
+export async function listAllItems(projectId, { after = null, repoName = null, labels = null } = {}) {
   const allItems = [];
   let cursor  = after;
   let hasMore = true;
@@ -158,7 +115,7 @@ export async function listAllItems(projectId, { after = null, repoName = null } 
     const page = await fetchPage(projectId, { id: projectId, first: 100, after: cursor });
     pages++;
     const filtered = page.items
-      .filter((i) => !repoName || !i._repoName || i._repoName === repoName)
+      .filter((i) => repoMatches(i._repoName, repoName) && labelsMatch(i.labels, labels))
       .map(toClientItemWithColumn);
     allItems.push(...filtered);
     hasMore = page.hasNextPage;
@@ -183,14 +140,14 @@ function parseCursor(after) {
   return { globalCursor: after, skip: 0 };
 }
 
-export async function listItemsByColumn(projectId, { columnId, columnName }, { first = 20, after = null, repoName = null } = {}) {
+export async function listItemsByColumn(projectId, { columnId, columnName }, { first = 20, after = null, repoName = null, labels = null } = {}) {
   const { globalCursor, skip } = parseCursor(after);
 
   const collected = [];
   let cursor   = globalCursor;
   let hasMore  = true;
   let pages    = 0;
-  const MAX_PAGES = 10;
+  const MAX_PAGES = 20;
   let isFirstPage = true;
   let skipped     = 0;
 
@@ -201,7 +158,7 @@ export async function listItemsByColumn(projectId, { columnId, columnName }, { f
   let lastPageWasFirst     = false;
 
   while (collected.length < first && hasMore && pages < MAX_PAGES) {
-    const page = await fetchPage(projectId, { id: projectId, first: 50, after: cursor });
+    const page = await fetchPage(projectId, { id: projectId, first: 100, after: cursor });
     pages++;
 
     lastPageCursorBefore = cursor;
@@ -210,7 +167,7 @@ export async function listItemsByColumn(projectId, { columnId, columnName }, { f
     lastPageWasFirst     = isFirstPage;
 
     for (const item of page.items) {
-      if (repoName && item._repoName && item._repoName !== repoName) continue;
+      if (!repoMatches(item._repoName, repoName) || !labelsMatch(item.labels, labels)) continue;
       const matchById   = columnId   && item._statusOptionId === columnId;
       const matchByName = columnName && item._status?.toLowerCase() === columnName.toLowerCase();
       const match = matchById || (!columnId && matchByName) || (columnId && !item._statusOptionId && matchByName);
@@ -232,7 +189,9 @@ export async function listItemsByColumn(projectId, { columnId, columnName }, { f
   }
 
   if (collected.length < first) {
-    return { items: collected.map(toClientItem), hasNextPage: false, endCursor: null };
+    // Esgotamos as páginas (MAX_PAGES ou fim do projeto).
+    // Se o GitHub ainda tem páginas, preserva o cursor para o scroll carregar o restante.
+    return { items: collected.map(toClientItem), hasNextPage: hasMore, endCursor: hasMore ? cursor : null };
   }
 
   const leftover  = lastPageTotalMatches - lastPageConsumed;

@@ -128,8 +128,8 @@ export default function InitBoardModal({ onClose, onSaved }) {
       const config    = await configRes.json();
       const existing  = config.boards ?? [];
 
-      const name     = boardName || selected.title;
-      const repoName = selectedView?.repo ?? "";
+      const name      = boardName || selected.title;
+      const repoName  = selectedView?.repo ?? "";
       const newBoard = {
         id:         selected.id,
         viewId:     selectedView?.id ?? null,
@@ -139,6 +139,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
         slug:       boardSlug({ name, repoName }),
         boardPath:  "",
         repoName,
+        viewFilter: selectedView?.filter ?? "",
         repoPath:   "",
         columns:    activeCols.map((c) => ({ id: c.id, name: c.name, color: c.color ?? null })),
       };
