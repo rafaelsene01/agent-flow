@@ -8,7 +8,7 @@ import "highlight.js/styles/github-dark.css";
 
 // ── CardModal ─────────────────────────────────────────────────────────────────
 
-const TYPE_LABEL = { Issue: "Issue", PullRequest: "Pull Request", DraftIssue: "Draft" };
+const TYPE_LABEL = { Issue: "Issue", PullRequest: "Pull request", DraftIssue: "Draft issue" };
 
 function CardModal({ item, onClose }) {
   useEffect(() => {
@@ -43,7 +43,7 @@ function CardModal({ item, onClose }) {
                 <div className="card-modal-body md">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeHighlight]}
+                    rehypePlugins={[[rehypeHighlight, { detect: false }]]}
                   >
                     {item.body}
                   </ReactMarkdown>
@@ -94,7 +94,7 @@ function CardModal({ item, onClose }) {
 
             <div className="sidebar-section">
               <span className="sidebar-label">Tipo</span>
-              <span className="sidebar-value">{TYPE_LABEL[item.type] ?? item.type}</span>
+              <span className="sidebar-value">{item.itemType ?? TYPE_LABEL[item.type] ?? item.type}</span>
             </div>
           </aside>
         </div>
@@ -228,6 +228,18 @@ function Column({ boardId, columnId, columnName, columnColor, viewFilter, onCard
             {items.length}{hasNextPage ? "+" : ""}
           </span>
         )}
+        <button
+          className={`col-refresh-btn${loading ? " spinning" : ""}`}
+          title="Atualizar coluna"
+          disabled={loading}
+          onClick={() => {
+            setItems([]);
+            pageRef.current = { hasNextPage: false, cursor: null };
+            fetchItems(null);
+          }}
+        >
+          ↻
+        </button>
       </div>
       <div className="col-cards" onScroll={handleScroll}>
         {loading && <ColumnLoader />}

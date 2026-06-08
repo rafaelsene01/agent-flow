@@ -23,6 +23,20 @@ function AppContent() {
   const [showEditBoard, setShowEditBoard] = useState(false);
   const [boards, setBoards]               = useState([]);
   const [activeBoard, setActiveBoard]     = useState(null);
+  const [theme, setTheme]                 = useState("dark");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("theme") ?? "dark";
+    setTheme(saved);
+    document.documentElement.setAttribute("data-theme", saved);
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("theme", next);
+  }
 
   // Sincroniza activePath com botões de voltar/avançar do browser.
   useEffect(() => {
@@ -125,6 +139,8 @@ function AppContent() {
         activePath={activePath}
         onSelectBoard={selectBoard}
         onRemoveBoard={removeBoard}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       {activeBoard ? (
