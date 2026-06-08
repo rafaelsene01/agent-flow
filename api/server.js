@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import express from "express";
 import statusRoutes from "./routes/status.js";
 import configRoutes from "./routes/config.js";
+import githubRoutes from "./routes/github.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST_DIR = path.resolve(__dirname, "../web/out");
@@ -21,6 +22,7 @@ export async function startServer({ port, apiOnly = false }) {
 
   statusRoutes(app);
   configRoutes(app);
+  githubRoutes(app);
 
   if (!apiOnly) {
     app.use(express.static(WEB_DIST_DIR));
