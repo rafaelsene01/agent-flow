@@ -106,7 +106,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
         repoPath:   "",
         columns:    columns
           .filter((c) => selectedCols.includes(c.id))
-          .map((c) => c.name),
+          .map((c) => ({ id: c.id, name: c.name })),
       };
 
       await fetch("/api/config", {

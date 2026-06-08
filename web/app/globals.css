@@ -191,6 +191,36 @@ body { background: var(--bg); color: var(--text); }
   padding: 20px 0;
 }
 
+.col-error {
+  font-size: 12px;
+  color: var(--c-cancelled);
+  text-align: center;
+  padding: 12px 8px;
+}
+
+.col-loader {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  padding: 24px 0;
+}
+
+.col-loader-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: .5;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+.col-loader-dot:nth-child(2) { animation-delay: .2s; }
+.col-loader-dot:nth-child(3) { animation-delay: .4s; }
+
+@keyframes pulse-dot {
+  0%, 80%, 100% { transform: scale(.7); opacity: .3; }
+  40%           { transform: scale(1);  opacity: 1;   }
+}
+
 /* ── card ──────────────────────────────────────────────────────────────────── */
 .card {
   display: flex;

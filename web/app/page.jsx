@@ -48,11 +48,16 @@ function AppContent() {
     selectBoard(newBoard);
   }
 
-  function handleBoardUpdated(updatedBoard) {
+  async function handleBoardUpdated(updatedBoard) {
     const next = boards.map((b) => b.id === updatedBoard.id ? updatedBoard : b);
     setBoards(next);
     setActiveBoard(updatedBoard);
     setShowEditBoard(false);
+    await fetch("/api/config", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ boards: next }),
+    });
   }
 
   async function removeBoard(board) {

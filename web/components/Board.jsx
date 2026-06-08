@@ -8,12 +8,8 @@ function Card({ item }) {
   return (
     <div className="card p-none">
       <div className="card-top">
-        {item.number != null && (
-          <span className="card-id">#{item.number}</span>
-        )}
-        {item.type === "PullRequest" && (
-          <span className="card-type-badge">PR</span>
-        )}
+        {item.number != null && <span className="card-id">#{item.number}</span>}
+        {item.type === "PullRequest" && <span className="card-type-badge">PR</span>}
       </div>
       <p className="card-title">{item.title}</p>
       {item.labels.length > 0 && (
@@ -23,9 +19,9 @@ function Card({ item }) {
               key={l.name}
               className="label-chip"
               style={{
-                background:   `#${l.color}22`,
-                color:        `#${l.color}`,
-                borderColor:  `#${l.color}55`,
+                background:  `#${l.color}22`,
+                color:       `#${l.color}`,
+                borderColor: `#${l.color}55`,
               }}
             >
               {l.name}
@@ -42,20 +38,90 @@ function Card({ item }) {
   );
 }
 
+// ── ColumnLoader ──────────────────────────────────────────────────────────────
+
+function ColumnLoader() {
+  return (
+    <div className="col-loader">
+      <span className="col-loader-dot" />
+      <span className="col-loader-dot" />
+      <span className="col-loader-dot" />
+    </div>
+  );
+}
+
 // ── Column ────────────────────────────────────────────────────────────────────
 
-function Column({ name, items, onColScroll, loadingMore }) {
+function Column({ boardId, columnId, columnName, repoName }) {
+  const [items, setItems]             = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError]             = useState(null);
+
+  const fetchingRef = useRef(false);
+  const pageRef     = useRef({ hasNextPage: false, cursor: null });
+
+  const fetchItems = useCallback(async (cursor = null) => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    const isFirst = cursor === null;
+    if (isFirst) setLoading(true); else setLoadingMore(true);
+    setError(null);
+
+    try {
+      const qs = new URLSearchParams({ first: "30" });
+      if (columnId)  qs.set("columnId",  columnId);
+      else           qs.set("columnName", columnName);
+      if (repoName)  qs.set("repoName",  repoName);
+      if (cursor)    qs.set("after",     cursor);
+
+      const res  = await fetch(`/api/github/boards/${encodeURIComponent(boardId)}/items?${qs}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setItems((prev) => isFirst ? data.items : [...prev, ...data.items]);
+      pageRef.current = { hasNextPage: data.hasNextPage, cursor: data.endCursor };
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      fetchingRef.current = false;
+      if (isFirst) setLoading(false); else setLoadingMore(false);
+    }
+  }, [boardId, columnId, columnName, repoName]);
+
+  useEffect(() => {
+    setItems([]);
+    pageRef.current = { hasNextPage: false, cursor: null };
+    fetchItems(null);
+  }, [fetchItems]);
+
+  function handleScroll(e) {
+    const el = e.currentTarget;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 180;
+    if (nearBottom && pageRef.current.hasNextPage && !fetchingRef.current) {
+      fetchItems(pageRef.current.cursor);
+    }
+  }
+
+  const { hasNextPage } = pageRef.current;
+
   return (
     <div className="column">
       <div className="col-header">
-        <span className="col-name">{name}</span>
-        <span className="col-count">{items.length}</span>
+        <span className="col-name">{columnName}</span>
+        {!loading && (
+          <span className="col-count">
+            {items.length}{hasNextPage ? "+" : ""}
+          </span>
+        )}
       </div>
-      <div className="col-cards" onScroll={onColScroll}>
-        {items.length === 0 && <p className="col-empty">Sem cards</p>}
-        {items.map((item) => (
-          <Card key={item.id} item={item} />
-        ))}
+      <div className="col-cards" onScroll={handleScroll}>
+        {loading && <ColumnLoader />}
+        {!loading && error && <p className="col-error">{error}</p>}
+        {!loading && !error && items.length === 0 && (
+          <p className="col-empty">Sem cards</p>
+        )}
+        {!loading && items.map((item) => <Card key={item.id} item={item} />)}
         {loadingMore && <p className="col-loading-more">Carregando…</p>}
       </div>
     </div>
@@ -64,91 +130,34 @@ function Column({ name, items, onColScroll, loadingMore }) {
 
 // ── Board ─────────────────────────────────────────────────────────────────────
 
+function normalizeColumns(raw) {
+  return (raw ?? []).map((col) =>
+    typeof col === "string" ? { id: null, name: col } : col
+  );
+}
+
 export default function Board({ board }) {
-  const [items, setItems]             = useState([]);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [endCursor, setEndCursor]     = useState(null);
-  const [loading, setLoading]         = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError]             = useState(null);
+  const columns = normalizeColumns(board?.columns);
 
-  const fetchingRef = useRef(false);
-  const stateRef    = useRef({ hasNextPage: false, endCursor: null });
-
-  const fetchItems = useCallback(async (cursor = null) => {
-    if (!board?.id || fetchingRef.current) return;
-    fetchingRef.current = true;
-    const isFirst = cursor === null;
-    if (isFirst) setLoading(true); else setLoadingMore(true);
-    setError(null);
-
-    try {
-      const qs = `first=30${cursor ? `&after=${encodeURIComponent(cursor)}` : ""}`;
-      const res = await fetch(`/api/github/boards/${encodeURIComponent(board.id)}/items?${qs}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-
-      setItems((prev) => isFirst ? data.items : [...prev, ...data.items]);
-      setHasNextPage(data.hasNextPage);
-      setEndCursor(data.endCursor);
-      stateRef.current = { hasNextPage: data.hasNextPage, endCursor: data.endCursor };
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      fetchingRef.current = false;
-      if (isFirst) setLoading(false); else setLoadingMore(false);
-    }
-  }, [board.id]);
-
-  useEffect(() => {
-    if (!board?.id) return;
-    setItems([]);
-    setHasNextPage(false);
-    setEndCursor(null);
-    setError(null);
-    stateRef.current = { hasNextPage: false, endCursor: null };
-    fetchItems(null);
-  }, [board?.id, fetchItems]);
-
-  function handleColScroll(e) {
-    const el = e.currentTarget;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 180;
-    if (nearBottom && stateRef.current.hasNextPage && !fetchingRef.current) {
-      fetchItems(stateRef.current.endCursor);
-    }
-  }
-
-  const columns = board.columns ?? [];
-  const grouped = Object.fromEntries(columns.map((c) => [c, []]));
-  for (const item of items) {
-    if (item.status && Object.prototype.hasOwnProperty.call(grouped, item.status)) {
-      grouped[item.status].push(item);
-    }
-  }
-
-  if (loading) {
+  if (columns.length === 0) {
     return (
-      <div className="loader">
-        <span className="loader-dot" />
-        <span className="loader-dot" />
-        <span className="loader-dot" />
+      <div className="empty-board">
+        <div className="empty-board-inner">
+          <p>Nenhuma coluna configurada. Edite o board para adicionar colunas.</p>
+        </div>
       </div>
     );
-  }
-
-  if (error) {
-    return <div className="error-bar">{error}</div>;
   }
 
   return (
     <div className="board">
       {columns.map((col) => (
         <Column
-          key={col}
-          name={col}
-          items={grouped[col] ?? []}
-          onColScroll={handleColScroll}
-          loadingMore={loadingMore}
+          key={`${board.id}:${col.id ?? col.name}`}
+          boardId={board.id}
+          columnId={col.id}
+          columnName={col.name}
+          repoName={board.repoName ?? null}
         />
       ))}
     </div>
