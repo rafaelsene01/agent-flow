@@ -52,7 +52,18 @@ function ColumnLoader() {
 
 // ── Column ────────────────────────────────────────────────────────────────────
 
-function Column({ boardId, columnId, columnName, repoName }) {
+const GH_COLORS = {
+  GRAY:   "#7d8590",
+  BLUE:   "#58a6ff",
+  GREEN:  "#3fb950",
+  YELLOW: "#e3b341",
+  ORANGE: "#fb8f44",
+  RED:    "#f85149",
+  PINK:   "#f778ba",
+  PURPLE: "#bf68d9",
+};
+
+function Column({ boardId, columnId, columnName, columnColor, repoName }) {
   const [items, setItems]             = useState([]);
   const [loading, setLoading]         = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -105,10 +116,12 @@ function Column({ boardId, columnId, columnName, repoName }) {
 
   const { hasNextPage } = pageRef.current;
 
+  const accentColor = GH_COLORS[columnColor] ?? GH_COLORS.GRAY;
+
   return (
-    <div className="column">
+    <div className="column" style={{ borderTop: `2px solid ${accentColor}` }}>
       <div className="col-header">
-        <span className="col-name">{columnName}</span>
+        <span className="col-name" style={{ color: accentColor }}>{columnName}</span>
         {!loading && (
           <span className="col-count">
             {items.length}{hasNextPage ? "+" : ""}
@@ -157,6 +170,7 @@ export default function Board({ board }) {
           boardId={board.id}
           columnId={col.id}
           columnName={col.name}
+          columnColor={col.color ?? null}
           repoName={board.repoName ?? null}
         />
       ))}

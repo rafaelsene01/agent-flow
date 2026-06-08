@@ -1,22 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { boardSlug } from "@/lib/boardSlug.js";
+
+function colKey(c) {
+  return c.id ?? c.name;
+}
 
 export default function InitBoardModal({ onClose, onSaved }) {
   const [boards, setBoards]               = useState([]);
   const [loading, setLoading]             = useState(true);
   const [fetchError, setFetchError]       = useState(null);
   const [missingScope, setMissingScope]   = useState(false);
-  const [selected, setSelected]             = useState(null);
-  const [boardName, setBoardName]           = useState("");
-  const [views, setViews]                   = useState([]);
-  const [viewsLoading, setViewsLoading]     = useState(false);
-  const [selectedView, setSelectedView]     = useState(null);
-  const [columns, setColumns]               = useState([]);
+  const [selected, setSelected]           = useState(null);
+  const [boardName, setBoardName]         = useState("");
+  const [views, setViews]                 = useState([]);
+  const [viewsLoading, setViewsLoading]   = useState(false);
+  const [selectedView, setSelectedView]   = useState(null);
+  const [allCols, setAllCols]             = useState([]);
+  const [activeCols, setActiveCols]       = useState([]);
   const [columnsLoading, setColumnsLoading] = useState(false);
-  const [selectedCols, setSelectedCols]     = useState([]);
-  const [saving, setSaving]                 = useState(false);
+  const [dragOver, setDragOver]           = useState(null);
+  const [saving, setSaving]               = useState(false);
+  const dragIdx = useRef(null);
 
   useEffect(() => {
     fetch("/api/github/boards")
@@ -48,8 +54,8 @@ export default function InitBoardModal({ onClose, onSaved }) {
     setBoardName(board.title);
     setViews([]);
     setSelectedView(null);
-    setColumns([]);
-    setSelectedCols([]);
+    setAllCols([]);
+    setActiveCols([]);
     setViewsLoading(true);
     fetch(`/api/github/boards/${encodeURIComponent(board.id)}/views`)
       .then((r) => r.json())
@@ -64,33 +70,63 @@ export default function InitBoardModal({ onClose, onSaved }) {
 
   function selectView(board, view) {
     setSelectedView(view);
-    setColumns([]);
-    setSelectedCols([]);
+    setAllCols([]);
+    setActiveCols([]);
     setColumnsLoading(true);
     fetch(`/api/github/boards/${encodeURIComponent(board.id)}/columns`)
       .then((r) => r.json())
       .then((data) => {
         if (!data.error) {
-          setColumns(data);
-          setSelectedCols(data.map((c) => c.id));
+          setAllCols(data);
+          setActiveCols(data);
         }
       })
       .finally(() => setColumnsLoading(false));
   }
 
-  function toggleCol(id) {
-    setSelectedCols((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
-    );
+  // ── drag-and-drop ────────────────────────────────────────────────────────────
+
+  function onDragStart(i) { dragIdx.current = i; }
+  function onDragEnter(i) { setDragOver(i); }
+
+  function onDrop(i) {
+    const from = dragIdx.current;
+    if (from === null || from === i) { resetDrag(); return; }
+    const next = [...activeCols];
+    const [item] = next.splice(from, 1);
+    next.splice(i, 0, item);
+    setActiveCols(next);
+    resetDrag();
   }
+
+  function resetDrag() {
+    dragIdx.current = null;
+    setDragOver(null);
+  }
+
+  function remove(col) {
+    setActiveCols((prev) => prev.filter((c) => colKey(c) !== colKey(col)));
+  }
+
+  function add(col) {
+    setActiveCols((prev) => [...prev, col]);
+  }
+
+  const available = allCols.filter((apiCol) =>
+    !activeCols.some((ac) =>
+      (ac.id && ac.id === apiCol.id) || ac.name === apiCol.name
+    )
+  );
+
+  // ── save ─────────────────────────────────────────────────────────────────────
 
   async function save() {
     if (!selected) return;
     setSaving(true);
     try {
       const configRes = await fetch("/api/config");
-      const config = await configRes.json();
-      const existing = config.boards ?? [];
+      const config    = await configRes.json();
+      const existing  = config.boards ?? [];
 
       const name     = boardName || selected.title;
       const repoName = selectedView?.repo ?? "";
@@ -104,9 +140,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
         boardPath:  "",
         repoName,
         repoPath:   "",
-        columns:    columns
-          .filter((c) => selectedCols.includes(c.id))
-          .map((c) => ({ id: c.id, name: c.name })),
+        columns:    activeCols.map((c) => ({ id: c.id, name: c.name, color: c.color ?? null })),
       };
 
       await fetch("/api/config", {
@@ -120,6 +154,8 @@ export default function InitBoardModal({ onClose, onSaved }) {
       setSaving(false);
     }
   }
+
+  // ── render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="backdrop" onClick={onClose}>
@@ -140,7 +176,6 @@ export default function InitBoardModal({ onClose, onSaved }) {
             <label className="sf-label">Board GitHub</label>
 
             {loading && <div className="board-select-state">Carregando boards…</div>}
-
             {fetchError && <div className="board-select-state err">{fetchError}</div>}
 
             {missingScope && (
@@ -196,9 +231,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
 
               <div className="sf-field">
                 <label className="sf-label">View</label>
-                {viewsLoading && (
-                  <div className="board-select-state">Carregando views…</div>
-                )}
+                {viewsLoading && <div className="board-select-state">Carregando views…</div>}
                 {!viewsLoading && views.length === 0 && (
                   <div className="board-select-state">Nenhuma view encontrada.</div>
                 )}
@@ -222,35 +255,56 @@ export default function InitBoardModal({ onClose, onSaved }) {
               </div>
 
               <div className="sf-field">
-                <label className="sf-label">Colunas visíveis</label>
-                {columnsLoading && (
-                  <div className="board-select-state">Carregando colunas…</div>
+                <span className="sf-section-title">Colunas ativas</span>
+                {columnsLoading && <div className="board-select-state">Carregando colunas…</div>}
+                {!columnsLoading && activeCols.length === 0 && (
+                  <div className="board-select-state">Nenhuma coluna selecionada.</div>
                 )}
-                {!columnsLoading && columns.length > 0 && (
-                  <div className="sf-checkgrid">
-                    {columns.map((col) => {
-                      const checked = selectedCols.includes(col.id);
-                      return (
-                        <label
-                          key={col.id}
-                          className={`sf-check${checked ? " checked" : ""}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleCol(col.id)}
-                          />
-                          <span className="sf-check-dot" />
-                          {col.name}
-                        </label>
-                      );
-                    })}
+                {!columnsLoading && activeCols.length > 0 && (
+                  <div className="edit-col-list">
+                    {activeCols.map((col, i) => (
+                      <div
+                        key={colKey(col)}
+                        className={`edit-col-item${dragOver === i ? " drag-over" : ""}`}
+                        draggable
+                        onDragStart={() => onDragStart(i)}
+                        onDragEnter={() => onDragEnter(i)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => onDrop(i)}
+                        onDragEnd={resetDrag}
+                      >
+                        <span className="col-drag-handle" title="Arrastar para reordenar">⠿</span>
+                        <span className="edit-col-name">{col.name}</span>
+                        <button
+                          className="btn-col-remove"
+                          type="button"
+                          onClick={() => remove(col)}
+                          title="Remover"
+                        >×</button>
+                      </div>
+                    ))}
                   </div>
                 )}
-                {!columnsLoading && columns.length === 0 && (
-                  <div className="board-select-state">Nenhuma coluna encontrada.</div>
-                )}
               </div>
+
+              {!columnsLoading && available.length > 0 && (
+                <div className="sf-field">
+                  <span className="sf-section-title">Disponíveis</span>
+                  <div className="edit-col-available-list">
+                    {available.map((col) => (
+                      <button
+                        key={colKey(col)}
+                        className="edit-col-add-item"
+                        type="button"
+                        onClick={() => add(col)}
+                      >
+                        <span className="edit-col-add-icon">+</span>
+                        {col.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -263,7 +317,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
             <button
               className="btn-primary"
               type="button"
-              disabled={!selected || !boardName || !selectedView || saving || columnsLoading || selectedCols.length === 0}
+              disabled={!selected || !boardName || !selectedView || saving || columnsLoading || activeCols.length === 0}
               onClick={save}
             >
               {saving ? "Salvando…" : "Adicionar Board"}

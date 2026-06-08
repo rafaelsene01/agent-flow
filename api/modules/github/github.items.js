@@ -72,7 +72,7 @@ const ITEMS_QUERY = `query($id: ID!, $first: Int!, $after: String) {
             }
             ... on DraftIssue { title }
           }
-          fieldValues(first: 15) {
+          fieldValues(first: 30) {
             nodes {
               ... on ProjectV2ItemFieldSingleSelectValue {
                 name
@@ -211,9 +211,9 @@ export async function listItemsByColumn(projectId, { columnId, columnName }, { f
 
     for (const item of page.items) {
       if (repoName && item._repoName && item._repoName !== repoName) continue;
-      const match = columnId
-        ? item._statusOptionId === columnId
-        : item._status === columnName;
+      const matchById   = columnId   && item._statusOptionId === columnId;
+      const matchByName = columnName && item._status?.toLowerCase() === columnName.toLowerCase();
+      const match = matchById || (!columnId && matchByName) || (columnId && !item._statusOptionId && matchByName);
       if (!match) continue;
 
       // Pula os primeiros `skip` matches apenas na primeira página buscada.
