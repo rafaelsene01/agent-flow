@@ -1188,3 +1188,117 @@ select.sf-input option { background: #1c2333; }
   color: var(--c-completed);
   border-color: var(--c-completed);
 }
+
+/* ── board view header ──────────────────────────────────────────────────────── */
+.board-view-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.btn-edit-board {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.btn-edit-board:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── edit board modal (columns) ─────────────────────────────────────────────── */
+.edit-col-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface2);
+  padding: 4px;
+}
+
+.edit-col-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  transition: border-color .1s, background .1s;
+}
+.edit-col-item.drag-over {
+  border-color: var(--accent);
+  background: #0d1f33;
+}
+
+.col-drag-handle {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  font-size: 14px;
+  cursor: grab;
+  line-height: 1;
+  user-select: none;
+  padding: 0 2px;
+}
+.col-drag-handle:active { cursor: grabbing; }
+
+.edit-col-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.btn-col-remove {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-faint);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  transition: color .1s, background .1s;
+}
+.btn-col-remove:hover { color: var(--c-cancelled); background: rgba(248,81,73,.1); }
+
+.edit-col-available-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface2);
+  padding: 4px;
+}
+
+.edit-col-add-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .1s, color .1s, border-color .1s;
+}
+.edit-col-add-item:hover { background: var(--surface); color: var(--text); border-color: var(--border2); }
+
+.edit-col-add-icon {
+  font-size: 15px;
+  color: var(--c-completed);
+  line-height: 1;
+  flex-shrink: 0;
+}

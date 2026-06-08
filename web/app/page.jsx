@@ -1,18 +1,21 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { boardSlug } from "@/lib/boardSlug.js";
 import Header from "@/components/Header.jsx";
 import SettingsModal from "@/components/SettingsModal.jsx";
 import InitBoardModal from "@/components/InitBoardModal.jsx";
+import EditBoardModal from "@/components/EditBoardModal.jsx";
 
 function AppContent() {
-  const router       = useRouter();
-  const searchParams = useSearchParams();
+  const router   = useRouter();
+  const pathname = usePathname();
 
   const [initializing, setInitializing]   = useState(true);
   const [showSettings, setShowSettings]   = useState(false);
   const [showInitBoard, setShowInitBoard] = useState(false);
+  const [showEditBoard, setShowEditBoard] = useState(false);
   const [boards, setBoards]               = useState([]);
   const [activeBoard, setActiveBoard]     = useState(null);
 
@@ -25,21 +28,28 @@ function AppContent() {
       const saved = config.boards ?? [];
       setBoards(saved);
 
-      const boardId   = searchParams.get("board");
-      const fromUrl   = boardId ? saved.find((b) => b.id === boardId) : null;
+      const slug    = pathname.slice(1);
+      const fromUrl = slug ? saved.find((b) => boardSlug(b) === slug) : null;
       setActiveBoard(fromUrl ?? saved[0] ?? null);
     }).finally(() => setInitializing(false));
   }, []);
 
   function selectBoard(board) {
     setActiveBoard(board);
-    router.push(`?board=${board.id}`, { scroll: false });
+    router.push(`/${boardSlug(board)}`, { scroll: false });
   }
 
   function handleBoardSaved(newBoard) {
     setBoards((prev) => [...prev, newBoard]);
     setShowInitBoard(false);
     selectBoard(newBoard);
+  }
+
+  function handleBoardUpdated(updatedBoard) {
+    const next = boards.map((b) => b.id === updatedBoard.id ? updatedBoard : b);
+    setBoards(next);
+    setActiveBoard(updatedBoard);
+    setShowEditBoard(false);
   }
 
   async function removeBoard(board) {
@@ -49,7 +59,7 @@ function AppContent() {
     if (activeBoard?.id === board.id) {
       const fallback = next[0] ?? null;
       setActiveBoard(fallback);
-      router.push(fallback ? `?board=${fallback.id}` : "/", { scroll: false });
+      router.push(fallback ? `/${boardSlug(fallback)}` : "/", { scroll: false });
     }
 
     await fetch("/api/config", {
@@ -86,8 +96,20 @@ function AppContent() {
 
       {activeBoard ? (
         <div className="board-view">
-          <h2 className="board-view-name">{activeBoard.name}</h2>
-          <p className="board-view-repo">{activeBoard.repoName}</p>
+          <div className="board-view-header">
+            <div>
+              <h2 className="board-view-name">{activeBoard.name}</h2>
+              <p className="board-view-repo">{activeBoard.repoName}</p>
+            </div>
+            <button
+              className="btn-edit-board"
+              type="button"
+              onClick={() => setShowEditBoard(true)}
+              title="Editar colunas"
+            >
+              ✎
+            </button>
+          </div>
         </div>
       ) : (
         <div className="empty-board">
@@ -112,6 +134,14 @@ function AppContent() {
         <InitBoardModal
           onClose={() => setShowInitBoard(false)}
           onSaved={handleBoardSaved}
+        />
+      )}
+
+      {showEditBoard && activeBoard && (
+        <EditBoardModal
+          board={activeBoard}
+          onClose={() => setShowEditBoard(false)}
+          onSaved={handleBoardUpdated}
         />
       )}
     </div>

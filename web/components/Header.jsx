@@ -16,7 +16,7 @@ export default function Header({ onSettings, onInitBoard, boards = [], activeBoa
                 type="button"
                 onClick={() => onSelectBoard(b)}
               >
-                {b.name}
+                {b.repoName ? b.repoName.split("/").pop() : b.name}
                 <span
                   className="board-tab-close"
                   role="button"
