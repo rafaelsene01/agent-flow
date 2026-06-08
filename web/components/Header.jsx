@@ -2,7 +2,7 @@
 
 import { boardSlug } from "@/lib/boardSlug.js";
 
-export default function Header({ onSettings, onInitBoard, boards = [], activePath = "", onSelectBoard, onRemoveBoard }) {
+export default function Header({ onSettings, onInitBoard, boards = [], activePath = "", onSelectBoard, onRemoveBoard, theme = "dark", onToggleTheme }) {
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -43,6 +43,14 @@ export default function Header({ onSettings, onInitBoard, boards = [], activePat
       </div>
 
       <div className="topbar-right">
+        <button
+          className="btn-theme"
+          type="button"
+          onClick={onToggleTheme}
+          title={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
+        >
+          {theme === "dark" ? "☀" : "🌙"}
+        </button>
         <button
           className="btn-settings"
           type="button"

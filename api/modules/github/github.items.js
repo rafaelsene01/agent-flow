@@ -48,9 +48,11 @@ function parseItems(raw) {
     const statusFV =
       fvNodes.find((fv) => fv?.field?.name?.toLowerCase() === "status") ??
       fvNodes.find((fv) => fv?.field?.name != null);
+    const typeFV = fvNodes.find((fv) => fv?.field?.name?.toLowerCase() === "type");
     return {
       id:             node.id,
       type:           content.__typename ?? "Unknown",
+      itemType:       typeFV?.name ?? null,
       title:          content.title ?? "(sem título)",
       number:         content.number ?? null,
       body:           content.body ?? null,
@@ -87,12 +89,12 @@ function labelsMatch(itemLabels, labelFilter) {
   return wanted.some((w) => itemLabels.some((l) => l.name.toLowerCase() === w));
 }
 
-function toClientItem({ id, type, title, number, body, assignees, labels }) {
-  return { id, type, title, number, body, assignees, labels };
+function toClientItem({ id, type, itemType, title, number, body, assignees, labels }) {
+  return { id, type, itemType, title, number, body, assignees, labels };
 }
 
-function toClientItemWithColumn({ id, type, title, number, body, assignees, labels, _status, _statusOptionId }) {
-  return { id, type, title, number, body, assignees, labels, columnName: _status, columnId: _statusOptionId };
+function toClientItemWithColumn({ id, type, itemType, title, number, body, assignees, labels, _status, _statusOptionId }) {
+  return { id, type, itemType, title, number, body, assignees, labels, columnName: _status, columnId: _statusOptionId };
 }
 
 export async function listItems(projectId, { first = 30, after = null, repoName = null, labels = null } = {}) {
