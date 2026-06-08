@@ -25,7 +25,7 @@ export async function getRepositories(token) {
   return request("/user/repos?per_page=100&sort=updated", token);
 }
 
-export async function graphQL(query, token) {
+export async function graphQL(query, token, variables = {}) {
   const res = await fetch(`${BASE_URL}/graphql`, {
     method: "POST",
     headers: {
@@ -34,7 +34,7 @@ export async function graphQL(query, token) {
       "X-GitHub-Api-Version": "2022-11-28",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) {
     const text = await res.text();
