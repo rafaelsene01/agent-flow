@@ -29,6 +29,13 @@ export async function startServer({ port, apiOnly = false }) {
     app.use((_req, res) => res.sendFile(path.join(WEB_DIST_DIR, "index.html")));
   }
 
+  // Garante que erros não capturados retornem JSON, nunca "Internal Server Error" em texto.
+  app.use((err, _req, res, _next) => {
+    console.error("[server error]", err);
+    if (res.headersSent) return;
+    res.status(500).json({ error: err?.message ?? String(err) });
+  });
+
   const host = "localhost";
   const server = await new Promise((resolve, reject) => {
     const s = app.listen(port, host, () => resolve(s));

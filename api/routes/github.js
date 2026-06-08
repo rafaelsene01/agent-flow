@@ -2,22 +2,26 @@ import { listRepos }                        from "../modules/github/github.repos
 import { listBoards, listViews, listColumns } from "../modules/github/github.boards.js";
 import { listItems, listAllItems, listItemsByColumn } from "../modules/github/github.items.js";
 
+function sendError(res, err) {
+  if (res.headersSent) return;
+  res.status(500).json({ error: err?.message ?? String(err) });
+}
+
 export default function githubRoutes(app) {
   app.get("/api/github/repos", async (_req, res) => {
     try {
       res.json(await listRepos());
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      sendError(res, err);
     }
   });
 
   app.get("/api/github/boards", async (_req, res) => {
     try {
-      const boards = await listBoards();
-      res.json(boards);
+      res.json(await listBoards());
     } catch (err) {
-      console.error("[/api/github/boards]", err.message);
-      res.status(500).json({ error: err.message });
+      console.error("[boards]", err.message);
+      sendError(res, err);
     }
   });
 
@@ -27,13 +31,16 @@ export default function githubRoutes(app) {
       const after      = req.query.after      || null;
       const columnId   = req.query.columnId   || null;
       const columnName = req.query.columnName || req.query.column || null;
-      const repoName   = req.query.repoName   || null;
+      const viewFilter = req.query.viewFilter || null;
+      const repoName   = viewFilter ? (viewFilter.match(/repo:([^\s]+)/i)?.[1] ?? null) : null;
+      const labels     = viewFilter ? (viewFilter.match(/label:([^\s]+)/i)?.[1] ?? null) : null;
       const result = (columnId || columnName)
-        ? await listItemsByColumn(req.params.id, { columnId, columnName }, { first, after, repoName })
-        : await listAllItems(req.params.id, { after, repoName });
+        ? await listItemsByColumn(req.params.id, { columnId, columnName }, { first, after, repoName, labels })
+        : await listAllItems(req.params.id, { after, repoName, labels });
       res.json(result);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      console.error("[items]", err);
+      sendError(res, err);
     }
   });
 
@@ -41,7 +48,7 @@ export default function githubRoutes(app) {
     try {
       res.json(await listViews(req.params.id));
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      sendError(res, err);
     }
   });
 
@@ -49,7 +56,7 @@ export default function githubRoutes(app) {
     try {
       res.json(await listColumns(req.params.id));
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      sendError(res, err);
     }
   });
 }

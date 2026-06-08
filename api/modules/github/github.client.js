@@ -1,4 +1,28 @@
+import { execSync } from "child_process";
+
 const BASE_URL = "https://api.github.com";
+
+let _cachedToken = null;
+
+export function getToken() {
+  const env = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || process.env.GITHUB_KEY;
+  if (env) return env;
+  if (_cachedToken) return _cachedToken;
+  try {
+    _cachedToken = execSync("gh auth token", {
+      encoding: "utf-8",
+      timeout:  5000,
+      shell:    true,
+    }).trim();
+    return _cachedToken;
+  } catch {
+    return null;
+  }
+}
+
+export function clearTokenCache() {
+  _cachedToken = null;
+}
 
 async function request(path, token) {
   const res = await fetch(`${BASE_URL}${path}`, {
