@@ -7,6 +7,7 @@ const CONFIG_FILE = path.join(APP_DIR, "config.json");
 
 const DEFAULTS = {
   projectsPath: path.join(APP_DIR, "projects"),
+  boards: [],
 };
 
 function ensureDirs() {

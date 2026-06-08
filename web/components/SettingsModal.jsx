@@ -88,10 +88,9 @@ function IntegrationCard({ name, logo, loading, data, commands }) {
               {data.version && <div className="intg-status ok">{data.version}</div>}
               {!data.user && !data.version && <div className="intg-status ok">Conectado</div>}
               <div className="intg-detail">
-                {data.method === "env"         ? "via variável de ambiente" :
-                 data.method === "gh-cli"      ? "via gh CLI"               :
-                 data.method === "ssh"         ? "via chave SSH"            :
-                 data.method === "claude-cli"  ? "via claude CLI"            : data.method}
+                {data.method === "env"        ? "via variável de ambiente" :
+                 data.method === "gh-cli"     ? "via gh CLI"               :
+                 data.method === "claude-cli" ? "via claude CLI"           : data.method}
               </div>
             </>
           )}
