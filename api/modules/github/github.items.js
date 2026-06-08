@@ -48,11 +48,14 @@ function parseItems(raw) {
     const statusFV =
       fvNodes.find((fv) => fv?.field?.name?.toLowerCase() === "status") ??
       fvNodes.find((fv) => fv?.field?.name != null);
-    const typeFV = fvNodes.find((fv) => fv?.field?.name?.toLowerCase() === "type");
+    const typeFV = fvNodes.find((fv) => fv?.field?.name?.toLowerCase() === "type")
+                ?? fvNodes.find((fv) => fv?.field?.name?.toLowerCase() === "issue type")
+                ?? fvNodes.find((fv) => fv?.field?.name?.toLowerCase() === "item type");
+    const itemType = typeFV?.name ?? typeFV?.text ?? null;
     return {
       id:             node.id,
       type:           content.__typename ?? "Unknown",
-      itemType:       typeFV?.name ?? null,
+      itemType,
       title:          content.title ?? "(sem título)",
       number:         content.number ?? null,
       body:           content.body ?? null,
