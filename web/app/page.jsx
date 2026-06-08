@@ -28,11 +28,13 @@ function AppContent() {
       if (!status?.github?.connected || !status?.claude?.connected) setShowSettings(true);
       const saved = config.boards ?? [];
       setBoards(saved);
-
       const slug    = pathname.slice(1);
       const fromUrl = slug ? saved.find((b) => boardSlug(b) === slug) : null;
       setActiveBoard(fromUrl ?? saved[0] ?? null);
-    }).finally(() => setInitializing(false));
+      setInitializing(false);
+    }).catch(() => {
+      setInitializing(false);
+    });
   }, []);
 
   function selectBoard(board) {

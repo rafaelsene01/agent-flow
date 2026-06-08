@@ -76,7 +76,7 @@ export default function Board({ board }) {
   const stateRef    = useRef({ hasNextPage: false, endCursor: null });
 
   const fetchItems = useCallback(async (cursor = null) => {
-    if (fetchingRef.current) return;
+    if (!board?.id || fetchingRef.current) return;
     fetchingRef.current = true;
     const isFirst = cursor === null;
     if (isFirst) setLoading(true); else setLoadingMore(true);
@@ -101,13 +101,14 @@ export default function Board({ board }) {
   }, [board.id]);
 
   useEffect(() => {
+    if (!board?.id) return;
     setItems([]);
     setHasNextPage(false);
     setEndCursor(null);
     setError(null);
     stateRef.current = { hasNextPage: false, endCursor: null };
     fetchItems(null);
-  }, [board.id, fetchItems]);
+  }, [board?.id, fetchItems]);
 
   function handleColScroll(e) {
     const el = e.currentTarget;
