@@ -1,6 +1,6 @@
 "use client";
 
-export default function Header({ onSettings, onInitBoard, boards = [], activeBoard, onSelectBoard }) {
+export default function Header({ onSettings, onInitBoard, boards = [], activeBoard, onSelectBoard, onRemoveBoard }) {
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -17,6 +17,14 @@ export default function Header({ onSettings, onInitBoard, boards = [], activeBoa
                 onClick={() => onSelectBoard(b)}
               >
                 {b.name}
+                <span
+                  className="board-tab-close"
+                  role="button"
+                  title="Remover board"
+                  onClick={(e) => { e.stopPropagation(); onRemoveBoard(b); }}
+                >
+                  ×
+                </span>
               </button>
             ))}
           </nav>

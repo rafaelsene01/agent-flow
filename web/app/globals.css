@@ -451,6 +451,19 @@ body { background: var(--bg); color: var(--text); }
 .board-tab:hover  { color: var(--text); background: var(--surface2); }
 .board-tab.active { color: var(--text); border-bottom-color: var(--accent); }
 
+.board-tab-close {
+  margin-left: 6px;
+  font-size: 14px;
+  line-height: 1;
+  color: transparent;
+  border-radius: 3px;
+  padding: 0 2px;
+  transition: color .15s, background .15s;
+}
+.board-tab:hover .board-tab-close,
+.board-tab.active .board-tab-close { color: var(--text-faint); }
+.board-tab-close:hover { color: var(--text) !important; background: var(--border); }
+
 /* ── board view ────────────────────────────────────────────────────────────── */
 .board-view {
   padding: 32px 28px;
