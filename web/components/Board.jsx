@@ -1,12 +1,113 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github-dark.css";
+
+// ── CardModal ─────────────────────────────────────────────────────────────────
+
+const TYPE_LABEL = { Issue: "Issue", PullRequest: "Pull Request", DraftIssue: "Draft" };
+
+function CardModal({ item, onClose }) {
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  return (
+    <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal card-modal">
+        <div className="card-modal-layout">
+          {/* ── main ── */}
+          <div className="card-modal-main">
+            <div className="card-modal-fixed">
+              <div className="card-modal-header">
+                <div className="card-modal-header-left">
+                  {item.number != null && <span className="modal-id">#{item.number}</span>}
+                </div>
+                <button className="modal-close" onClick={onClose}>✕</button>
+              </div>
+              <h2 className="modal-title card-modal-title">{item.title}</h2>
+              <div className="card-modal-divider" />
+              <div className="card-modal-desc-label">Descrição</div>
+            </div>
+            <div className="card-modal-scroll">
+              {item.body ? (
+                <div className="card-modal-body md">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                  >
+                    {item.body}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <p className="card-modal-no-body">Sem descrição.</p>
+              )}
+            </div>
+          </div>
+
+          {/* ── sidebar ── */}
+          <aside className="card-modal-sidebar">
+            <div className="sidebar-section">
+              <span className="sidebar-label">Assignees</span>
+              {item.assignees.length > 0 ? (
+                <div className="sidebar-assignees">
+                  {item.assignees.map((a) => (
+                    <span key={a} className="sidebar-assignee">@{a}</span>
+                  ))}
+                </div>
+              ) : (
+                <span className="sidebar-empty">Nenhum</span>
+              )}
+            </div>
+
+            <div className="sidebar-section">
+              <span className="sidebar-label">Labels</span>
+              {item.labels.length > 0 ? (
+                <div className="sidebar-labels">
+                  {item.labels.map((l) => (
+                    <span
+                      key={l.name}
+                      className="label-chip"
+                      style={{
+                        background:  `#${l.color}22`,
+                        color:       `#${l.color}`,
+                        borderColor: `#${l.color}55`,
+                      }}
+                    >
+                      {l.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="sidebar-empty">Nenhum</span>
+              )}
+            </div>
+
+            <div className="sidebar-section">
+              <span className="sidebar-label">Tipo</span>
+              <span className="sidebar-value">{TYPE_LABEL[item.type] ?? item.type}</span>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 
-function Card({ item }) {
+function Card({ item, onOpen }) {
   return (
-    <div className="card p-none">
+    <div className="card p-none" onClick={() => onOpen(item)}>
       <div className="card-top">
         {item.number != null && <span className="card-id">#{item.number}</span>}
         {item.type === "PullRequest" && <span className="card-type-badge">PR</span>}
@@ -63,7 +164,7 @@ const GH_COLORS = {
   PURPLE: "#bf68d9",
 };
 
-function Column({ boardId, columnId, columnName, columnColor, viewFilter }) {
+function Column({ boardId, columnId, columnName, columnColor, viewFilter, onCardOpen }) {
   const [items, setItems]             = useState([]);
   const [loading, setLoading]         = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -134,7 +235,7 @@ function Column({ boardId, columnId, columnName, columnColor, viewFilter }) {
         {!loading && !error && items.length === 0 && (
           <p className="col-empty">Sem cards</p>
         )}
-        {!loading && items.map((item) => <Card key={item.id} item={item} />)}
+        {!loading && items.map((item) => <Card key={item.id} item={item} onOpen={onCardOpen} />)}
         {loadingMore && <p className="col-loading-more">Carregando…</p>}
       </div>
     </div>
@@ -151,6 +252,7 @@ function normalizeColumns(raw) {
 
 export default function Board({ board }) {
   const columns = normalizeColumns(board?.columns);
+  const [activeCard, setActiveCard] = useState(null);
 
   if (columns.length === 0) {
     return (
@@ -163,17 +265,21 @@ export default function Board({ board }) {
   }
 
   return (
-    <div className="board">
-      {columns.map((col) => (
-        <Column
-          key={`${board.id}:${col.id ?? col.name}`}
-          boardId={board.id}
-          columnId={col.id}
-          columnName={col.name}
-          columnColor={col.color ?? null}
-          viewFilter={board.viewFilter ?? null}
-        />
-      ))}
-    </div>
+    <>
+      <div className="board">
+        {columns.map((col) => (
+          <Column
+            key={`${board.id}:${col.id ?? col.name}`}
+            boardId={board.id}
+            columnId={col.id}
+            columnName={col.name}
+            columnColor={col.color ?? null}
+            viewFilter={board.viewFilter ?? null}
+            onCardOpen={setActiveCard}
+          />
+        ))}
+      </div>
+      {activeCard && <CardModal item={activeCard} onClose={() => setActiveCard(null)} />}
+    </>
   );
 }
