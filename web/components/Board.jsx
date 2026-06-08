@@ -92,10 +92,18 @@ function CardModal({ item, onClose }) {
               )}
             </div>
 
-            <div className="sidebar-section">
-              <span className="sidebar-label">Tipo</span>
-              <span className="sidebar-value">{item.itemType ?? TYPE_LABEL[item.type] ?? item.type}</span>
-            </div>
+            {item.itemType && (
+              <div className="sidebar-section">
+                <span className="sidebar-label">Tipo</span>
+                <span className="sidebar-value">{item.itemType}</span>
+              </div>
+            )}
+            {!item.itemType && item.type !== "Issue" && (
+              <div className="sidebar-section">
+                <span className="sidebar-label">Tipo</span>
+                <span className="sidebar-value">{TYPE_LABEL[item.type] ?? item.type}</span>
+              </div>
+            )}
           </aside>
         </div>
       </div>
