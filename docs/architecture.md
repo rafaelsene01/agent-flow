@@ -44,14 +44,19 @@ api/
 
 ## Estado atual
 
-Projeto em fase inicial. Módulos existentes:
-
 | Módulo | Caminho | Descrição |
 |--------|---------|-----------|
-| `status` | `api/routes/status.js` | Verificação GitHub + Claude |
-| `github` | `api/clients/github.js` | Cliente HTTP GitHub REST API |
+| `github` | `api/modules/github/` | Auth, repos e boards do GitHub |
+| `claude` | `api/modules/claude/` | Detecção do Claude CLI |
+| `config` | `api/modules/config/` | Config persistida em `~/.agent-flow/config.json` |
 
-> Estes arquivos ainda não seguem a estrutura modular completa. Ao expandir qualquer módulo, migrar para `api/modules/<modulo>/`.
+Rotas registradas:
+
+| Rota | Arquivo | Doc |
+|------|---------|-----|
+| `/api/status` | `api/routes/status.js` | [docs/routes/status.md](../routes/status.md) |
+| `/api/config` | `api/routes/config.js` | [docs/routes/config.md](../routes/config.md) |
+| `/api/github/*` | `api/routes/github.js` | [docs/routes/github.md](../routes/github.md) |
 
 ---
 
