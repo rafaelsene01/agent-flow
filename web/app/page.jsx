@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header.jsx";
 import SettingsModal from "@/components/SettingsModal.jsx";
 import InitBoardModal from "@/components/InitBoardModal.jsx";
 
-export default function App() {
+function AppContent() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+
   const [initializing, setInitializing]   = useState(true);
   const [showSettings, setShowSettings]   = useState(false);
   const [showInitBoard, setShowInitBoard] = useState(false);
@@ -20,14 +24,22 @@ export default function App() {
       if (!status?.github?.connected || !status?.claude?.connected) setShowSettings(true);
       const saved = config.boards ?? [];
       setBoards(saved);
-      if (saved.length > 0) setActiveBoard(saved[0]);
+
+      const boardId   = searchParams.get("board");
+      const fromUrl   = boardId ? saved.find((b) => b.id === boardId) : null;
+      setActiveBoard(fromUrl ?? saved[0] ?? null);
     }).finally(() => setInitializing(false));
   }, []);
 
+  function selectBoard(board) {
+    setActiveBoard(board);
+    router.push(`?board=${board.id}`, { scroll: false });
+  }
+
   function handleBoardSaved(newBoard) {
     setBoards((prev) => [...prev, newBoard]);
-    setActiveBoard(newBoard);
     setShowInitBoard(false);
+    selectBoard(newBoard);
   }
 
   if (initializing) {
@@ -51,7 +63,7 @@ export default function App() {
         onInitBoard={() => setShowInitBoard(true)}
         boards={boards}
         activeBoard={activeBoard}
-        onSelectBoard={setActiveBoard}
+        onSelectBoard={selectBoard}
       />
 
       {activeBoard ? (
@@ -85,5 +97,13 @@ export default function App() {
         />
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Suspense>
+      <AppContent />
+    </Suspense>
   );
 }
