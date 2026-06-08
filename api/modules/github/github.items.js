@@ -10,18 +10,18 @@ const ITEMS_QUERY = `query($id: ID!, $first: Int!, $after: String) {
           content {
             __typename
             ... on Issue {
-              title number
+              title number body
               repository { nameWithOwner }
               assignees(first: 3) { nodes { login } }
               labels(first: 20) { nodes { name color } }
             }
             ... on PullRequest {
-              title number
+              title number body
               repository { nameWithOwner }
               assignees(first: 3) { nodes { login } }
               labels(first: 20) { nodes { name color } }
             }
-            ... on DraftIssue { title }
+            ... on DraftIssue { title body }
           }
           fieldValues(first: 30) {
             nodes {
@@ -53,6 +53,7 @@ function parseItems(raw) {
       type:           content.__typename ?? "Unknown",
       title:          content.title ?? "(sem título)",
       number:         content.number ?? null,
+      body:           content.body ?? null,
       assignees:      (content.assignees?.nodes ?? []).map((a) => a.login),
       labels:         (content.labels?.nodes ?? []).map((l) => ({ name: l.name, color: l.color })),
       // campos usados apenas no servidor para filtragem — removidos antes de enviar ao cliente
@@ -86,12 +87,12 @@ function labelsMatch(itemLabels, labelFilter) {
   return wanted.some((w) => itemLabels.some((l) => l.name.toLowerCase() === w));
 }
 
-function toClientItem({ id, type, title, number, assignees, labels }) {
-  return { id, type, title, number, assignees, labels };
+function toClientItem({ id, type, title, number, body, assignees, labels }) {
+  return { id, type, title, number, body, assignees, labels };
 }
 
-function toClientItemWithColumn({ id, type, title, number, assignees, labels, _status, _statusOptionId }) {
-  return { id, type, title, number, assignees, labels, columnName: _status, columnId: _statusOptionId };
+function toClientItemWithColumn({ id, type, title, number, body, assignees, labels, _status, _statusOptionId }) {
+  return { id, type, title, number, body, assignees, labels, columnName: _status, columnId: _statusOptionId };
 }
 
 export async function listItems(projectId, { first = 30, after = null, repoName = null, labels = null } = {}) {
