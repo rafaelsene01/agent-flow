@@ -56,7 +56,7 @@ const COLUMNS_QUERY = `query($id: ID!) {
         nodes {
           ... on ProjectV2SingleSelectField {
             id name
-            options { id name }
+            options { id name color }
           }
         }
       }
@@ -159,7 +159,7 @@ function parseColumns(raw) {
   const statusField =
     fields.find((f) => f?.name?.toLowerCase() === "status") ??
     fields.find((f) => f?.options);
-  return (statusField?.options ?? []).map((o) => ({ id: o.id, name: o.name }));
+  return (statusField?.options ?? []).map((o) => ({ id: o.id, name: o.name, color: o.color ?? null }));
 }
 
 function viaGhCliColumns(projectId) {
