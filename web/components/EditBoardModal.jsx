@@ -2,18 +2,41 @@
 
 import { useEffect, useRef, useState } from "react";
 
+// Normaliza string legada para { id: null, name } ou mantém { id, name }.
+function normalizeCol(c) {
+  return typeof c === "string" ? { id: null, name: c } : c;
+}
+
+function colKey(c) {
+  return c.id ?? c.name;
+}
+
 export default function EditBoardModal({ board, onClose, onSaved }) {
   const [allCols, setAllCols]       = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [activeCols, setActiveCols] = useState(board.columns ?? []);
-  const [saving, setSaving]         = useState(false);
+  const [activeCols, setActiveCols] = useState(
+    (board.columns ?? []).map(normalizeCol)
+  );
+  const [saving]                    = useState(false);
   const [dragOver, setDragOver]     = useState(null);
   const dragIdx = useRef(null);
 
   useEffect(() => {
     fetch(`/api/github/boards/${encodeURIComponent(board.id)}/columns`)
       .then((r) => r.json())
-      .then((data) => { if (!data.error) setAllCols(data.map((c) => c.name)); })
+      .then((data) => {
+        if (!data.error) {
+          const apiCols = data.map((c) => ({ id: c.id, name: c.name }));
+          setAllCols(apiCols);
+          // Migra colunas salvas como string (id: null) para o formato { id, name }
+          // fazendo match por nome com as opções reais da API.
+          setActiveCols((prev) =>
+            prev.map((ac) =>
+              ac.id ? ac : (apiCols.find((c) => c.name === ac.name) ?? ac)
+            )
+          );
+        }
+      })
       .finally(() => setLoading(false));
   }, [board.id]);
 
@@ -46,33 +69,23 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
     setDragOver(null);
   }
 
-  function remove(name) {
-    setActiveCols((prev) => prev.filter((c) => c !== name));
+  function remove(col) {
+    setActiveCols((prev) => prev.filter((c) => colKey(c) !== colKey(col)));
   }
 
-  function add(name) {
-    setActiveCols((prev) => [...prev, name]);
+  function add(col) {
+    setActiveCols((prev) => [...prev, col]);
   }
 
-  const available = allCols.filter((c) => !activeCols.includes(c));
+  // Compara por ID quando disponível, senão por nome (compat com configs antigos).
+  const available = allCols.filter((apiCol) =>
+    !activeCols.some((ac) =>
+      (ac.id && ac.id === apiCol.id) || ac.name === apiCol.name
+    )
+  );
 
-  async function save() {
-    setSaving(true);
-    try {
-      const configRes = await fetch("/api/config");
-      const config = await configRes.json();
-      const boards = (config.boards ?? []).map((b) =>
-        b.id === board.id ? { ...b, columns: activeCols } : b
-      );
-      await fetch("/api/config", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ boards }),
-      });
-      onSaved({ ...board, columns: activeCols });
-    } catch {
-      setSaving(false);
-    }
+  function save() {
+    onSaved({ ...board, columns: activeCols });
   }
 
   return (
@@ -97,9 +110,9 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
               <div className="board-select-state">Nenhuma coluna ativa.</div>
             ) : (
               <div className="edit-col-list">
-                {activeCols.map((name, i) => (
+                {activeCols.map((col, i) => (
                   <div
-                    key={name}
+                    key={colKey(col)}
                     className={`edit-col-item${dragOver === i ? " drag-over" : ""}`}
                     draggable
                     onDragStart={() => onDragStart(i)}
@@ -109,11 +122,11 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
                     onDragEnd={reset}
                   >
                     <span className="col-drag-handle" title="Arrastar para reordenar">⠿</span>
-                    <span className="edit-col-name">{name}</span>
+                    <span className="edit-col-name">{col.name}</span>
                     <button
                       className="btn-col-remove"
                       type="button"
-                      onClick={() => remove(name)}
+                      onClick={() => remove(col)}
                       title="Remover"
                     >×</button>
                   </div>
@@ -126,15 +139,15 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
             <div className="sf-field">
               <span className="sf-section-title">Disponíveis</span>
               <div className="edit-col-available-list">
-                {available.map((name) => (
+                {available.map((col) => (
                   <button
-                    key={name}
+                    key={colKey(col)}
                     className="edit-col-add-item"
                     type="button"
-                    onClick={() => add(name)}
+                    onClick={() => add(col)}
                   >
                     <span className="edit-col-add-icon">+</span>
-                    {name}
+                    {col.name}
                   </button>
                 ))}
               </div>
