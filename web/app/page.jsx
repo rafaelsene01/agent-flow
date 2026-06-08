@@ -42,6 +42,23 @@ function AppContent() {
     selectBoard(newBoard);
   }
 
+  async function removeBoard(board) {
+    const next = boards.filter((b) => b.id !== board.id);
+    setBoards(next);
+
+    if (activeBoard?.id === board.id) {
+      const fallback = next[0] ?? null;
+      setActiveBoard(fallback);
+      router.push(fallback ? `?board=${fallback.id}` : "/", { scroll: false });
+    }
+
+    await fetch("/api/config", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ boards: next }),
+    });
+  }
+
   if (initializing) {
     return (
       <div className="init-screen">
@@ -64,6 +81,7 @@ function AppContent() {
         boards={boards}
         activeBoard={activeBoard}
         onSelectBoard={selectBoard}
+        onRemoveBoard={removeBoard}
       />
 
       {activeBoard ? (
