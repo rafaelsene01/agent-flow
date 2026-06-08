@@ -466,13 +466,18 @@ body { background: var(--bg); color: var(--text); }
 
 /* ── board view ────────────────────────────────────────────────────────────── */
 .board-view {
-  padding: 32px 28px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  flex: 1;
+  min-height: 0;
 }
-.board-view-name { font-size: 22px; font-weight: 700; color: var(--text); }
-.board-view-repo { font-size: 13px; color: var(--text-muted); }
+.board-view-header {
+  padding: 12px 20px 10px;
+  border-bottom: 1px solid var(--border2);
+  flex-shrink: 0;
+}
+.board-view-name { font-size: 16px; font-weight: 700; color: var(--text); }
+.board-view-repo { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
 
 /* ── init board modal ──────────────────────────────────────────────────────── */
 .init-board-modal {
@@ -1187,6 +1192,26 @@ select.sf-input option { background: #1c2333; }
 .btn-secondary.saved {
   color: var(--c-completed);
   border-color: var(--c-completed);
+}
+
+/* ── card type badge ────────────────────────────────────────────────────────── */
+.card-type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: #101c2c;
+  color: var(--accent);
+  border: 1px solid #1a3a5a;
+  flex-shrink: 0;
+}
+
+/* ── column loading more ─────────────────────────────────────────────────────── */
+.col-loading-more {
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 8px 0 4px;
 }
 
 /* ── board view header ──────────────────────────────────────────────────────── */
