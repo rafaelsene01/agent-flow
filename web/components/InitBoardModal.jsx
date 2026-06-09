@@ -13,6 +13,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
   const [fetchError, setFetchError]       = useState(null);
   const [missingScope, setMissingScope]   = useState(false);
   const [selected, setSelected]           = useState(null);
+  const [originRepo, setOriginRepo]       = useState("");
   const [boardName, setBoardName]         = useState("");
   const [views, setViews]                 = useState([]);
   const [viewsLoading, setViewsLoading]   = useState(false);
@@ -49,6 +50,12 @@ export default function InitBoardModal({ onClose, onSaved }) {
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
+  function repoOptions(boardData, view) {
+    const fromRepos  = (boardData?.repos ?? []).map((r) => r.fullName);
+    const fromFilter = (view?.repo ?? "").split(",").map((r) => r.trim()).filter(Boolean);
+    return [...new Set([...fromRepos, ...fromFilter])];
+  }
+
   function selectBoard(board) {
     setSelected(board);
     setBoardName(board.title);
@@ -56,6 +63,8 @@ export default function InitBoardModal({ onClose, onSaved }) {
     setSelectedView(null);
     setAllCols([]);
     setActiveCols([]);
+    const opts = repoOptions(board, null);
+    setOriginRepo(opts.length === 1 ? opts[0] : "");
     setViewsLoading(true);
     fetch(`/api/github/boards/${encodeURIComponent(board.id)}/views`)
       .then((r) => r.json())
@@ -72,6 +81,12 @@ export default function InitBoardModal({ onClose, onSaved }) {
     setSelectedView(view);
     setAllCols([]);
     setActiveCols([]);
+    // Atualiza opções de repo ao selecionar uma view (o filtro pode trazer novos repos)
+    setOriginRepo((prev) => {
+      const opts = repoOptions(board, view);
+      if (prev && opts.includes(prev)) return prev;  // mantém seleção válida
+      return opts.length === 1 ? opts[0] : "";
+    });
     setColumnsLoading(true);
     fetch(`/api/github/boards/${encodeURIComponent(board.id)}/columns`)
       .then((r) => r.json())
@@ -139,6 +154,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
         slug:       boardSlug({ name, repoName }),
         boardPath:  "",
         repoName,
+        originRepo: originRepo || null,
         viewFilter: selectedView?.filter ?? "",
         repoPath:   "",
         columns:    activeCols.map((c) => ({ id: c.id, name: c.name, color: c.color ?? null })),
@@ -254,6 +270,31 @@ export default function InitBoardModal({ onClose, onSaved }) {
                   </div>
                 )}
               </div>
+
+              {selectedView && (() => {
+                const opts = repoOptions(selected, selectedView);
+                return (
+                  <div className="sf-field">
+                    <label className="sf-label">Repositório de Origem</label>
+                    {opts.length === 0 ? (
+                      <div className="board-select-state">
+                        Nenhum repositório detectado no filtro desta view.
+                      </div>
+                    ) : (
+                      <select
+                        className="sf-input"
+                        value={originRepo}
+                        onChange={(e) => setOriginRepo(e.target.value)}
+                      >
+                        <option value="">Selecione o repositório…</option>
+                        {opts.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="sf-field">
                 <span className="sf-section-title">Colunas ativas</span>

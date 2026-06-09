@@ -5,23 +5,27 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
+import CreateBranchModal from "./CreateBranchModal.jsx";
 
 // ── CardModal ─────────────────────────────────────────────────────────────────
 
 const TYPE_LABEL = { Issue: "Issue", PullRequest: "Pull request", DraftIssue: "Draft issue" };
 
-function CardModal({ item, onClose }) {
+function CardModal({ item, board, onClose }) {
+  const [showCreateBranch, setShowCreateBranch] = useState(false);
+
   useEffect(() => {
-    function onKey(e) { if (e.key === "Escape") onClose(); }
+    function onKey(e) { if (e.key === "Escape" && !showCreateBranch) onClose(); }
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [onClose]);
+  }, [onClose, showCreateBranch]);
 
   return (
+    <>
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal card-modal">
         <div className="card-modal-layout">
@@ -56,6 +60,21 @@ function CardModal({ item, onClose }) {
 
           {/* ── sidebar ── */}
           <aside className="card-modal-sidebar">
+            <div className="sidebar-section">
+              <span className="sidebar-label">Gatilhos</span>
+              <div className="sidebar-triggers">
+                <button
+                  className="trigger-item"
+                  type="button"
+                  onClick={() => setShowCreateBranch(true)}
+                >
+                  <span className="trigger-icon">⎇</span>
+                  <span className="trigger-label">Criar Branch</span>
+                  <span className="trigger-run">▷</span>
+                </button>
+              </div>
+            </div>
+
             <div className="sidebar-section">
               <span className="sidebar-label">Assignees</span>
               {item.assignees.length > 0 ? (
@@ -108,6 +127,10 @@ function CardModal({ item, onClose }) {
         </div>
       </div>
     </div>
+    {showCreateBranch && board && (
+      <CreateBranchModal board={board} onClose={() => setShowCreateBranch(false)} />
+    )}
+    </>
   );
 }
 
@@ -299,7 +322,7 @@ export default function Board({ board }) {
           />
         ))}
       </div>
-      {activeCard && <CardModal item={activeCard} onClose={() => setActiveCard(null)} />}
+      {activeCard && <CardModal item={activeCard} board={board} onClose={() => setActiveCard(null)} />}
     </>
   );
 }
