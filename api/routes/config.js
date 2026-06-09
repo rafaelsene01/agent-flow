@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { getConfig, setConfig } from "../modules/config/config.service.js";
+import { getConfig, setConfig, getWorktrees, removeWorktree } from "../modules/config/config.service.js";
 
 const BROWSE_CMD = {
   win32:  `powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }"`,
@@ -16,6 +16,19 @@ export default function configRoutes(app) {
     try {
       const updated = setConfig(req.body);
       res.json(updated);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/config/worktrees", (_req, res) => {
+    res.json(getWorktrees());
+  });
+
+  app.delete("/api/config/worktrees/:id", (req, res) => {
+    try {
+      removeWorktree(decodeURIComponent(req.params.id));
+      res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

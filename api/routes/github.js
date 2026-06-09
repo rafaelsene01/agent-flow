@@ -2,6 +2,7 @@ import { listRepos }                                  from "../modules/github/gi
 import { listBoards, listViews, listColumns, listBoardRepos } from "../modules/github/github.boards.js";
 import { listItems, listAllItems, listItemsByColumn }  from "../modules/github/github.items.js";
 import { listBranches, createBranch }                  from "../modules/github/github.branches.js";
+import { setupWorktree }                               from "../modules/git/git.worktree.js";
 
 function sendError(res, err) {
   if (res.headersSent) return;
@@ -79,11 +80,24 @@ export default function githubRoutes(app) {
 
   app.post("/api/github/repos/:owner/:repo/branches", async (req, res) => {
     try {
-      const { newBranch, originBranch } = req.body;
+      const { newBranch, originBranch, cardNumber } = req.body;
       if (!newBranch || !originBranch) {
         return res.status(400).json({ error: "newBranch e originBranch são obrigatórios" });
       }
+
       await createBranch(req.params.owner, req.params.repo, newBranch, originBranch);
+
+      if (cardNumber != null) {
+        const { worktreeDir, cloned } = await setupWorktree({
+          owner:        req.params.owner,
+          repo:         req.params.repo,
+          newBranch,
+          originBranch,
+          cardNumber,
+        });
+        return res.json({ ok: true, worktreeDir, cloned });
+      }
+
       res.json({ ok: true });
     } catch (err) {
       sendError(res, err);

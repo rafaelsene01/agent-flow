@@ -33,3 +33,29 @@ export function setConfig(updates) {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2), "utf-8");
   return next;
 }
+
+// ── Worktrees ──────────────────────────────────────────────────────────────────
+
+export function getWorktrees() {
+  return getConfig().worktrees ?? [];
+}
+
+export function registerWorktree({ owner, repo, branch, cardNumber, repoDir, worktreeDir }) {
+  const id       = `${owner}/${repo}#${cardNumber}`;
+  const existing = getWorktrees().filter((w) => w.id !== id);
+  const entry    = {
+    id,
+    cardNumber,
+    repo: `${owner}/${repo}`,
+    branch,
+    path:      worktreeDir,
+    repoDir,
+    createdAt: new Date().toISOString(),
+  };
+  setConfig({ worktrees: [...existing, entry] });
+  return entry;
+}
+
+export function removeWorktree(id) {
+  setConfig({ worktrees: getWorktrees().filter((w) => w.id !== id) });
+}
