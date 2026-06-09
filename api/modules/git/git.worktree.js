@@ -65,31 +65,56 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
     cloned = true;
   }
 
-  // Fetch to pick up the branch just created via GitHub API
-  await git(repoDir, ["fetch", "origin"]);
+  // Fetch + pull origin branch before creating the new one.
+  // fetch --all updates all remote refs; then we fast-forward the originBranch
+  // locally so the new branch starts from the latest remote state.
+  // Using --ff-only so we never create a merge commit or fail on diverged history.
+  await git(repoDir, ["fetch", "--all"]);
+  await execFileP(
+    "git", ["pull", "--ff-only", "origin", originBranch],
+    { cwd: repoDir, timeout: 60_000 },
+  ).catch(() => {
+    // Not fatal: branch may be diverged, detached HEAD, or not yet exist locally.
+    // The worktree will still be created from origin/{originBranch}.
+  });
 
-  // Remove stale worktree if path already exists
+  // Clean up: remove directory if present, then prune stale git registrations.
   if (fs.existsSync(worktreeDir)) {
     await execFileP("git", ["worktree", "remove", "--force", worktreeDir], {
-      cwd: repoDir,
-      timeout: 10_000,
+      cwd: repoDir, timeout: 10_000,
     }).catch(() => {});
     fs.rmSync(worktreeDir, { recursive: true, force: true });
   }
+  // Prune removes registrations whose paths no longer exist on disk
+  // (covers the "missing but already registered" error).
+  await execFileP("git", ["worktree", "prune"], { cwd: repoDir, timeout: 10_000 }).catch(() => {});
 
   // Checkout strategy:
-  // 1. branch exists locally            → worktree add <path> <branch>
-  // 2. branch exists on remote          → worktree add --track -b <branch> <path> origin/<branch>
-  // 3. branch doesn't exist anywhere    → worktree add -b <branch> <path> origin/<originBranch>
+  // 1. branch exists locally   → worktree add <path> <branch>
+  // 2. branch exists on remote → worktree add --track -b <branch> <path> origin/<branch>
+  // 3. branch doesn't exist    → worktree add -b <branch> <path> origin/<originBranch>
+  async function addWorktree(extraArgs, ref) {
+    try {
+      await git(repoDir, ["worktree", "add", ...extraArgs, worktreeDir, ref]);
+    } catch (err) {
+      // Last-resort: if git still considers the path registered, force it.
+      if (err.message?.includes("already registered")) {
+        await git(repoDir, ["worktree", "add", "-f", ...extraArgs, worktreeDir, ref]);
+      } else {
+        throw err;
+      }
+    }
+  }
+
   if (await refExists(repoDir, newBranch)) {
-    await git(repoDir, ["worktree", "add", worktreeDir, newBranch]);
+    await addWorktree([], newBranch);
   } else if (await refExists(repoDir, `origin/${newBranch}`)) {
-    await git(repoDir, ["worktree", "add", "--track", "-b", newBranch, worktreeDir, `origin/${newBranch}`]);
+    await addWorktree(["--track", "-b", newBranch], `origin/${newBranch}`);
   } else {
     const base = (await refExists(repoDir, `origin/${originBranch}`))
       ? `origin/${originBranch}`
       : originBranch;
-    await git(repoDir, ["worktree", "add", "-b", newBranch, worktreeDir, base]);
+    await addWorktree(["-b", newBranch], base);
   }
 
   registerWorktree({ owner, repo, branch: newBranch, cardNumber, repoDir, worktreeDir });

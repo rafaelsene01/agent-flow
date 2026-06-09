@@ -1575,8 +1575,46 @@ select.sf-input option {
   opacity: .75;
 }
 
+.trigger-item--error,
+.trigger-item--error:hover {
+  color: var(--err, #f44336);
+  border-color: var(--err, #f44336);
+  background: var(--surface);
+  cursor: default;
+  opacity: .75;
+}
+
 .trigger-item:disabled {
   cursor: default;
+  opacity: .45;
+}
+
+.trigger-feedback {
+  font-size: 11px;
+  padding: 0 2px;
+}
+.trigger-feedback.ok  { color: var(--ok,  #4caf50); }
+.trigger-feedback.err { color: var(--err, #f44336); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trigger-feedback--running { color: var(--text-faint); font-style: italic; }
+
+.spec-log {
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  margin-top: 4px;
+}
+
+.spec-log pre {
+  margin: 0;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .worktree-info {

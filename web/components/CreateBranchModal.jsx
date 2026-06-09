@@ -86,6 +86,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
       setWorktreeDir(data.worktreeDir ?? null);
       setNewBranch("");
       setNameError(null);
+      setTimeout(onClose, 1200);
     } catch (err) {
       setCreateError(err.message);
     } finally {
