@@ -19,7 +19,14 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   );
   const [saving]                    = useState(false);
   const [dragOver, setDragOver]     = useState(null);
+  const [originRepo, setOriginRepo] = useState(board.originRepo ?? "");
   const dragIdx = useRef(null);
+
+  // Repos derivados do repoName salvo no config (fonte confiável)
+  const repoOptions = (board.repoName ?? "")
+    .split(",")
+    .map((r) => r.trim())
+    .filter(Boolean);
 
   useEffect(() => {
     fetch(`/api/github/boards/${encodeURIComponent(board.id)}/columns`)
@@ -85,7 +92,7 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   );
 
   function save() {
-    onSaved({ ...board, columns: activeCols });
+    onSaved({ ...board, columns: activeCols, originRepo: originRepo || null });
   }
 
   return (
@@ -103,6 +110,26 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
         </div>
 
         <div className="sf-body">
+
+          <div className="sf-field">
+            <label className="sf-label">Repositório de Origem</label>
+            {repoOptions.length === 0 ? (
+              <div className="board-select-state">
+                Nenhum repositório detectado no filtro desta view.
+              </div>
+            ) : (
+              <select
+                className="sf-input"
+                value={originRepo}
+                onChange={(e) => setOriginRepo(e.target.value)}
+              >
+                <option value="">Selecione o repositório…</option>
+                {repoOptions.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            )}
+          </div>
 
           <div className="sf-field">
             <span className="sf-section-title">Colunas ativas</span>

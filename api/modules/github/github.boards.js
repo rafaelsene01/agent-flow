@@ -44,6 +44,16 @@ const VIEWS_QUERY = `query($id: ID!) {
   }
 }`;
 
+const REPOS_QUERY = `query($id: ID!) {
+  node(id: $id) {
+    ... on ProjectV2 {
+      repositories(first: 20) {
+        nodes { name nameWithOwner url }
+      }
+    }
+  }
+}`;
+
 const COLUMNS_QUERY = `query($id: ID!) {
   node(id: $id) {
     ... on ProjectV2 {
@@ -121,4 +131,10 @@ export async function listViews(projectId) {
 
 export async function listColumns(projectId) {
   return parseColumns(await graphQL(COLUMNS_QUERY, requireToken(), { id: projectId }));
+}
+
+export async function listBoardRepos(projectId) {
+  const raw   = await graphQL(REPOS_QUERY, requireToken(), { id: projectId });
+  const nodes = raw.data?.node?.repositories?.nodes ?? [];
+  return nodes.map((r) => ({ name: r.name, fullName: r.nameWithOwner, url: r.url }));
 }

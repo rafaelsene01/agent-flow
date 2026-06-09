@@ -1,6 +1,7 @@
-import { listRepos }                        from "../modules/github/github.repos.js";
-import { listBoards, listViews, listColumns } from "../modules/github/github.boards.js";
-import { listItems, listAllItems, listItemsByColumn } from "../modules/github/github.items.js";
+import { listRepos }                                  from "../modules/github/github.repos.js";
+import { listBoards, listViews, listColumns, listBoardRepos } from "../modules/github/github.boards.js";
+import { listItems, listAllItems, listItemsByColumn }  from "../modules/github/github.items.js";
+import { listBranches, createBranch }                  from "../modules/github/github.branches.js";
 
 function sendError(res, err) {
   if (res.headersSent) return;
@@ -55,6 +56,35 @@ export default function githubRoutes(app) {
   app.get("/api/github/boards/:id/columns", async (req, res) => {
     try {
       res.json(await listColumns(req.params.id));
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.get("/api/github/boards/:id/repos", async (req, res) => {
+    try {
+      res.json(await listBoardRepos(req.params.id));
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.get("/api/github/repos/:owner/:repo/branches", async (req, res) => {
+    try {
+      res.json(await listBranches(req.params.owner, req.params.repo));
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.post("/api/github/repos/:owner/:repo/branches", async (req, res) => {
+    try {
+      const { newBranch, originBranch } = req.body;
+      if (!newBranch || !originBranch) {
+        return res.status(400).json({ error: "newBranch e originBranch são obrigatórios" });
+      }
+      await createBranch(req.params.owner, req.params.repo, newBranch, originBranch);
+      res.json({ ok: true });
     } catch (err) {
       sendError(res, err);
     }
