@@ -118,6 +118,73 @@ function IntegrationCard({ name, logo, loading, data, commands }) {
   );
 }
 
+function SkillCard({ loading, installed, onInstalled }) {
+  const [installing, setInstalling] = useState(false);
+  const [installError, setInstallError] = useState(null);
+
+  function install() {
+    setInstalling(true);
+    setInstallError(null);
+    fetch("/api/status/install-skill", { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        onInstalled(data);
+      })
+      .catch((err) => setInstallError(err.message))
+      .finally(() => setInstalling(false));
+  }
+
+  return (
+    <div className="intg-card">
+      <div className="intg-top">
+        <div className={`intg-logo${loading ? "" : installed ? " ok" : " warn"}`}>
+          ⚡
+        </div>
+
+        <div className="intg-body">
+          <div className="intg-name">Skill: tlc-spec-driven</div>
+
+          {loading && <div className="intg-status">Verificando…</div>}
+
+          {!loading && installed && (
+            <div className="intg-status ok">Instalada globalmente</div>
+          )}
+
+          {!loading && !installed && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
+                <span className="intg-status" style={{ color: "var(--c-high)" }}>
+                  Não instalada
+                </span>
+                <button
+                  className="btn-secondary"
+                  type="button"
+                  disabled={installing}
+                  onClick={install}
+                  style={{ padding: "2px 8px", fontSize: 11, lineHeight: 1.4 }}
+                >
+                  {installing ? "…" : "Instalar"}
+                </button>
+              </div>
+              {installError && (
+                <div className="intg-detail" style={{ color: "var(--c-cancelled)", marginTop: 2 }}>
+                  {installError}
+                </div>
+              )}
+              <div className="intg-detail">Recomendada para planejamento de features com IA</div>
+            </>
+          )}
+        </div>
+
+        <div className={`intg-badge${loading ? " badge-loading" : installed ? " badge-ok" : " badge-warn"}`}>
+          {loading ? "…" : installed ? "✓" : "!"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsModal({ onClose }) {
   const [status, setStatus]         = useState(null);
   const [loading, setLoading]       = useState(true);
@@ -126,9 +193,9 @@ export default function SettingsModal({ onClose }) {
   const [pathSaving, setPathSaving] = useState(false);
   const [pathSaved, setPathSaved]   = useState(false);
 
-  const fetchStatus = useCallback(() => {
+  const fetchStatus = useCallback((force = false) => {
     setLoading(true);
-    fetch("/api/status")
+    fetch("/api/status", force ? { method: "POST" } : undefined)
       .then((r) => r.json())
       .then((s) => { setStatus(s); setLoading(false); })
       .catch(() => setLoading(false));
@@ -223,6 +290,12 @@ export default function SettingsModal({ onClose }) {
             commands={claudeCommands}
           />
 
+          <SkillCard
+            loading={loading}
+            installed={status?.claude?.tlcSkill ?? false}
+            onInstalled={setStatus}
+          />
+
           <div className="intg-card">
             <div className="intg-top">
               <div className="intg-logo ok">◉</div>
@@ -265,11 +338,11 @@ export default function SettingsModal({ onClose }) {
 
         <div className="sf-footer">
           <div className="sf-footer-actions">
-            <button className="btn-secondary" type="button" onClick={fetchStatus} disabled={loading}>
+            <button className="btn-secondary" type="button" onClick={() => fetchStatus(true)} disabled={loading}>
               {loading ? "Verificando…" : "↻ Verificar"}
             </button>
             {!isLocked && (
-              <button className="btn-primary" type="button" onClick={onClose}>
+              <button className="btn-secondary" type="button" onClick={onClose}>
                 Fechar
               </button>
             )}
