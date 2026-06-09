@@ -21,19 +21,23 @@ function validateBranchName(name) {
   return null;
 }
 
-export default function CreateBranchModal({ board, onClose }) {
+export default function CreateBranchModal({ board, item, onClose }) {
   const [owner, repo] = (board.originRepo ?? "").split("/");
+  const cardNumber = item?.number ?? null;
 
   const [branches, setBranches]               = useState([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [branchesError, setBranchesError]     = useState(null);
   const [originBranch, setOriginBranch]       = useState(null);
 
+  const [branchFilter, setBranchFilter] = useState("");
+
   const [newBranch, setNewBranch]       = useState("");
   const [nameError, setNameError]       = useState(null);
   const [creating, setCreating]         = useState(false);
   const [createError, setCreateError]   = useState(null);
   const [lastCreated, setLastCreated]   = useState(null);
+  const [worktreeDir, setWorktreeDir]   = useState(null);
 
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -60,6 +64,7 @@ export default function CreateBranchModal({ board, onClose }) {
     setNameError(val ? validateBranchName(val) : null);
     setCreateError(null);
     setLastCreated(null);
+    setWorktreeDir(null);
   }
 
   async function handleCreate() {
@@ -73,11 +78,12 @@ export default function CreateBranchModal({ board, onClose }) {
       const res  = await fetch(`/api/github/repos/${owner}/${repo}/branches`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ newBranch, originBranch }),
+        body:    JSON.stringify({ newBranch, originBranch, cardNumber }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setLastCreated(newBranch);
+      setWorktreeDir(data.worktreeDir ?? null);
       setNewBranch("");
       setNameError(null);
     } catch (err) {
@@ -97,7 +103,7 @@ export default function CreateBranchModal({ board, onClose }) {
           <div className="modal-id-row">
             <span className="cb-modal-icon">⎇</span>
             <h2 className="modal-title" style={{ fontSize: 15, marginBottom: 0 }}>
-              Criar Branch
+              Configurar Branch
             </h2>
           </div>
           <button className="modal-close" type="button" onClick={onClose}>✕</button>
@@ -134,23 +140,43 @@ export default function CreateBranchModal({ board, onClose }) {
               {!branchesLoading && !branchesError && branches.length === 0 && (
                 <div className="board-select-state">Nenhuma branch encontrada.</div>
               )}
-              {!branchesLoading && !branchesError && branches.length > 0 && (
-                <div className="board-select-list cb-branches-list">
-                  {branches.map((b) => (
-                    <button
-                      key={b.name}
-                      className={`board-select-item${originBranch === b.name ? " selected" : ""}`}
-                      type="button"
-                      onClick={() => setOriginBranch(b.name)}
-                    >
-                      <span className="board-select-title cb-branch-name">
-                        <span className="cb-branch-dot" />
-                        {b.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {!branchesLoading && !branchesError && branches.length > 0 && (() => {
+                const filtered = branches.filter((b) =>
+                  b.name.toLowerCase().includes(branchFilter.toLowerCase())
+                );
+                return (
+                  <>
+                    <input
+                      className="sf-input cb-branch-filter"
+                      type="text"
+                      placeholder="Filtrar branches…"
+                      value={branchFilter}
+                      onChange={(e) => setBranchFilter(e.target.value)}
+                      autoComplete="off"
+                      spellCheck="false"
+                    />
+                    <div className="board-select-list cb-branches-list">
+                      {filtered.length === 0 ? (
+                        <div className="board-select-state">Nenhuma branch encontrada para "{branchFilter}".</div>
+                      ) : (
+                        filtered.map((b) => (
+                          <button
+                            key={b.name}
+                            className={`board-select-item${originBranch === b.name ? " selected" : ""}`}
+                            type="button"
+                            onClick={() => setOriginBranch(b.name)}
+                          >
+                            <span className="board-select-title cb-branch-name">
+                              <span className="cb-branch-dot" />
+                              {b.name}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           )}
 
@@ -180,9 +206,16 @@ export default function CreateBranchModal({ board, onClose }) {
             <p className="sf-hint err cb-feedback">{createError}</p>
           )}
           {lastCreated && (
-            <p className="sf-hint ok cb-feedback">
-              Branch <code className="cb-inline-code">{lastCreated}</code> criada com sucesso ✓
-            </p>
+            <div className="cb-feedback-block">
+              <p className="sf-hint ok cb-feedback">
+                Branch <code className="cb-inline-code">{lastCreated}</code> criada com sucesso ✓
+              </p>
+              {worktreeDir && (
+                <p className="sf-hint ok cb-feedback">
+                  Worktree em <code className="cb-inline-code cb-worktree-path">{worktreeDir}</code>
+                </p>
+              )}
+            </div>
           )}
 
         </div>
@@ -199,7 +232,7 @@ export default function CreateBranchModal({ board, onClose }) {
                 disabled={!canCreate}
                 onClick={handleCreate}
               >
-                {creating ? "Criando…" : "Criar Branch"}
+                {creating ? (cardNumber ? "Configurando…" : "Criando…") : "Configurar Branch"}
               </button>
             )}
           </div>

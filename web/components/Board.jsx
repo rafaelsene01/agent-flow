@@ -13,6 +13,21 @@ const TYPE_LABEL = { Issue: "Issue", PullRequest: "Pull request", DraftIssue: "D
 
 function CardModal({ item, board, onClose }) {
   const [showCreateBranch, setShowCreateBranch] = useState(false);
+  const [worktreeConfig, setWorktreeConfig]     = useState(null); // null=loading false=none object=found
+
+  const worktreeId = board?.originRepo && item.number != null
+    ? `${board.originRepo}#${item.number}`
+    : null;
+
+  function loadWorktreeConfig() {
+    if (!worktreeId) { setWorktreeConfig(false); return; }
+    fetch("/api/config/worktrees")
+      .then((r) => r.json())
+      .then((list) => setWorktreeConfig(list.find((w) => w.id === worktreeId) ?? false))
+      .catch(() => setWorktreeConfig(false));
+  }
+
+  useEffect(loadWorktreeConfig, [worktreeId]);
 
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape" && !showCreateBranch) onClose(); }
@@ -23,6 +38,9 @@ function CardModal({ item, board, onClose }) {
       document.body.style.overflow = "";
     };
   }, [onClose, showCreateBranch]);
+
+  const isConfigured = !!worktreeConfig;
+  const isChecking   = worktreeConfig === null && worktreeId !== null;
 
   return (
     <>
@@ -64,14 +82,21 @@ function CardModal({ item, board, onClose }) {
               <span className="sidebar-label">Gatilhos</span>
               <div className="sidebar-triggers">
                 <button
-                  className="trigger-item"
+                  className={`trigger-item${isConfigured ? " trigger-item--done" : ""}`}
                   type="button"
+                  disabled={isConfigured || isChecking}
                   onClick={() => setShowCreateBranch(true)}
                 >
                   <span className="trigger-icon">⎇</span>
-                  <span className="trigger-label">Criar Branch</span>
-                  <span className="trigger-run">▷</span>
+                  <span className="trigger-label">Configurar Branch</span>
+                  <span className="trigger-run">{isConfigured ? "✓" : "▷"}</span>
                 </button>
+                {isConfigured && (
+                  <div className="worktree-info">
+                    <span className="worktree-info-branch">⎇ {worktreeConfig.branch}</span>
+                    <span className="worktree-info-path" title={worktreeConfig.path}>{worktreeConfig.path}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -128,7 +153,11 @@ function CardModal({ item, board, onClose }) {
       </div>
     </div>
     {showCreateBranch && board && (
-      <CreateBranchModal board={board} onClose={() => setShowCreateBranch(false)} />
+      <CreateBranchModal
+        board={board}
+        item={item}
+        onClose={() => { setShowCreateBranch(false); loadWorktreeConfig(); }}
+      />
     )}
     </>
   );

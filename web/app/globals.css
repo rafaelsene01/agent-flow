@@ -1566,6 +1566,46 @@ select.sf-input option {
   color: var(--accent);
 }
 
+.trigger-item--done,
+.trigger-item--done:hover {
+  color: var(--ok, #4caf50);
+  border-color: var(--ok, #4caf50);
+  background: var(--surface);
+  cursor: default;
+  opacity: .75;
+}
+
+.trigger-item:disabled {
+  cursor: default;
+}
+
+.worktree-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-top: 2px;
+}
+
+.worktree-info-branch {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.worktree-info-path {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── create-branch modal ────────────────────────────────────────────────────── */
 .create-branch-modal {
   width: min(480px, 100%);
@@ -1620,6 +1660,10 @@ select.sf-input option {
   font-family: "JetBrains Mono", "Fira Code", monospace;
 }
 
+.cb-branch-filter {
+  margin-bottom: 6px;
+}
+
 .cb-branches-list {
   max-height: 200px;
 }
@@ -1647,9 +1691,19 @@ select.sf-input option {
   border-color: var(--c-cancelled);
 }
 
+.cb-feedback-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .cb-feedback {
   margin: 0;
   font-size: 12px;
+}
+
+.cb-worktree-path {
+  word-break: break-all;
 }
 
 .cb-inline-code {
