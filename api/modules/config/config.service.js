@@ -59,3 +59,9 @@ export function registerWorktree({ owner, repo, branch, cardNumber, repoDir, wor
 export function removeWorktree(id) {
   setConfig({ worktrees: getWorktrees().filter((w) => w.id !== id) });
 }
+
+export function updateWorktreeStatus(id, updates) {
+  setConfig({
+    worktrees: getWorktrees().map((w) => w.id === id ? { ...w, ...updates } : w),
+  });
+}

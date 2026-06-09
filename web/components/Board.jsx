@@ -42,6 +42,36 @@ function CardModal({ item, board, onClose }) {
   const isConfigured = !!worktreeConfig;
   const isChecking   = worktreeConfig === null && worktreeId !== null;
 
+  const [specSending, setSpecSending] = useState(false);
+
+  // Poll while the background job is running
+  useEffect(() => {
+    if (worktreeConfig?.status !== "running") return;
+    const timer = setInterval(loadWorktreeConfig, 3000);
+    return () => clearInterval(timer);
+  }, [worktreeConfig?.status]);
+
+  async function handleRunSpec() {
+    setSpecSending(true);
+    try {
+      const res  = await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run`,
+        {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ title: item.title, number: item.number, body: item.body }),
+        },
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      loadWorktreeConfig(); // pick up status: "running" immediately
+    } catch (err) {
+      console.error("[run-spec]", err);
+    } finally {
+      setSpecSending(false);
+    }
+  }
+
   return (
     <>
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -97,6 +127,44 @@ function CardModal({ item, board, onClose }) {
                     <span className="worktree-info-path" title={worktreeConfig.path}>{worktreeConfig.path}</span>
                   </div>
                 )}
+
+                {(() => {
+                  const runStatus = worktreeConfig?.status;
+                  const isRunning = runStatus === "running" || specSending;
+                  const isDone    = runStatus === "done";
+                  const isError   = runStatus === "error";
+                  return (
+                    <>
+                      <button
+                        className={`trigger-item${isDone ? " trigger-item--done" : isError ? " trigger-item--error" : ""}`}
+                        type="button"
+                        disabled={!isConfigured || isRunning}
+                        onClick={handleRunSpec}
+                      >
+                        <span className="trigger-icon">✎</span>
+                        <span className="trigger-label">Executar Tarefa</span>
+                        <span className="trigger-run">
+                          {isRunning ? "…" : isDone ? "✓" : isError ? "↺" : "▷"}
+                        </span>
+                      </button>
+                      {isRunning && (
+                        <span className="trigger-feedback trigger-feedback--running">
+                          ⟳ Executando em background…
+                        </span>
+                      )}
+                      {isDone && (
+                        <span className="trigger-feedback ok">
+                          ✓ Concluído · clique para re-executar
+                        </span>
+                      )}
+                      {isError && worktreeConfig?.lastError && (
+                        <span className="trigger-feedback err" title={worktreeConfig.lastError}>
+                          ✕ {worktreeConfig.lastError}
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
