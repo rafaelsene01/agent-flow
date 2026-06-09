@@ -2,7 +2,7 @@
 
 Ponto de entrada: `bin/agent-flow.js` → inicia o Express via `api/server.js`.
 
-> **Arquitetura:** este projeto segue padrão **modular (feature-based)**. Leia [docs/architecture.md](docs/architecture.md) antes de adicionar qualquer módulo.
+> Leia [docs/architecture.md](docs/architecture.md) antes de adicionar módulos.
 
 ---
 
@@ -16,6 +16,9 @@ Ponto de entrada: `bin/agent-flow.js` → inicia o Express via `api/server.js`.
 | `POST` | `/api/config/browse` | [docs/routes/config.md](docs/routes/config.md) |
 | `GET` | `/api/github/repos` | [docs/routes/github.md](docs/routes/github.md) |
 | `GET` | `/api/github/boards` | [docs/routes/github.md](docs/routes/github.md) |
+| `GET` | `/api/github/boards/:id/items` | [docs/routes/github.md](docs/routes/github.md) |
+| `GET` | `/api/github/boards/:id/views` | [docs/routes/github.md](docs/routes/github.md) |
+| `GET` | `/api/github/boards/:id/columns` | [docs/routes/github.md](docs/routes/github.md) |
 
 ## Módulos
 
@@ -27,22 +30,16 @@ Ponto de entrada: `bin/agent-flow.js` → inicia o Express via `api/server.js`.
 
 ## Core
 
-| Módulo | Caminho | Documentação |
-|--------|---------|--------------|
-| Servidor | `api/server.js` | [docs/server.md](docs/server.md) |
-| Arquitetura | — | [docs/architecture.md](docs/architecture.md) |
-| Frontend (Next.js) | `web/` | [docs/web.md](docs/web.md) |
+| Arquivo | Documentação |
+|---------|--------------|
+| `api/server.js` | [docs/server.md](docs/server.md) |
+| `web/` | [docs/web.md](docs/web.md) |
+| Arquitetura | [docs/architecture.md](docs/architecture.md) |
 
 ---
 
-## Regras para manutenção da doc
+## Manutenção da doc
 
-Ao adicionar ou alterar qualquer rota, módulo ou comportamento relevante:
-
-1. **Nova rota** → adicionar linha na tabela "Rotas" acima + criar/atualizar `docs/routes/<arquivo>.md`
-2. **Novo módulo** → adicionar linha na tabela "Módulos" acima + criar `docs/modules/<modulo>.md`
-3. **Mudança em módulo existente** → atualizar o `.md` correspondente em `docs/modules/`
-4. **Mudança no servidor** → atualizar `docs/server.md`
-5. **Mudança de arquitetura** → atualizar `docs/architecture.md`
-
-Doc desatualizada é pior que doc ausente — mantê-la em sincronia com o código.
+- Nova rota → linha na tabela + `docs/routes/<arquivo>.md`
+- Novo módulo → linha na tabela + `docs/modules/<modulo>.md`
+- Mudança em módulo/rota → atualizar o `.md` correspondente

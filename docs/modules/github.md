@@ -2,38 +2,28 @@
 
 Fonte: `api/modules/github/`
 
-Responsável por auth GitHub, listagem de repos e boards (Projects V2).
-
 ---
 
 ## Arquivos
 
-| Arquivo | Responsabilidade |
-|---------|-----------------|
-| `github.client.js` | HTTP client bruto — REST + GraphQL |
-| `github.service.js` | Detecção de auth — exporta `getStatus()` |
-| `github.repos.js` | Lista repositórios — exporta `listRepos()` |
-| `github.boards.js` | Lista GitHub Projects V2 — exporta `listBoards()` |
+| Arquivo | Exporta |
+|---------|---------|
+| `github.client.js` | `validateToken`, `getRepositories`, `graphQL`, `getToken` |
+| `github.service.js` | `getStatus()` |
+| `github.repos.js` | `listRepos()` |
+| `github.boards.js` | `listBoards()`, `listViews()`, `listColumns()` |
+| `github.items.js` | `listItems()`, `listAllItems()`, `listItemsByColumn()` |
 
 ---
 
 ## github.client.js
 
-Todas requisições usam `Bearer` token e header `X-GitHub-Api-Version: 2022-11-28`.
+Todas as requisições usam `Bearer` token e `X-GitHub-Api-Version: 2022-11-28`.
 
-### `validateToken(token)`
-
-`GET /user` — valida token. Retorna objeto do usuário ou lança erro em 401/403.
-
-### `getRepositories(token)`
-
-`GET /user/repos?per_page=100&sort=updated` — lista repos ordenados por última atualização.
-
-### `graphQL(query, token)`
-
-`POST /graphql` — executa query GraphQL autenticada. Retorna resposta bruta.
-
-**Formato de erro:** `"GitHub API error <status>: <body>"` / `"GitHub GraphQL error <status>: <body>"`
+- `validateToken(token)` — `GET /user`, valida token
+- `getRepositories(token)` — `GET /user/repos?per_page=100&sort=updated`
+- `graphQL(query, token, variables)` — `POST /graphql`, retorna resposta bruta
+- `getToken()` — lê `GH_TOKEN` | `GITHUB_TOKEN` | `GITHUB_KEY` do env
 
 ---
 
@@ -41,14 +31,12 @@ Todas requisições usam `Bearer` token e header `X-GitHub-Api-Version: 2022-11-
 
 ### `getStatus()`
 
-Detecta auth GitHub em ordem de prioridade:
+Detecta auth em ordem:
+1. Token de ambiente → `validateToken()`
+2. `gh api user` via CLI (tokens removidos do env antes de chamar)
 
-1. **Token de ambiente** — `GH_TOKEN` | `GITHUB_TOKEN` | `GITHUB_KEY` → valida via `validateToken()`
-2. **gh CLI** — `gh api user` → parse JSON para login (tokens de ambiente removidos do env antes de chamar)
+Salva `githubMethod` (`"env"` | `"gh-cli"`) em config.
 
-Salva `githubMethod` (`"env"` | `"gh-cli"`) em config via `setConfig()` quando conectado.
-
-**Retorno:**
 ```js
 { connected: true,  method: "env"|"gh-cli", user: "login", name: "Nome" }
 { connected: false, error: "mensagem" }
@@ -60,14 +48,8 @@ Salva `githubMethod` (`"env"` | `"gh-cli"`) em config via `setConfig()` quando c
 
 ### `listRepos()`
 
-Lista repos do usuário autenticado. Tenta em ordem:
+Tenta em ordem: token de ambiente → `getRepositories()`, depois `gh repo list`. Retorna `[]` se ambos falharem.
 
-1. Token de ambiente → `getRepositories()` (REST API)
-2. `gh repo list` (gh CLI)
-
-Retorna `[]` se ambos falharem.
-
-**Formato de retorno:**
 ```js
 [{ name, fullName, private, description, updatedAt, sshUrl, cloneUrl }]
 ```
@@ -78,20 +60,41 @@ Retorna `[]` se ambos falharem.
 
 ### `listBoards()`
 
-Lista GitHub Projects V2 (pessoais + organizações). Usa GraphQL.
+Lista Projects V2 (pessoais + orgs). Método via `config.githubMethod` — `"env"` usa token, `"gh-cli"` usa CLI. Busca até 50 por pessoa/org (máx 30 orgs).
 
-Decisão de método baseada em `config.githubMethod`:
-- `"env"` → `graphQL()` com token de ambiente
-- `"gh-cli"` → `gh api graphql` via CLI (sem tokens de ambiente no env)
-- Não definido → tenta token de ambiente, fallback para gh CLI
+Lança `"MISSING_SCOPE:read:project"` se gh CLI não tiver permissão `read:project`.
 
-Busca até 50 projetos pessoais e 50 por organização (máx 30 orgs).
-
-**Erro de escopo faltando:** lança `"MISSING_SCOPE:read:project"` quando gh CLI retorna `required scopes` ou `read:project`.
-
-**Formato de retorno:**
 ```js
 [{ id, title, number, url, org, repos: [{ name, fullName, cloneUrl }] }]
 ```
 
-`org` é `null` para projetos pessoais.
+### `listViews(projectId)` / `listColumns(projectId)`
+
+```js
+// views
+[{ id, name, number }]
+
+// columns — opções do campo Status
+[{ id, name, color }]
+```
+
+---
+
+## github.items.js
+
+### `listAllItems(projectId, opts)`
+
+Busca todas as páginas (até 10 / 1000 itens), filtra por `repoName` e `labels`. Retorna itens com coluna (`columnName`, `columnId`).
+
+### `listItemsByColumn(projectId, { columnId, columnName }, opts)`
+
+Paginação eficiente por coluna. Cursor composto `"<githubCursor>|<skip>"` evita re-buscar do início ao paginar.
+
+**Item retornado:**
+```js
+{ id, type, itemType, title, number, body, assignees, labels }
+```
+
+- `type` — `"Issue"` | `"PullRequest"` | `"DraftIssue"`
+- `itemType` — valor do campo "Type"/"Issue Type" (single-select). `null` se não existir.
+- `body` — markdown da descrição. `null` se vazio.

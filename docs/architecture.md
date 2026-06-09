@@ -1,76 +1,55 @@
 # Arquitetura — Modular
 
-Este projeto segue **arquitetura modular** (feature-based). Cada domínio é isolado em seu próprio módulo com rotas, serviço e cliente HTTP internos. Código compartilhado vai em `shared/`.
+Cada domínio é isolado em `api/modules/<modulo>/`. Rotas ficam em `api/routes/`.
 
 ---
 
-## Estrutura de pastas
+## Estrutura
 
 ```
 api/
 ├── modules/
-│   ├── <modulo>/
-│   │   ├── <modulo>.routes.js      ← handlers Express (entrada HTTP)
-│   │   ├── <modulo>.service.js     ← lógica de negócio
-│   │   └── <modulo>.client.js      ← HTTP client externo (se houver)
-│   │
 │   ├── github/
-│   │   ├── github.routes.js
-│   │   ├── github.service.js
-│   │   └── github.client.js
-│   │
-│   └── claude/
-│       ├── claude.routes.js
-│       └── claude.service.js
-│
-├── shared/
-│   ├── middlewares/    ← middlewares globais
-│   └── utils/         ← helpers sem domínio
-│
-└── server.js           ← monta app, registra módulos
+│   │   ├── github.client.js   ← HTTP client bruto
+│   │   ├── github.service.js  ← detecção de auth
+│   │   ├── github.repos.js    ← lista repos
+│   │   ├── github.boards.js   ← lista boards/views/colunas
+│   │   └── github.items.js    ← itens do projeto
+│   ├── claude/
+│   │   └── claude.service.js
+│   └── config/
+│       └── config.service.js
+├── routes/
+│   ├── status.js
+│   ├── config.js
+│   └── github.js
+└── server.js
 ```
 
 ---
 
 ## Regras
 
-- **Módulo não importa de outro módulo.** Dependência entre domínios passa por `shared/` ou pelo `server.js`.
-- **routes** só orquestra request/response — sem lógica de negócio.
-- **service** contém toda lógica — sem dependência de `req`/`res`.
-- **client** faz chamadas HTTP externas — sem lógica de negócio.
-- Novo domínio = nova pasta em `modules/`. Nunca adicionar arquivos soltos em `api/`.
+- Módulo não importa de outro módulo — dependências cruzadas passam por `server.js`.
+- `routes/` só orquestra request/response — sem lógica de negócio.
+- `service` contém toda lógica — sem dependência de `req`/`res`.
+- `client` faz chamadas HTTP externas — sem lógica de negócio.
+- Novo domínio = nova pasta em `modules/` + arquivo em `routes/`. Nunca arquivos soltos em `api/`.
 
 ---
 
-## Estado atual
-
-| Módulo | Caminho | Descrição |
-|--------|---------|-----------|
-| `github` | `api/modules/github/` | Auth, repos e boards do GitHub |
-| `claude` | `api/modules/claude/` | Detecção do Claude CLI |
-| `config` | `api/modules/config/` | Config persistida em `~/.agent-flow/config.json` |
-
-Rotas registradas:
-
-| Rota | Arquivo | Doc |
-|------|---------|-----|
-| `/api/status` | `api/routes/status.js` | [docs/routes/status.md](../routes/status.md) |
-| `/api/config` | `api/routes/config.js` | [docs/routes/config.md](../routes/config.md) |
-| `/api/github/*` | `api/routes/github.js` | [docs/routes/github.md](../routes/github.md) |
-
----
-
-## Exemplo — adicionar módulo `repos`
+## Adicionar módulo novo
 
 ```
-api/modules/repos/
-├── repos.routes.js    ← GET /api/repos
-├── repos.service.js   ← filtra, ordena, formata
-└── repos.client.js    ← chama github.client.js ou reutiliza
+api/modules/novo/
+├── novo.service.js
+└── novo.client.js    ← se tiver HTTP externo
+
+api/routes/novo.js    ← handlers Express
 ```
 
 Registrar em `server.js`:
 ```js
-import reposRoutes from "./modules/repos/repos.routes.js";
-reposRoutes(app);
+import novoRoutes from "./routes/novo.js";
+novoRoutes(app);
 ```
