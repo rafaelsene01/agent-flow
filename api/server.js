@@ -5,6 +5,7 @@ import express from "express";
 import statusRoutes from "./routes/status.js";
 import configRoutes from "./routes/config.js";
 import githubRoutes from "./routes/github.js";
+import { warmup } from "./modules/status/status.cache.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST_DIR = path.resolve(__dirname, "../web/out");
@@ -45,6 +46,8 @@ export async function startServer({ port, apiOnly = false }) {
         : err);
     });
   });
+
+  warmup();
 
   return { app, server, url: `http://${host}:${port}` };
 }

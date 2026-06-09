@@ -1,11 +1,42 @@
-import { getStatus as getGithubStatus } from "../modules/github/github.service.js";
-import { getStatus as getClaudeStatus } from "../modules/claude/claude.service.js";
+import { cpSync, existsSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+import { homedir } from "os";
+import { getCache, refresh } from "../modules/status/status.cache.js";
+
+const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
 export default function statusRoutes(app) {
-  app.get("/api/status", async (_req, res) => {
+  app.get("/api/status", (_req, res) => {
+    const cached = getCache();
+    if (cached) return res.json(cached);
+    // Ainda não terminou o warmup — aguarda a primeira leitura real.
+    refresh()
+      .then((data) => res.json(data))
+      .catch((err) => res.status(500).json({ error: err.message }));
+  });
+
+  app.post("/api/status", async (_req, res) => {
     try {
-      const [github, claude] = await Promise.all([getGithubStatus(), getClaudeStatus()]);
-      res.json({ platform: process.platform, github, claude });
+      const data = await refresh();
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/status/install-skill", async (_req, res) => {
+    const src  = join(PROJECT_ROOT, ".claude", "skills", "tlc-spec-driven");
+    const dest = join(homedir(), ".claude", "skills", "tlc-spec-driven");
+
+    if (!existsSync(src)) {
+      return res.status(404).json({ error: "Skill não encontrada no projeto." });
+    }
+
+    try {
+      cpSync(src, dest, { recursive: true });
+      const data = await refresh();
+      res.json(data);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
