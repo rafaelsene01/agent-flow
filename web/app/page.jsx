@@ -23,13 +23,10 @@ function AppContent() {
   const [showEditBoard, setShowEditBoard] = useState(false);
   const [boards, setBoards]               = useState([]);
   const [activeBoard, setActiveBoard]     = useState(null);
-  const [theme, setTheme]                 = useState("dark");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("theme") ?? "dark";
-    setTheme(saved);
-    document.documentElement.setAttribute("data-theme", saved);
-  }, []);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") return "dark";
+    return localStorage.getItem("theme") ?? "dark";
+  });
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
