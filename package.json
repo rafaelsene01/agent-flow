@@ -11,7 +11,8 @@
     "dev": "concurrently -n api,web -c cyan,magenta \"node api/dev.js\" \"npm run dev --prefix web\"",
     "start": "npm run build:web && node bin/agent-flow.js",
     "build:web": "npm run build --prefix web",
-    "prepack": "npm install --prefix web && npm run build --prefix web"
+    "postinstall": "npm install --prefix web",
+    "prepack": "npm run build --prefix web"
   },
   "files": [
     "bin/",
