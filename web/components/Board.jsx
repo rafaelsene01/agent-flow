@@ -7,6 +7,134 @@ import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
 import CreateBranchModal from "./CreateBranchModal.jsx";
 
+// ── CopyCmd ───────────────────────────────────────────────────────────────────
+
+function CopyCmd({ cmd }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(cmd).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  return (
+    <button className={`git-cmd${copied ? " git-cmd--copied" : ""}`} type="button" onClick={handleCopy} title="Copiar">
+      <code className="git-cmd-text">{cmd}</code>
+    </button>
+  );
+}
+
+// ── TlcFileModal ──────────────────────────────────────────────────────────────
+
+const TLC_LABEL = { spec: "Spec", design: "Design", tasks: "Tasks" };
+const TLC_ICON  = { spec: "📋", design: "🎨", tasks: "✅" };
+
+function TlcFileModal({ worktreeId, type, onClose }) {
+  const [content,  setContent]  = useState(null);  // null = loading
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState(null);
+  const [preview,  setPreview]  = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/tlc-file/${type}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.error) throw new Error(d.error); setContent(d.content); })
+      .catch((err) => setError(err.message));
+  }, [worktreeId, type]);
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res  = await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/tlc-file/${type}`,
+        { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) },
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="backdrop tlc-file-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal tlc-file-modal">
+
+        {/* ── top row: title + close ── */}
+        <div className="tlc-file-toprow">
+          <span className="tlc-file-modal-title">
+            <span className="tlc-file-modal-icon">{TLC_ICON[type]}</span>
+            {TLC_LABEL[type]}
+          </span>
+          <button className="tlc-file-close" type="button" onClick={onClose} title="Fechar (Esc)">✕</button>
+        </div>
+
+        {/* ── toolbar: tabs + save ── */}
+        <div className="tlc-file-toolbar">
+          <div className="tlc-tabs">
+            <button
+              className={`tlc-tab${!preview ? " tlc-tab--active" : ""}`}
+              type="button"
+              onClick={() => setPreview(false)}
+            >
+              ✎ Editar
+            </button>
+            <button
+              className={`tlc-tab${preview ? " tlc-tab--active" : ""}`}
+              type="button"
+              onClick={() => setPreview(true)}
+            >
+              ◉ Preview
+            </button>
+          </div>
+
+          <button
+            className="tlc-save-btn"
+            type="button"
+            onClick={handleSave}
+            disabled={saving || content === null}
+          >
+            {saving ? "Salvando…" : "Salvar"}
+          </button>
+        </div>
+
+        {error && <p className="tlc-file-error">⚠ {error}</p>}
+
+        {content === null && !error && <p className="tlc-file-loading">Carregando…</p>}
+
+        {content !== null && (
+          preview ? (
+            <div className="tlc-file-preview card-modal-body md">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeHighlight, { detect: false }]]}>
+                {content}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <textarea
+              className="tlc-file-editor"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              spellCheck={false}
+            />
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── CardModal ─────────────────────────────────────────────────────────────────
 
 const TYPE_LABEL = { Issue: "Issue", PullRequest: "Pull request", DraftIssue: "Draft issue" };
@@ -42,14 +170,88 @@ function CardModal({ item, board, onClose }) {
   const isConfigured = !!worktreeConfig;
   const isChecking   = worktreeConfig === null && worktreeId !== null;
 
-  const [specSending, setSpecSending] = useState(false);
+  const [specSending,    setSpecSending]    = useState(false);
+  const [tlcSending,     setTlcSending]     = useState(false);
+  const [tlcExecSending, setTlcExecSending] = useState(false);
+  const [claudeStatus,   setClaudeStatus]   = useState(null);
+  const [tlcFileModal,   setTlcFileModal]   = useState(null); // null | "spec" | "design" | "tasks"
+  const [tlcFiles,       setTlcFiles]       = useState(null); // { spec, design, tasks } from live scan
 
-  // Poll while the background job is running
   useEffect(() => {
-    if (worktreeConfig?.status !== "running") return;
+    fetch("/api/status")
+      .then((r) => r.json())
+      .then((d) => setClaudeStatus(d.claude ?? null))
+      .catch(() => setClaudeStatus(null));
+  }, []);
+
+  // Scan .specs/features/ whenever TLC is done so buttons reflect real disk state.
+  useEffect(() => {
+    if (worktreeConfig?.tlcStatus !== "done" || !worktreeId) return;
+    fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/tlc-scan`)
+      .then((r) => r.json())
+      .then((d) => setTlcFiles(d.tlcFiles ?? null))
+      .catch(() => setTlcFiles(null));
+  }, [worktreeConfig?.tlcStatus, worktreeId]);
+
+  // Poll while any background job is running
+  useEffect(() => {
+    const anyRunning =
+      worktreeConfig?.status        === "running" ||
+      worktreeConfig?.tlcStatus     === "running" ||
+      worktreeConfig?.tlcExecStatus === "running";
+    if (!anyRunning) return;
     const timer = setInterval(loadWorktreeConfig, 3000);
     return () => clearInterval(timer);
-  }, [worktreeConfig?.status]);
+  }, [worktreeConfig?.status, worktreeConfig?.tlcStatus, worktreeConfig?.tlcExecStatus]);
+
+  async function handleRunTlc() {
+    setTlcSending(true);
+    try {
+      const res = await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run-tlc`,
+        {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ title: item.title, number: item.number, body: item.body }),
+        },
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      loadWorktreeConfig();
+    } catch (err) {
+      console.error("[run-tlc]", err);
+    } finally {
+      setTlcSending(false);
+    }
+  }
+
+  async function handleResetWorktree() {
+    if (!worktreeId) return;
+    try {
+      await fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}`, { method: "DELETE" });
+      setTlcFiles(null);
+      loadWorktreeConfig();
+    } catch (err) {
+      console.error("[reset-worktree]", err);
+    }
+  }
+
+  async function handleRunTlcExec() {
+    setTlcExecSending(true);
+    try {
+      const res = await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run-tlc-exec`,
+        { method: "POST", headers: { "Content-Type": "application/json" } },
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      loadWorktreeConfig();
+    } catch (err) {
+      console.error("[run-tlc-exec]", err);
+    } finally {
+      setTlcExecSending(false);
+    }
+  }
 
   async function handleRunSpec() {
     setSpecSending(true);
@@ -111,16 +313,26 @@ function CardModal({ item, board, onClose }) {
             <div className="sidebar-section">
               <span className="sidebar-label">Gatilhos</span>
               <div className="sidebar-triggers">
-                <button
-                  className={`trigger-item${isConfigured ? " trigger-item--done" : ""}`}
-                  type="button"
-                  disabled={isConfigured || isChecking}
-                  onClick={() => setShowCreateBranch(true)}
-                >
-                  <span className="trigger-icon">⎇</span>
-                  <span className="trigger-label">Configurar Branch</span>
-                  <span className="trigger-run">{isConfigured ? "✓" : "▷"}</span>
-                </button>
+                <div className="trigger-item-row">
+                  <button
+                    className={`trigger-item${isConfigured ? " trigger-item--done" : ""}`}
+                    type="button"
+                    disabled={isConfigured || isChecking}
+                    onClick={() => setShowCreateBranch(true)}
+                  >
+                    <span className="trigger-icon">⎇</span>
+                    <span className="trigger-label">Configurar Branch</span>
+                    <span className="trigger-run">{isConfigured ? "✓" : "▷"}</span>
+                  </button>
+                  {isConfigured && (
+                    <button
+                      className="trigger-reset"
+                      type="button"
+                      title="Resetar: remove a worktree do disco e limpa a configuração do card"
+                      onClick={handleResetWorktree}
+                    >↺</button>
+                  )}
+                </div>
                 {isConfigured && (
                   <div className="worktree-info">
                     <span className="worktree-info-branch">⎇ {worktreeConfig.branch}</span>
@@ -161,6 +373,127 @@ function CardModal({ item, board, onClose }) {
                         <span className="trigger-feedback err" title={worktreeConfig.lastError}>
                           ✕ {worktreeConfig.lastError}
                         </span>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* ── TLC button ── */}
+                {(() => {
+                  const tlcStatus    = worktreeConfig?.tlcStatus;
+                  const isTlcRunning = tlcStatus === "running" || tlcSending;
+                  const isTlcDone    = tlcStatus === "done";
+                  const isTlcError   = tlcStatus === "error";
+                  const hasTlcSkill  = claudeStatus?.tlcSkill ?? false;
+                  return (
+                    <>
+                      <button
+                        className={`trigger-item${isTlcDone ? " trigger-item--done" : isTlcError ? " trigger-item--error" : ""}`}
+                        type="button"
+                        disabled={!isConfigured || !hasTlcSkill || isTlcRunning}
+                        title={!hasTlcSkill ? "Skill tlc-spec-driven não instalada — configure nas Configurações" : undefined}
+                        onClick={handleRunTlc}
+                      >
+                        <span className="trigger-icon">⚡</span>
+                        <span className="trigger-label">Executar TLC</span>
+                        <span className="trigger-run">
+                          {isTlcRunning ? "…" : isTlcDone ? "✓" : isTlcError ? "↺" : "▷"}
+                        </span>
+                      </button>
+                      {isTlcRunning && (
+                        <span className="trigger-feedback trigger-feedback--running">
+                          ⟳ Criando spec, design e tasks…
+                        </span>
+                      )}
+                      {isTlcError && worktreeConfig?.tlcLastError && (
+                        <span className="trigger-feedback err" title={worktreeConfig.tlcLastError}>
+                          ✕ {worktreeConfig.tlcLastError}
+                        </span>
+                      )}
+                      {isTlcDone && (
+                        <>
+                          <div className="tlc-outputs">
+                            {[
+                              { type: "spec",   icon: "📋", label: "Spec"   },
+                              { type: "design", icon: "🎨", label: "Design" },
+                              { type: "tasks",  icon: "✅", label: "Tasks"  },
+                            ].map(({ type, icon, label }) => {
+                              const exists = tlcFiles?.[type] ?? false;
+                              return (
+                                <button
+                                  key={type}
+                                  className={`tlc-output-btn${exists ? " tlc-output-btn--active" : ""}`}
+                                  type="button"
+                                  disabled={!exists}
+                                  title={!exists ? `${label} não foi gerado` : `Abrir ${label}`}
+                                  onClick={() => setTlcFileModal(type)}
+                                >
+                                  <span className="tlc-output-icon">{icon}</span>
+                                  <span>{label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {(() => {
+                            const execStatus    = worktreeConfig?.tlcExecStatus;
+                            const isExecRunning = execStatus === "running" || tlcExecSending;
+                            const isExecDone    = execStatus === "done";
+                            const isExecError   = execStatus === "error";
+                            return (
+                              <>
+                                <button
+                                  className={`trigger-item${isExecDone ? " trigger-item--done" : isExecError ? " trigger-item--error" : ""}`}
+                                  type="button"
+                                  disabled={isExecRunning}
+                                  onClick={handleRunTlcExec}
+                                >
+                                  <span className="trigger-icon">▶</span>
+                                  <span className="trigger-label">Executar Spec</span>
+                                  <span className="trigger-run">
+                                    {isExecRunning ? "…" : isExecDone ? "✓" : isExecError ? "↺" : "▷"}
+                                  </span>
+                                </button>
+                                {isExecRunning && (
+                                  <span className="trigger-feedback trigger-feedback--running">
+                                    ⟳ Implementando, commitando e fazendo push…
+                                  </span>
+                                )}
+                                {isExecDone && (
+                                  <span className="trigger-feedback ok">
+                                    ✓ Concluído · clique para re-executar
+                                  </span>
+                                )}
+                                {isExecError && worktreeConfig?.tlcExecLastError && (
+                                  <span className="trigger-feedback err" title={worktreeConfig.tlcExecLastError}>
+                                    ✕ {worktreeConfig.tlcExecLastError}
+                                  </span>
+                                )}
+
+                                {/* ── git commands ── */}
+                                {(() => {
+                                  const branch = worktreeConfig?.branch ?? "branch";
+                                  const cmds = [
+                                    `git checkout ${branch}`,
+                                    `git pull`,
+                                    `git reset --soft HEAD~1`,
+                                    `git reset`,
+                                    `git add .`,
+                                    `git commit -m "message"`,
+                                    `git push --force-with-lease origin ${branch}`,
+                                  ];
+                                  return (
+                                    <div className="git-cmds">
+                                      {cmds.map((cmd) => (
+                                        <CopyCmd key={cmd} cmd={cmd} />
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                              </>
+                            );
+                          })()}
+                        </>
                       )}
                     </>
                   );
@@ -225,6 +558,13 @@ function CardModal({ item, board, onClose }) {
         board={board}
         item={item}
         onClose={() => { setShowCreateBranch(false); loadWorktreeConfig(); }}
+      />
+    )}
+    {tlcFileModal && (
+      <TlcFileModal
+        worktreeId={worktreeId}
+        type={tlcFileModal}
+        onClose={() => setTlcFileModal(null)}
       />
     )}
     </>
