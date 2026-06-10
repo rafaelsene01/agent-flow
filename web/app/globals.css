@@ -1881,6 +1881,66 @@ select.sf-input option {
   flex: 1;
 }
 
+/* ── trigger action row (Limpar + Commit & Push) ───────────────────────────── */
+.trigger-action-row {
+  display: flex;
+  gap: 4px;
+  padding-top: 6px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border2);
+}
+
+.trigger-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background .1s, color .1s, border-color .1s;
+}
+.trigger-action-btn .trigger-icon { font-size: 13px; }
+.trigger-action-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--surface2);
+}
+.trigger-action-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+.trigger-action-btn--done {
+  color: var(--c-completed);
+  border-color: var(--c-completed);
+  opacity: .75;
+  cursor: default;
+}
+.trigger-action-btn--done:hover {
+  color: var(--c-completed);
+  border-color: var(--c-completed);
+  background: var(--surface);
+}
+.trigger-action-btn--error {
+  color: var(--c-cancelled);
+  border-color: var(--c-cancelled);
+  opacity: .75;
+}
+.trigger-action-btn--push:not(:disabled):not(.trigger-action-btn--done):not(.trigger-action-btn--error) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.trigger-action-btn--push:hover:not(:disabled):not(.trigger-action-btn--done):not(.trigger-action-btn--error) {
+  background: rgba(88, 166, 255, .08);
+}
+
 .trigger-reset {
   flex-shrink: 0;
   width: 30px;

@@ -170,9 +170,11 @@ function CardModal({ item, board, onClose, onWorktreeChange }) {
   const isConfigured = !!worktreeConfig;
   const isChecking   = worktreeConfig === null && worktreeId !== null;
 
-  const [specSending,    setSpecSending]    = useState(false);
-  const [tlcSending,     setTlcSending]     = useState(false);
-  const [tlcExecSending, setTlcExecSending] = useState(false);
+  const [specSending,       setSpecSending]       = useState(false);
+  const [tlcSending,        setTlcSending]        = useState(false);
+  const [tlcExecSending,    setTlcExecSending]    = useState(false);
+  const [cleanupSending,    setCleanupSending]    = useState(false);
+  const [commitPushSending, setCommitPushSending] = useState(false);
   const [claudeStatus,   setClaudeStatus]   = useState(null);
   const [tlcFileModal,   setTlcFileModal]   = useState(null); // null | "spec" | "design" | "tasks"
   const [tlcFiles,       setTlcFiles]       = useState(null); // { spec, design, tasks } from live scan
@@ -196,9 +198,10 @@ function CardModal({ item, board, onClose, onWorktreeChange }) {
   // Poll while any background job is running
   useEffect(() => {
     const anyRunning =
-      worktreeConfig?.status        === "running" ||
-      worktreeConfig?.tlcStatus     === "running" ||
-      worktreeConfig?.tlcExecStatus === "running";
+      worktreeConfig?.status           === "running" ||
+      worktreeConfig?.tlcStatus        === "running" ||
+      worktreeConfig?.tlcExecStatus    === "running" ||
+      worktreeConfig?.commitPushStatus === "running";
     if (!anyRunning) return;
     const timer = setInterval(loadWorktreeConfig, 3000);
     return () => clearInterval(timer);
@@ -253,6 +256,41 @@ function CardModal({ item, board, onClose, onWorktreeChange }) {
       console.error("[run-tlc-exec]", err);
     } finally {
       setTlcExecSending(false);
+    }
+  }
+
+  async function handleCleanup() {
+    setCleanupSending(true);
+    try {
+      const res  = await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/cleanup`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      loadWorktreeConfig();
+    } catch (err) {
+      console.error("[cleanup]", err);
+    } finally {
+      setCleanupSending(false);
+    }
+  }
+
+  async function handleCommitPush() {
+    setCommitPushSending(true);
+    try {
+      const res  = await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/commit-push`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      loadWorktreeConfig();
+      onWorktreeChange?.();
+    } catch (err) {
+      console.error("[commit-push]", err);
+    } finally {
+      setCommitPushSending(false);
     }
   }
 
@@ -464,32 +502,9 @@ function CardModal({ item, board, onClose, onWorktreeChange }) {
                                   </span>
                                 )}
                                 {isExecDone && (
-                                  <>
-                                    <span className="trigger-feedback ok">
-                                      ✓ Concluído · clique para re-executar
-                                    </span>
-                                    {/* ── git commands ── */}
-                                    {(() => {
-                                      const branch      = worktreeConfig?.branch ?? "branch";
-                                      const commitCount = worktreeConfig?.commitCount ?? 1;
-                                      const cmds = [
-                                        `git checkout ${branch}`,
-                                        `git pull`,
-                                        `git reset --soft HEAD~${commitCount}`,
-                                        `git reset`,
-                                        `git add .`,
-                                        `git commit -m "message"`,
-                                        `git push --force-with-lease origin ${branch}`,
-                                      ];
-                                      return (
-                                        <div className="git-cmds">
-                                          {cmds.map((cmd) => (
-                                            <CopyCmd key={cmd} cmd={cmd} />
-                                          ))}
-                                        </div>
-                                      );
-                                    })()}
-                                  </>
+                                  <span className="trigger-feedback ok">
+                                    ✓ Concluído · clique para re-executar
+                                  </span>
                                 )}
                                 {isExecError && worktreeConfig?.tlcExecLastError && (
                                   <span className="trigger-feedback err" title={worktreeConfig.tlcExecLastError}>
@@ -502,6 +517,42 @@ function CardModal({ item, board, onClose, onWorktreeChange }) {
                         </>
                       )}
                     </>
+                  );
+                })()}
+
+                {isConfigured && (() => {
+                  const cleanupDone         = worktreeConfig?.cleanupDone === true;
+                  const commitPushStatus    = worktreeConfig?.commitPushStatus;
+                  const isCommitPushRunning = commitPushStatus === "running" || commitPushSending;
+                  const isCommitPushDone    = commitPushStatus === "done";
+                  const isCommitPushError   = commitPushStatus === "error";
+                  return (
+                    <div className="trigger-action-row">
+                      <button
+                        className={`trigger-action-btn${cleanupDone ? " trigger-action-btn--done" : ""}`}
+                        type="button"
+                        disabled={cleanupSending}
+                        onClick={handleCleanup}
+                      >
+                        <span className="trigger-icon">🧹</span>
+                        <span>{cleanupSending ? "Limpando…" : cleanupDone ? "✓ Limpo" : "Limpar"}</span>
+                      </button>
+                      <button
+                        className={`trigger-action-btn trigger-action-btn--push${isCommitPushDone ? " trigger-action-btn--done" : isCommitPushError ? " trigger-action-btn--error" : ""}`}
+                        type="button"
+                        disabled={!cleanupDone || isCommitPushRunning}
+                        onClick={handleCommitPush}
+                        title={!cleanupDone ? "Execute a limpeza antes de commitar" : (isCommitPushError ? worktreeConfig?.commitPushLastError : undefined)}
+                      >
+                        <span className="trigger-icon">↑</span>
+                        <span>
+                          {isCommitPushRunning ? "Enviando…"   :
+                           isCommitPushDone    ? "✓ Enviado"   :
+                           isCommitPushError   ? "↺ Tentar"    :
+                                                 "Commit & Push"}
+                        </span>
+                      </button>
+                    </div>
                   );
                 })()}
               </div>
@@ -583,7 +634,8 @@ function Card({ item, onOpen, worktrees = [], originRepo = null }) {
   const worktreeId = originRepo && item.number != null ? `${originRepo}#${item.number}` : null;
   const wt         = worktreeId ? worktrees.find((w) => w.id === worktreeId) : null;
   const isRunning  = wt && (
-    wt.status === "running" || wt.tlcStatus === "running" || wt.tlcExecStatus === "running"
+    wt.status === "running" || wt.tlcStatus === "running" || wt.tlcExecStatus === "running" ||
+    wt.commitPushStatus === "running"
   );
 
   return (
@@ -762,7 +814,8 @@ export default function Board({ board }) {
   // Re-poll while any worktree has a running process
   useEffect(() => {
     const anyRunning = worktrees.some(
-      (w) => w.status === "running" || w.tlcStatus === "running" || w.tlcExecStatus === "running",
+      (w) => w.status === "running" || w.tlcStatus === "running" || w.tlcExecStatus === "running" ||
+             w.commitPushStatus === "running",
     );
     if (!anyRunning) return;
     const timer = setInterval(loadWorktrees, 3000);

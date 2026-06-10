@@ -113,9 +113,12 @@ export default function configRoutes(app) {
 
     // ── 2. Marcar como running e responder imediatamente ──────────────────────
     updateWorktreeStatus(id, {
-      status:     "running",
-      lastRunAt:  new Date().toISOString(),
-      lastError:  null,
+      status:          "running",
+      lastRunAt:       new Date().toISOString(),
+      lastError:       null,
+      cleanupDone:     false,
+      commitPushStatus: null,
+      pendingCommitMsg: null,
     });
     res.json({ ok: true });
 
@@ -204,48 +207,17 @@ export default function configRoutes(app) {
         return;
       }
 
-      // ── step 5: fechar log e remover arquivos internos ────────────────────
+      // ── step 5: fechar log ────────────────────────────────────────────────
       await new Promise((resolve) => logStream.end(resolve));
-      for (const f of INTERNAL) try { fs.rmSync(path.join(wt.path, f), { force: true }); } catch (_) {}
-      try { fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true }); } catch (_) {}
 
-      // ── step 6: single commit ──────────────────────────────────────────────
-      try {
-        await execFileP("git", ["add", "-A"], { cwd: wt.path, timeout: 30_000 });
-      } catch (err) {
-        updateWorktreeStatus(id, { status: "error", lastError: `git add failed: ${err.message}` });
-        return;
-      }
+      // ── step 6: registrar mensagem de commit pendente ─────────────────────
+      const pendingCommitMsg = impl.output
+        .split("\n").map((l) => l.trim()).filter(Boolean).reverse()
+        .find((l) => l.startsWith("COMMIT:"))
+        ?.replace(/^COMMIT:\s*/, "").replace(/^["'`]|["'`]$/g, "")
+        || "feat: implement task";
 
-      const { stdout: statusOut } = await execFileP(
-        "git", ["status", "--porcelain"], { cwd: wt.path, timeout: 10_000 },
-      ).catch(() => ({ stdout: "" }));
-
-      if (statusOut.trim()) {
-        const commitMsg = impl.output
-          .split("\n").map((l) => l.trim()).filter(Boolean).reverse()
-          .find((l) => l.startsWith("COMMIT:"))
-          ?.replace(/^COMMIT:\s*/, "").replace(/^["'`]|["'`]$/g, "")
-          || "feat: implement task";
-
-        try {
-          await execFileP("git", ["commit", "-m", commitMsg], { cwd: wt.path, timeout: 30_000 });
-        } catch (err) {
-          updateWorktreeStatus(id, { status: "error", lastError: `git commit failed: ${err.message}` });
-          return;
-        }
-      }
-
-      // ── step 7: push ───────────────────────────────────────────────────────
-      try {
-        await execFileP("git", ["push"], { cwd: wt.path, timeout: 60_000 });
-      } catch (err) {
-        updateWorktreeStatus(id, { status: "error", lastError: `Push failed: ${err.message}` });
-        return;
-      }
-
-      const prevCount = getWorktrees().find((w) => w.id === id)?.commitCount ?? 0;
-      updateWorktreeStatus(id, { status: "done", commitCount: prevCount + 1 });
+      updateWorktreeStatus(id, { status: "done", pendingCommitMsg });
     })();
   });
 
@@ -457,6 +429,9 @@ export default function configRoutes(app) {
       tlcExecStatus:    "running",
       tlcExecLastRunAt: new Date().toISOString(),
       tlcExecLastError: null,
+      cleanupDone:      false,
+      commitPushStatus: null,
+      pendingCommitMsg: null,
     });
     res.json({ ok: true });
 
@@ -518,48 +493,94 @@ export default function configRoutes(app) {
         }
       }
 
-      // ── step 4: fechar log e remover arquivos internos ────────────────────
+      // ── step 4: fechar log ────────────────────────────────────────────────
       await new Promise((resolve) => logStream.end(resolve));
-      for (const f of INTERNAL) try { fs.rmSync(path.join(wt.path, f), { force: true }); } catch (_) {}
-      try { fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true }); } catch (_) {}
 
-      // ── step 5: single commit ──────────────────────────────────────────────
+      // ── step 5: registrar mensagem de commit pendente ─────────────────────
+      const pendingCommitMsg = impl.output
+        .split("\n").map((l) => l.trim()).filter(Boolean).reverse()
+        .find((l) => l.startsWith("COMMIT:"))
+        ?.replace(/^COMMIT:\s*/, "").replace(/^["'`]|["'`]$/g, "")
+        || "feat: execute spec";
+
+      updateWorktreeStatus(id, { tlcExecStatus: "done", pendingCommitMsg });
+    })();
+  });
+
+  // ── Limpar arquivos internos ──────────────────────────────────────────────────
+
+  app.post("/api/config/worktrees/:id/cleanup", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt)                     return res.status(404).json({ error: "Worktree não encontrado na configuração." });
+    if (!fs.existsSync(wt.path)) return res.status(400).json({ error: `Diretório não encontrado: ${wt.path}` });
+
+    const INTERNAL = ["CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log"];
+    for (const f of INTERNAL) {
+      try { fs.rmSync(path.join(wt.path, f), { force: true }); } catch (_) {}
+    }
+
+    updateWorktreeStatus(id, { cleanupDone: true, commitPushStatus: null });
+    res.json({ ok: true });
+  });
+
+  // ── Commit & Push ─────────────────────────────────────────────────────────────
+
+  app.post("/api/config/worktrees/:id/commit-push", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt)                     return res.status(404).json({ error: "Worktree não encontrado na configuração." });
+    if (!fs.existsSync(wt.path)) return res.status(400).json({ error: `Diretório não encontrado: ${wt.path}` });
+
+    updateWorktreeStatus(id, {
+      commitPushStatus:    "running",
+      commitPushLastRunAt: new Date().toISOString(),
+      commitPushLastError: null,
+    });
+    res.json({ ok: true });
+
+    (async () => {
+      // ── step 1: git add -A ────────────────────────────────────────────────
       try {
         await execFileP("git", ["add", "-A"], { cwd: wt.path, timeout: 30_000 });
       } catch (err) {
-        updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `git add falhou: ${err.message}` });
+        updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `git add falhou: ${err.message}` });
         return;
       }
 
+      // ── step 2: verificar se há alterações ────────────────────────────────
       const { stdout: statusOut } = await execFileP(
         "git", ["status", "--porcelain"], { cwd: wt.path, timeout: 10_000 },
       ).catch(() => ({ stdout: "" }));
 
-      if (statusOut.trim()) {
-        const commitMsg = impl.output
-          .split("\n").map((l) => l.trim()).filter(Boolean).reverse()
-          .find((l) => l.startsWith("COMMIT:"))
-          ?.replace(/^COMMIT:\s*/, "").replace(/^["'`]|["'`]$/g, "")
-          || "feat: execute spec";
-
-        try {
-          await execFileP("git", ["commit", "-m", commitMsg], { cwd: wt.path, timeout: 30_000 });
-        } catch (err) {
-          updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `git commit falhou: ${err.message}` });
-          return;
-        }
+      if (!statusOut.trim()) {
+        updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: "Nenhuma alteração para commitar" });
+        return;
       }
 
-      // ── step 6: push ───────────────────────────────────────────────────────
+      // ── step 3: mensagem de commit ────────────────────────────────────────
+      const currentWt = getWorktrees().find((w) => w.id === id);
+      const commitMsg = currentWt?.pendingCommitMsg || "feat: implement task";
+
+      // ── step 4: commit ────────────────────────────────────────────────────
+      try {
+        await execFileP("git", ["commit", "-m", commitMsg], { cwd: wt.path, timeout: 30_000 });
+      } catch (err) {
+        updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `git commit falhou: ${err.message}` });
+        return;
+      }
+
+      // ── step 5: push ──────────────────────────────────────────────────────
       try {
         await execFileP("git", ["push"], { cwd: wt.path, timeout: 60_000 });
       } catch (err) {
-        updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `Push falhou: ${err.message}` });
+        updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `Push falhou: ${err.message}` });
         return;
       }
 
       const prevCount = getWorktrees().find((w) => w.id === id)?.commitCount ?? 0;
-      updateWorktreeStatus(id, { tlcExecStatus: "done", commitCount: prevCount + 1 });
+      updateWorktreeStatus(id, { commitPushStatus: "done", commitCount: prevCount + 1 });
     })();
   });
 
