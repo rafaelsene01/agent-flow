@@ -144,11 +144,16 @@ export default function configRoutes(app) {
     }
 
     (async () => {
-      // ── step 1: implement task ─────────────────────────────────────────────
-      logStream.write("=== Step 1: implementing task ===\n");
+      const INTERNAL = ["CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log"];
 
-      // Embed CARD.md content directly so Claude has full context without needing
-      // to ask what to do with the file.
+      // ── step 1: record HEAD before Claude touches anything ─────────────────
+      const { stdout: headBefore } = await execFileP(
+        "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
+      ).catch(() => ({ stdout: "" }));
+      const initialHead = headBefore.trim();
+
+      // ── step 2: implement task ─────────────────────────────────────────────
+      logStream.write("=== Step 1: implementing task ===\n");
       const cardContent = fs.readFileSync(path.join(wt.path, "CARD.md"), "utf-8");
 
       const impl = await runClaude(
@@ -168,13 +173,27 @@ export default function configRoutes(app) {
         return;
       }
 
-      // Verify Claude actually changed files (CARD.md alone doesn't count)
+      // ── step 3: squash any intermediate commits Claude made ────────────────
+      if (initialHead) {
+        const { stdout: headAfter } = await execFileP(
+          "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
+        ).catch(() => ({ stdout: initialHead }));
+        if (headAfter.trim() !== initialHead) {
+          logStream.write("\n=== Step 2: squashing Claude's intermediate commits ===\n");
+          await execFileP("git", ["reset", "--soft", initialHead], { cwd: wt.path, timeout: 15_000 })
+            .catch((e) => logStream.write(`Warning: reset failed: ${e.message}\n`));
+        }
+      }
+
+      // ── step 4: verify Claude changed something beyond internal files ───────
       const { stdout: changesOut } = await execFileP(
         "git", ["status", "--porcelain"], { cwd: wt.path, timeout: 10_000 },
       ).catch(() => ({ stdout: "" }));
-
-      const realChanges = changesOut.trim().split("\n")
-        .filter((l) => l.trim() && !l.endsWith("CARD.md"));
+      const realChanges = changesOut.trim().split("\n").filter((l) => {
+        if (!l.trim()) return false;
+        const file = l.slice(3).trim();
+        return !INTERNAL.includes(file) && !file.startsWith(".specs/");
+      });
 
       if (realChanges.length === 0) {
         logStream.end();
@@ -182,14 +201,13 @@ export default function configRoutes(app) {
         return;
       }
 
-      // ── step 2: semantic commit (we run git, Claude only writes the message) ─
-      logStream.write("\n=== Step 2: semantic commit ===\n");
+      // ── step 5: remove internal files ─────────────────────────────────────
+      logStream.write("\n=== Step 3: removendo arquivos internos ===\n");
+      for (const f of INTERNAL) fs.rmSync(path.join(wt.path, f), { force: true });
+      fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true });
 
-      // Remove internal files before staging so they never appear in the commit.
-      for (const f of ["CARD.md", "agent-flow.log"]) {
-        fs.rmSync(path.join(wt.path, f), { force: true });
-      }
-
+      // ── step 6: single commit ──────────────────────────────────────────────
+      logStream.write("\n=== Step 4: commit único ===\n");
       try {
         await execFileP("git", ["add", "-A"], { cwd: wt.path, timeout: 30_000 });
       } catch (err) {
@@ -198,13 +216,11 @@ export default function configRoutes(app) {
         return;
       }
 
-      // Skip commit if nothing was staged after excluding CARD.md
       const { stdout: statusOut } = await execFileP(
         "git", ["status", "--porcelain"], { cwd: wt.path, timeout: 10_000 },
       ).catch(() => ({ stdout: "" }));
 
       if (statusOut.trim()) {
-        // Ask Claude only for the commit message text — no git tool calls
         const { stdout: diffStat } = await execFileP(
           "git", ["diff", "--cached", "--stat"], { cwd: wt.path, timeout: 10_000 },
         ).catch(() => ({ stdout: "" }));
@@ -215,10 +231,8 @@ export default function configRoutes(app) {
           "(feat/fix/refactor/docs/chore/style/test/etc). No explanation, no markdown, no quotes. " +
           "Changes:\n\n" + diffStat,
         );
-
-        const commitMsg = msgResult.output
-          .split("\n").map((l) => l.trim()).filter(Boolean).pop()
-          || "feat: implement task from CARD.md";
+        const commitMsg = msgResult.output.split("\n").map((l) => l.trim()).filter(Boolean).pop()
+          || "feat: implement task";
 
         logStream.write(`Committing: ${commitMsg}\n`);
         try {
@@ -232,8 +246,8 @@ export default function configRoutes(app) {
         logStream.write("Nothing to commit — skipping.\n");
       }
 
-      // ── step 3: push ───────────────────────────────────────────────────────
-      logStream.write("\n=== Step 3: git push ===\n");
+      // ── step 7: push ───────────────────────────────────────────────────────
+      logStream.write("\n=== Step 5: git push ===\n");
       try {
         const { stdout, stderr } = await execFileP("git", ["push"], { cwd: wt.path, timeout: 60_000 });
         if (stdout) logStream.write(stdout);
@@ -481,7 +495,15 @@ export default function configRoutes(app) {
     }
 
     (async () => {
-      // ── step 1: execute spec via Claude ────────────────────────────────────
+      const INTERNAL = ["CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log"];
+
+      // ── step 1: record HEAD before Claude touches anything ─────────────────
+      const { stdout: headBefore } = await execFileP(
+        "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
+      ).catch(() => ({ stdout: "" }));
+      const initialHead = headBefore.trim();
+
+      // ── step 2: execute spec via Claude ────────────────────────────────────
       logStream.write("=== Step 1: executando spec ===\n");
 
       const impl = await runClaude(
@@ -495,13 +517,25 @@ export default function configRoutes(app) {
         return;
       }
 
-      // ── step 2: remove .specs and log ──────────────────────────────────────
-      logStream.write("\n=== Step 2: removendo .specs ===\n");
-      fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true });
-      fs.rmSync(path.join(wt.path, "tlc-exec.log"), { force: true });
+      // ── step 3: squash any intermediate commits Claude made ────────────────
+      if (initialHead) {
+        const { stdout: headAfter } = await execFileP(
+          "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
+        ).catch(() => ({ stdout: initialHead }));
+        if (headAfter.trim() !== initialHead) {
+          logStream.write("\n=== Step 2: squashing commits intermediários ===\n");
+          await execFileP("git", ["reset", "--soft", initialHead], { cwd: wt.path, timeout: 15_000 })
+            .catch((e) => logStream.write(`Warning: reset failed: ${e.message}\n`));
+        }
+      }
 
-      // ── step 3: stage all ──────────────────────────────────────────────────
-      logStream.write("\n=== Step 3: git add -A ===\n");
+      // ── step 4: remove internal files ─────────────────────────────────────
+      logStream.write("\n=== Step 3: removendo arquivos internos ===\n");
+      for (const f of INTERNAL) fs.rmSync(path.join(wt.path, f), { force: true });
+      fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true });
+
+      // ── step 5: single commit ──────────────────────────────────────────────
+      logStream.write("\n=== Step 4: commit único ===\n");
       try {
         await execFileP("git", ["add", "-A"], { cwd: wt.path, timeout: 30_000 });
       } catch (err) {
@@ -515,20 +549,17 @@ export default function configRoutes(app) {
       ).catch(() => ({ stdout: "" }));
 
       if (statusOut.trim()) {
-        // ── step 4: semantic commit message ──────────────────────────────────
         const { stdout: diffStat } = await execFileP(
           "git", ["diff", "--cached", "--stat"], { cwd: wt.path, timeout: 10_000 },
         ).catch(() => ({ stdout: "" }));
 
-        logStream.write("\n=== Step 4: gerando mensagem de commit ===\n");
+        logStream.write("Gerando mensagem de commit…\n");
         const msgResult = await runClaude(
           "Output ONLY a single-line semantic commit message following Conventional Commits " +
           "(feat/fix/refactor/docs/chore/style/test/etc). No explanation, no markdown, no quotes. " +
           "Changes:\n\n" + diffStat,
         );
-
-        const commitMsg = msgResult.output
-          .split("\n").map((l) => l.trim()).filter(Boolean).pop()
+        const commitMsg = msgResult.output.split("\n").map((l) => l.trim()).filter(Boolean).pop()
           || "feat: implement spec";
 
         logStream.write(`Committing: ${commitMsg}\n`);
@@ -539,9 +570,11 @@ export default function configRoutes(app) {
           updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `git commit falhou: ${err.message}` });
           return;
         }
+      } else {
+        logStream.write("Nada para commitar — pulando.\n");
       }
 
-      // ── step 5: push ───────────────────────────────────────────────────────
+      // ── step 6: push ───────────────────────────────────────────────────────
       logStream.write("\n=== Step 5: git push ===\n");
       try {
         const { stdout, stderr } = await execFileP("git", ["push"], { cwd: wt.path, timeout: 60_000 });
@@ -556,6 +589,52 @@ export default function configRoutes(app) {
       logStream.end();
       updateWorktreeStatus(id, { tlcExecStatus: "done" });
     })();
+  });
+
+  app.post("/api/config/cleanup-board", async (req, res) => {
+    const { originRepo } = req.body;
+    if (!originRepo) return res.status(400).json({ error: "originRepo obrigatório" });
+
+    const worktrees = getWorktrees().filter((w) => w.repo === originRepo);
+
+    // Collect all dirs to delete before touching config
+    const dirsToDelete = new Set();
+
+    let repoDir = worktrees[0]?.repoDir ?? null;
+    if (!repoDir) {
+      const { projectsPath } = getConfig();
+      const repoName = originRepo.split("/")[1];
+      if (repoName) repoDir = path.join(projectsPath, repoName);
+    }
+    if (repoDir) dirsToDelete.add(repoDir);
+
+    for (const wt of worktrees) {
+      if (wt.path)    dirsToDelete.add(wt.path);
+      if (wt.repoDir) dirsToDelete.add(wt.repoDir);
+    }
+
+    // 1. Remove from config immediately
+    setConfig({ worktrees: getWorktrees().filter((w) => w.repo !== originRepo) });
+
+    // 2. Delete all directories — worktrees first, repo last
+    const sorted = [...dirsToDelete].sort((a, b) => b.length - a.length); // deepest first
+    for (const dir of sorted) {
+      if (!fs.existsSync(dir)) continue;
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch (_) {
+        // On Windows, locked files can resist rmSync — try via PowerShell as fallback
+        if (process.platform === "win32") {
+          await execFileP(
+            "powershell",
+            ["-NoProfile", "-Command", `Remove-Item -Recurse -Force -LiteralPath '${dir}'`],
+            { timeout: 20_000 },
+          ).catch(() => {});
+        }
+      }
+    }
+
+    res.json({ ok: true });
   });
 
   app.post("/api/config/browse", (_req, res) => {
