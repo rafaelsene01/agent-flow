@@ -139,7 +139,7 @@ function TlcFileModal({ worktreeId, type, onClose }) {
 
 const TYPE_LABEL = { Issue: "Issue", PullRequest: "Pull request", DraftIssue: "Draft issue" };
 
-function CardModal({ item, board, onClose }) {
+function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [showCreateBranch, setShowCreateBranch] = useState(false);
   const [worktreeConfig, setWorktreeConfig]     = useState(null); // null=loading false=none object=found
 
@@ -218,6 +218,7 @@ function CardModal({ item, board, onClose }) {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       loadWorktreeConfig();
+      onWorktreeChange?.();
     } catch (err) {
       console.error("[run-tlc]", err);
     } finally {
@@ -231,6 +232,7 @@ function CardModal({ item, board, onClose }) {
       await fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}`, { method: "DELETE" });
       setTlcFiles(null);
       loadWorktreeConfig();
+      onWorktreeChange?.();
     } catch (err) {
       console.error("[reset-worktree]", err);
     }
@@ -246,6 +248,7 @@ function CardModal({ item, board, onClose }) {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       loadWorktreeConfig();
+      onWorktreeChange?.();
     } catch (err) {
       console.error("[run-tlc-exec]", err);
     } finally {
@@ -266,7 +269,8 @@ function CardModal({ item, board, onClose }) {
       );
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      loadWorktreeConfig(); // pick up status: "running" immediately
+      loadWorktreeConfig();
+      onWorktreeChange?.();
     } catch (err) {
       console.error("[run-spec]", err);
     } finally {
@@ -573,12 +577,19 @@ function CardModal({ item, board, onClose }) {
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 
-function Card({ item, onOpen }) {
+function Card({ item, onOpen, worktrees = [], originRepo = null }) {
+  const worktreeId = originRepo && item.number != null ? `${originRepo}#${item.number}` : null;
+  const wt         = worktreeId ? worktrees.find((w) => w.id === worktreeId) : null;
+  const isRunning  = wt && (
+    wt.status === "running" || wt.tlcStatus === "running" || wt.tlcExecStatus === "running"
+  );
+
   return (
     <div className="card p-none" onClick={() => onOpen(item)}>
       <div className="card-top">
         {item.number != null && <span className="card-id">#{item.number}</span>}
         {item.type === "PullRequest" && <span className="card-type-badge">PR</span>}
+        {isRunning && <span className="card-running-dot" title="Processo em execução…" />}
       </div>
       <p className="card-title">{item.title}</p>
       {item.labels.length > 0 && (
@@ -632,7 +643,7 @@ const GH_COLORS = {
   PURPLE: "#bf68d9",
 };
 
-function Column({ boardId, columnId, columnName, columnColor, viewFilter, onCardOpen }) {
+function Column({ boardId, columnId, columnName, columnColor, viewFilter, onCardOpen, worktrees, originRepo }) {
   const [items, setItems]             = useState([]);
   const [loading, setLoading]         = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -715,7 +726,9 @@ function Column({ boardId, columnId, columnName, columnColor, viewFilter, onCard
         {!loading && !error && items.length === 0 && (
           <p className="col-empty">Sem cards</p>
         )}
-        {!loading && items.map((item) => <Card key={item.id} item={item} onOpen={onCardOpen} />)}
+        {!loading && items.map((item) => (
+          <Card key={item.id} item={item} onOpen={onCardOpen} worktrees={worktrees} originRepo={originRepo} />
+        ))}
         {loadingMore && <p className="col-loading-more">Carregando…</p>}
       </div>
     </div>
@@ -733,6 +746,26 @@ function normalizeColumns(raw) {
 export default function Board({ board }) {
   const columns = normalizeColumns(board?.columns);
   const [activeCard, setActiveCard] = useState(null);
+  const [worktrees,  setWorktrees]  = useState([]);
+
+  function loadWorktrees() {
+    fetch("/api/config/worktrees")
+      .then((r) => r.json())
+      .then(setWorktrees)
+      .catch(() => {});
+  }
+
+  useEffect(loadWorktrees, []);
+
+  // Re-poll while any worktree has a running process
+  useEffect(() => {
+    const anyRunning = worktrees.some(
+      (w) => w.status === "running" || w.tlcStatus === "running" || w.tlcExecStatus === "running",
+    );
+    if (!anyRunning) return;
+    const timer = setInterval(loadWorktrees, 3000);
+    return () => clearInterval(timer);
+  }, [worktrees]);
 
   if (columns.length === 0) {
     return (
@@ -756,10 +789,19 @@ export default function Board({ board }) {
             columnColor={col.color ?? null}
             viewFilter={board.viewFilter ?? null}
             onCardOpen={setActiveCard}
+            worktrees={worktrees}
+            originRepo={board?.originRepo ?? null}
           />
         ))}
       </div>
-      {activeCard && <CardModal item={activeCard} board={board} onClose={() => setActiveCard(null)} />}
+      {activeCard && (
+        <CardModal
+          item={activeCard}
+          board={board}
+          onClose={() => setActiveCard(null)}
+          onWorktreeChange={loadWorktrees}
+        />
+      )}
     </>
   );
 }

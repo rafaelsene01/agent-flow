@@ -323,6 +323,20 @@ body { background: var(--bg); color: var(--text); }
   gap: 6px;
 }
 
+.card-running-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: card-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes card-pulse {
+  0%, 100% { opacity: 1;  transform: scale(1); }
+  50%       { opacity: .4; transform: scale(.7); }
+}
+
 .card-id {
   font-size: 11px;
   color: var(--text-muted);
@@ -2082,6 +2096,27 @@ select.sf-input option {
   transition: color .15s, border-color .15s;
 }
 .btn-edit-board:hover { color: var(--accent); border-color: var(--accent); }
+
+.board-view-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-delete-board-data {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.btn-delete-board-data:hover { color: #f85149; border-color: #f85149; background: #f8514911; }
 
 /* ── edit board modal (columns) ─────────────────────────────────────────────── */
 .edit-col-list {

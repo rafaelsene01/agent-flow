@@ -94,7 +94,28 @@ function AppContent() {
     });
   }
 
+  async function cleanupBoardData(board) {
+    if (!board.originRepo) return;
+    try {
+      const res = await fetch("/api/config/cleanup-board", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ originRepo: board.originRepo }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        console.error("[cleanup-board] server error:", d.error);
+      }
+    } catch (err) {
+      console.error("[cleanup-board]", err);
+    }
+  }
+
   async function removeBoard(board) {
+    if (!confirm(`Excluir o board "${board.name}" e todos os worktrees e repositório associados? Esta ação não pode ser desfeita.`)) return;
+
+    await cleanupBoardData(board);
+
     const next = boards.filter((b) => b.viewId !== board.viewId);
     setBoards(next);
 
@@ -147,14 +168,27 @@ function AppContent() {
               <h2 className="board-view-name">{activeBoard.name}</h2>
               <p className="board-view-repo">{activeBoard.repoName}</p>
             </div>
-            <button
-              className="btn-edit-board"
-              type="button"
-              onClick={() => setShowEditBoard(true)}
-              title="Editar colunas"
-            >
-              ✎
-            </button>
+            <div className="board-view-actions">
+              <button
+                className="btn-edit-board"
+                type="button"
+                onClick={() => setShowEditBoard(true)}
+                title="Editar colunas"
+              >
+                ✎
+              </button>
+              <button
+                className="btn-delete-board-data"
+                type="button"
+                title="Apagar repositório e worktrees deste board"
+                onClick={async () => {
+                  if (!confirm(`Apagar o repositório e todos os worktrees do board "${activeBoard.name}"?\nO board permanece na lista. Esta ação não pode ser desfeita.`)) return;
+                  await cleanupBoardData(activeBoard);
+                }}
+              >
+                🗑
+              </button>
+            </div>
           </div>
           <Board board={activeBoard} />
         </div>
