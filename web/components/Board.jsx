@@ -464,36 +464,38 @@ function CardModal({ item, board, onClose, onWorktreeChange }) {
                                   </span>
                                 )}
                                 {isExecDone && (
-                                  <span className="trigger-feedback ok">
-                                    ✓ Concluído · clique para re-executar
-                                  </span>
+                                  <>
+                                    <span className="trigger-feedback ok">
+                                      ✓ Concluído · clique para re-executar
+                                    </span>
+                                    {/* ── git commands ── */}
+                                    {(() => {
+                                      const branch      = worktreeConfig?.branch ?? "branch";
+                                      const commitCount = worktreeConfig?.commitCount ?? 1;
+                                      const cmds = [
+                                        `git checkout ${branch}`,
+                                        `git pull`,
+                                        `git reset --soft HEAD~${commitCount}`,
+                                        `git reset`,
+                                        `git add .`,
+                                        `git commit -m "message"`,
+                                        `git push --force-with-lease origin ${branch}`,
+                                      ];
+                                      return (
+                                        <div className="git-cmds">
+                                          {cmds.map((cmd) => (
+                                            <CopyCmd key={cmd} cmd={cmd} />
+                                          ))}
+                                        </div>
+                                      );
+                                    })()}
+                                  </>
                                 )}
                                 {isExecError && worktreeConfig?.tlcExecLastError && (
                                   <span className="trigger-feedback err" title={worktreeConfig.tlcExecLastError}>
                                     ✕ {worktreeConfig.tlcExecLastError}
                                   </span>
                                 )}
-
-                                {/* ── git commands ── */}
-                                {(() => {
-                                  const branch = worktreeConfig?.branch ?? "branch";
-                                  const cmds = [
-                                    `git checkout ${branch}`,
-                                    `git pull`,
-                                    `git reset --soft HEAD~1`,
-                                    `git reset`,
-                                    `git add .`,
-                                    `git commit -m "message"`,
-                                    `git push --force-with-lease origin ${branch}`,
-                                  ];
-                                  return (
-                                    <div className="git-cmds">
-                                      {cmds.map((cmd) => (
-                                        <CopyCmd key={cmd} cmd={cmd} />
-                                      ))}
-                                    </div>
-                                  );
-                                })()}
                               </>
                             );
                           })()}
