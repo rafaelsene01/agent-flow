@@ -161,7 +161,9 @@ export default function configRoutes(app) {
         "Rules:\n" +
         "- Use Write and Edit tools to create/modify files. Do NOT describe — just do it.\n" +
         "- Do NOT ask questions or wait for confirmation.\n" +
-        "- Do NOT run any git commands.\n\n" +
+        "- Do NOT run any git commands.\n" +
+        "- When fully done, output as your LAST line exactly: COMMIT: <conventional commit message>\n" +
+        "  (e.g. COMMIT: feat: add user auth endpoint)\n\n" +
         "TASK:\n" +
         cardContent,
       );
@@ -221,17 +223,10 @@ export default function configRoutes(app) {
       ).catch(() => ({ stdout: "" }));
 
       if (statusOut.trim()) {
-        const { stdout: diffStat } = await execFileP(
-          "git", ["diff", "--cached", "--stat"], { cwd: wt.path, timeout: 10_000 },
-        ).catch(() => ({ stdout: "" }));
-
-        logStream.write("Generating commit message…\n");
-        const msgResult = await runClaude(
-          "Output ONLY a single-line semantic commit message following Conventional Commits " +
-          "(feat/fix/refactor/docs/chore/style/test/etc). No explanation, no markdown, no quotes. " +
-          "Changes:\n\n" + diffStat,
-        );
-        const commitMsg = msgResult.output.split("\n").map((l) => l.trim()).filter(Boolean).pop()
+        const commitMsg = impl.output
+          .split("\n").map((l) => l.trim()).filter(Boolean).reverse()
+          .find((l) => l.startsWith("COMMIT:"))
+          ?.replace(/^COMMIT:\s*/, "").replace(/^["'`]|["'`]$/g, "")
           || "feat: implement task";
 
         logStream.write(`Committing: ${commitMsg}\n`);
@@ -507,7 +502,9 @@ export default function configRoutes(app) {
       logStream.write("=== Step 1: executando spec ===\n");
 
       const impl = await runClaude(
-        `Execute a spec em ${featureRelPath}/spec.md usando o máximo de subagentes possível. Não faça commits nem push.`,
+        `Execute a spec em ${featureRelPath}/spec.md usando o máximo de subagentes possível. Não faça commits nem push.\n` +
+        "Quando totalmente concluído, sua ÚLTIMA linha deve ser exatamente: COMMIT: <mensagem conventional commit>\n" +
+        "(ex: COMMIT: feat: implement card sorting)",
       );
 
       if (impl.code !== 0) {
@@ -549,18 +546,11 @@ export default function configRoutes(app) {
       ).catch(() => ({ stdout: "" }));
 
       if (statusOut.trim()) {
-        const { stdout: diffStat } = await execFileP(
-          "git", ["diff", "--cached", "--stat"], { cwd: wt.path, timeout: 10_000 },
-        ).catch(() => ({ stdout: "" }));
-
-        logStream.write("Gerando mensagem de commit…\n");
-        const msgResult = await runClaude(
-          "Output ONLY a single-line semantic commit message following Conventional Commits " +
-          "(feat/fix/refactor/docs/chore/style/test/etc). No explanation, no markdown, no quotes. " +
-          "Changes:\n\n" + diffStat,
-        );
-        const commitMsg = msgResult.output.split("\n").map((l) => l.trim()).filter(Boolean).pop()
-          || "feat: implement spec";
+        const commitMsg = impl.output
+          .split("\n").map((l) => l.trim()).filter(Boolean).reverse()
+          .find((l) => l.startsWith("COMMIT:"))
+          ?.replace(/^COMMIT:\s*/, "").replace(/^["'`]|["'`]$/g, "")
+          || "feat: execute spec";
 
         logStream.write(`Committing: ${commitMsg}\n`);
         try {
