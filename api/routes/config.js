@@ -177,12 +177,13 @@ export default function configRoutes(app) {
 
       // ── step 3: squash any intermediate commits Claude made ────────────────
       if (initialHead) {
-        const { stdout: headAfter } = await execFileP(
-          "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
-        ).catch(() => ({ stdout: initialHead }));
-        if (headAfter.trim() !== initialHead) {
-          logStream.write("\n=== Step 2: squashing Claude's intermediate commits ===\n");
-          await execFileP("git", ["reset", "--soft", initialHead], { cwd: wt.path, timeout: 15_000 })
+        const { stdout: countOut } = await execFileP(
+          "git", ["rev-list", "--count", `${initialHead}..HEAD`], { cwd: wt.path, timeout: 5_000 },
+        ).catch(() => ({ stdout: "0" }));
+        const claudeCommits = parseInt(countOut.trim(), 10) || 0;
+        if (claudeCommits > 0) {
+          logStream.write(`\n=== Step 2: squashing ${claudeCommits} commit(s) from Claude ===\n`);
+          await execFileP("git", ["reset", "--soft", `HEAD~${claudeCommits}`], { cwd: wt.path, timeout: 15_000 })
             .catch((e) => logStream.write(`Warning: reset failed: ${e.message}\n`));
         }
       }
@@ -203,17 +204,15 @@ export default function configRoutes(app) {
         return;
       }
 
-      // ── step 5: remove internal files ─────────────────────────────────────
-      logStream.write("\n=== Step 3: removendo arquivos internos ===\n");
-      for (const f of INTERNAL) fs.rmSync(path.join(wt.path, f), { force: true });
-      fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true });
+      // ── step 5: fechar log e remover arquivos internos ────────────────────
+      await new Promise((resolve) => logStream.end(resolve));
+      for (const f of INTERNAL) try { fs.rmSync(path.join(wt.path, f), { force: true }); } catch (_) {}
+      try { fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true }); } catch (_) {}
 
       // ── step 6: single commit ──────────────────────────────────────────────
-      logStream.write("\n=== Step 4: commit único ===\n");
       try {
         await execFileP("git", ["add", "-A"], { cwd: wt.path, timeout: 30_000 });
       } catch (err) {
-        logStream.end();
         updateWorktreeStatus(id, { status: "error", lastError: `git add failed: ${err.message}` });
         return;
       }
@@ -229,32 +228,24 @@ export default function configRoutes(app) {
           ?.replace(/^COMMIT:\s*/, "").replace(/^["'`]|["'`]$/g, "")
           || "feat: implement task";
 
-        logStream.write(`Committing: ${commitMsg}\n`);
         try {
           await execFileP("git", ["commit", "-m", commitMsg], { cwd: wt.path, timeout: 30_000 });
         } catch (err) {
-          logStream.end();
           updateWorktreeStatus(id, { status: "error", lastError: `git commit failed: ${err.message}` });
           return;
         }
-      } else {
-        logStream.write("Nothing to commit — skipping.\n");
       }
 
       // ── step 7: push ───────────────────────────────────────────────────────
-      logStream.write("\n=== Step 5: git push ===\n");
       try {
-        const { stdout, stderr } = await execFileP("git", ["push"], { cwd: wt.path, timeout: 60_000 });
-        if (stdout) logStream.write(stdout);
-        if (stderr) logStream.write(stderr);
+        await execFileP("git", ["push"], { cwd: wt.path, timeout: 60_000 });
       } catch (err) {
-        logStream.end();
         updateWorktreeStatus(id, { status: "error", lastError: `Push failed: ${err.message}` });
         return;
       }
 
-      logStream.end();
-      updateWorktreeStatus(id, { status: "done" });
+      const prevCount = getWorktrees().find((w) => w.id === id)?.commitCount ?? 0;
+      updateWorktreeStatus(id, { status: "done", commitCount: prevCount + 1 });
     })();
   });
 
@@ -516,27 +507,26 @@ export default function configRoutes(app) {
 
       // ── step 3: squash any intermediate commits Claude made ────────────────
       if (initialHead) {
-        const { stdout: headAfter } = await execFileP(
-          "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
-        ).catch(() => ({ stdout: initialHead }));
-        if (headAfter.trim() !== initialHead) {
-          logStream.write("\n=== Step 2: squashing commits intermediários ===\n");
-          await execFileP("git", ["reset", "--soft", initialHead], { cwd: wt.path, timeout: 15_000 })
+        const { stdout: countOut } = await execFileP(
+          "git", ["rev-list", "--count", `${initialHead}..HEAD`], { cwd: wt.path, timeout: 5_000 },
+        ).catch(() => ({ stdout: "0" }));
+        const claudeCommits = parseInt(countOut.trim(), 10) || 0;
+        if (claudeCommits > 0) {
+          logStream.write(`\n=== Step 2: squashing ${claudeCommits} commit(s) intermediários ===\n`);
+          await execFileP("git", ["reset", "--soft", `HEAD~${claudeCommits}`], { cwd: wt.path, timeout: 15_000 })
             .catch((e) => logStream.write(`Warning: reset failed: ${e.message}\n`));
         }
       }
 
-      // ── step 4: remove internal files ─────────────────────────────────────
-      logStream.write("\n=== Step 3: removendo arquivos internos ===\n");
-      for (const f of INTERNAL) fs.rmSync(path.join(wt.path, f), { force: true });
-      fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true });
+      // ── step 4: fechar log e remover arquivos internos ────────────────────
+      await new Promise((resolve) => logStream.end(resolve));
+      for (const f of INTERNAL) try { fs.rmSync(path.join(wt.path, f), { force: true }); } catch (_) {}
+      try { fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true }); } catch (_) {}
 
       // ── step 5: single commit ──────────────────────────────────────────────
-      logStream.write("\n=== Step 4: commit único ===\n");
       try {
         await execFileP("git", ["add", "-A"], { cwd: wt.path, timeout: 30_000 });
       } catch (err) {
-        logStream.end();
         updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `git add falhou: ${err.message}` });
         return;
       }
@@ -552,32 +542,24 @@ export default function configRoutes(app) {
           ?.replace(/^COMMIT:\s*/, "").replace(/^["'`]|["'`]$/g, "")
           || "feat: execute spec";
 
-        logStream.write(`Committing: ${commitMsg}\n`);
         try {
           await execFileP("git", ["commit", "-m", commitMsg], { cwd: wt.path, timeout: 30_000 });
         } catch (err) {
-          logStream.end();
           updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `git commit falhou: ${err.message}` });
           return;
         }
-      } else {
-        logStream.write("Nada para commitar — pulando.\n");
       }
 
       // ── step 6: push ───────────────────────────────────────────────────────
-      logStream.write("\n=== Step 5: git push ===\n");
       try {
-        const { stdout, stderr } = await execFileP("git", ["push"], { cwd: wt.path, timeout: 60_000 });
-        if (stdout) logStream.write(stdout);
-        if (stderr) logStream.write(stderr);
+        await execFileP("git", ["push"], { cwd: wt.path, timeout: 60_000 });
       } catch (err) {
-        logStream.end();
         updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `Push falhou: ${err.message}` });
         return;
       }
 
-      logStream.end();
-      updateWorktreeStatus(id, { tlcExecStatus: "done" });
+      const prevCount = getWorktrees().find((w) => w.id === id)?.commitCount ?? 0;
+      updateWorktreeStatus(id, { tlcExecStatus: "done", commitCount: prevCount + 1 });
     })();
   });
 
