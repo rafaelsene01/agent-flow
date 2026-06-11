@@ -27,7 +27,7 @@ await esbuild.build({
   bundle: true,
   platform: "node",
   format: "esm",
-  target: "node18",
+  target: "node20",
   packages: "external",
   define: { "process.env.AGENT_FLOW_BUNDLED": '"1"' },
 });
