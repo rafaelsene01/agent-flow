@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  validate:
+    name: Validate on Node.js ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ['18', '20', '22']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        # o postinstall instala também as deps de web/
+        run: npm ci
+
+      - name: Build (web + api ofuscada em dist/)
+        run: npm run build
+
+      - name: Verify package files (dry-run pack)
+        # --ignore-scripts evita que o prepack rode o build de novo
+        run: npm pack --dry-run --ignore-scripts
+
+      - name: Smoke test dist
+        run: node dist/agent-flow.js --version
