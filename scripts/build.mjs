@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import { rmSync, cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import esbuild from "esbuild";
+import { rolldown } from "rolldown";
 import JavaScriptObfuscator from "javascript-obfuscator";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,16 +20,15 @@ execSync("npm run build", {
   env: { ...process.env, NODE_ENV: "production" },
 });
 
-console.log("► Bundlando api + bin (esbuild)");
-await esbuild.build({
-  entryPoints: [path.join(ROOT, "bin", "agent-flow.js")],
-  outfile: OUTFILE,
-  bundle: true,
+console.log("► Bundlando api + bin (rolldown)");
+const bundle = await rolldown({
+  input: path.join(ROOT, "bin", "agent-flow.js"),
   platform: "node",
+});
+
+await bundle.write({
+  file: OUTFILE,
   format: "esm",
-  target: "node20",
-  packages: "external",
-  define: { "process.env.AGENT_FLOW_BUNDLED": '"1"' },
 });
 
 console.log("► Ofuscando bundle da api");
@@ -40,6 +39,7 @@ if (code.startsWith("#!")) {
   shebang = code.slice(0, nl);
   code = code.slice(nl);
 }
+code = code.replaceAll("process.env.AGENT_FLOW_BUNDLED", '"1"');
 const obfuscated = JavaScriptObfuscator.obfuscate(code, {
   target: "node",
   compact: true,
