@@ -40,6 +40,7 @@ jobs:
         run: npm pack --dry-run --ignore-scripts
 
       - name: Publish to npm
+        continue-on-error: true
         run: npm publish --access public --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
