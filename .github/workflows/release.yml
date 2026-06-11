@@ -38,8 +38,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        # o postinstall instala também as deps de web/
-        run: npm ci
+        run: npm ci && npm ci --prefix web
 
       - name: Build (validate before tagging)
         # garante que a tag não é criada se o build estiver quebrado
