@@ -1884,6 +1884,7 @@ select.sf-input option {
 /* ── trigger action row (Limpar + Commit & Push) ───────────────────────────── */
 .trigger-action-row {
   display: flex;
+  flex-direction: column;
   gap: 4px;
   padding-top: 6px;
   margin-top: 2px;
