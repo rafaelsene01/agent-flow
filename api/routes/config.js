@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { execSync, execFile, spawn } from "child_process";
 import { promisify } from "util";
@@ -11,6 +12,37 @@ const BROWSE_CMD = {
   darwin: `osascript -e 'POSIX path of (choose folder)'`,
   linux:  `zenity --file-selection --directory 2>/dev/null || kdialog --getexistingdirectory 2>/dev/null`,
 };
+
+const LOGS_DIR = path.join(os.homedir(), ".agent-flow", "logs");
+
+// Log stream that writes to the worktree (deleted on cleanup) AND to a
+// persistent copy in ~/.agent-flow/logs/<worktree>-<name>, so the run log
+// survives worktree removal and can be inspected after a failure.
+function createRunLog(wt, name) {
+  fs.mkdirSync(LOGS_DIR, { recursive: true });
+  const persistPath = path.join(LOGS_DIR, `${path.basename(wt.path)}-${name}`);
+  const streams = [
+    fs.createWriteStream(path.join(wt.path, name), { flags: "w", encoding: "utf-8" }),
+    fs.createWriteStream(persistPath, { flags: "w", encoding: "utf-8" }),
+  ];
+  return {
+    persistPath,
+    write(chunk) { for (const s of streams) s.write(chunk); },
+    end(cb) {
+      let pending = streams.length;
+      for (const s of streams) s.end(() => { if (--pending === 0) cb?.(); });
+    },
+  };
+}
+
+// lastError with the tail of Claude's output, so the real cause (usage limit,
+// crash, refusal) is visible in the UI even after the worktree log is gone.
+function failureDetail(result, persistPath) {
+  const reason = result.error ?? (result.signal ? `signal ${result.signal}` : `exit code ${result.code}`);
+  const tail = result.output.trim().slice(-500);
+  const log = persistPath ? `\n(log completo: ${persistPath})` : "";
+  return tail ? `${reason}\n--- final do output ---\n${tail}${log}` : `${reason}${log}`;
+}
 
 export default function configRoutes(app) {
   app.get("/api/config", (_req, res) => {
@@ -123,8 +155,7 @@ export default function configRoutes(app) {
     res.json({ ok: true });
 
     // ── 3. Pipeline em background: implementar → commit → done ───────────────
-    const logPath   = path.join(wt.path, "agent-flow.log");
-    const logStream = fs.createWriteStream(logPath, { flags: "w", encoding: "utf-8" });
+    const logStream = createRunLog(wt, "agent-flow.log");
     const isWin     = process.platform === "win32";
 
     // Pipe prompt via stdin (no -p flag) so Claude enters the full agentic loop.
@@ -138,7 +169,7 @@ export default function configRoutes(app) {
           { cwd: wt.path, shell: isWin, stdio: ["pipe", "pipe", "pipe"] },
         );
         child.stdout.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
-        child.stderr.on("data", (d) => logStream.write(d));
+        child.stderr.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
         child.on("error",  (err)          => resolve({ code: 1, output, error: err.message }));
         child.on("close",  (code, signal) => resolve({ code, signal, output }));
         // Write prompt then close stdin — EOF signals Claude to process and exit.
@@ -173,8 +204,7 @@ export default function configRoutes(app) {
 
       if (impl.code !== 0) {
         logStream.end();
-        const detail = impl.error ?? (impl.signal ? `signal ${impl.signal}` : `exit code ${impl.code}`);
-        updateWorktreeStatus(id, { status: "error", lastError: `Implementation failed: ${detail}` });
+        updateWorktreeStatus(id, { status: "error", lastError: `Implementation failed: ${failureDetail(impl, logStream.persistPath)}` });
         return;
       }
 
@@ -203,7 +233,7 @@ export default function configRoutes(app) {
 
       if (realChanges.length === 0) {
         logStream.end();
-        updateWorktreeStatus(id, { status: "error", lastError: "Implementation failed: no files were changed by Claude" });
+        updateWorktreeStatus(id, { status: "error", lastError: `Implementation failed: no files were changed by Claude\n(log completo: ${logStream.persistPath})` });
         return;
       }
 
@@ -256,8 +286,7 @@ export default function configRoutes(app) {
     res.json({ ok: true });
 
     // ── 3. Pipeline em background: criar spec, design e tasks ─────────────────
-    const logPath   = path.join(wt.path, "tlc.log");
-    const logStream = fs.createWriteStream(logPath, { flags: "w", encoding: "utf-8" });
+    const logStream = createRunLog(wt, "tlc.log");
     const isWin     = process.platform === "win32";
 
     function runClaude(prompt) {
@@ -269,7 +298,7 @@ export default function configRoutes(app) {
           { cwd: wt.path, shell: isWin, stdio: ["pipe", "pipe", "pipe"] },
         );
         child.stdout.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
-        child.stderr.on("data", (d) => logStream.write(d));
+        child.stderr.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
         child.on("error",  (err)          => resolve({ code: 1, output, error: err.message }));
         child.on("close",  (code, signal) => resolve({ code, signal, output }));
         child.stdin.end(prompt, "utf-8");
@@ -289,8 +318,7 @@ export default function configRoutes(app) {
 
       if (result.code !== 0) {
         logStream.end();
-        const detail = result.error ?? (result.signal ? `signal ${result.signal}` : `exit code ${result.code}`);
-        updateWorktreeStatus(id, { tlcStatus: "error", tlcLastError: `TLC failed: ${detail}` });
+        updateWorktreeStatus(id, { tlcStatus: "error", tlcLastError: `TLC failed: ${failureDetail(result, logStream.persistPath)}` });
         return;
       }
 
@@ -435,8 +463,7 @@ export default function configRoutes(app) {
     });
     res.json({ ok: true });
 
-    const logPath   = path.join(wt.path, "tlc-exec.log");
-    const logStream = fs.createWriteStream(logPath, { flags: "w", encoding: "utf-8" });
+    const logStream = createRunLog(wt, "tlc-exec.log");
     const isWin     = process.platform === "win32";
 
     function runClaude(prompt) {
@@ -448,7 +475,7 @@ export default function configRoutes(app) {
           { cwd: wt.path, shell: isWin, stdio: ["pipe", "pipe", "pipe"] },
         );
         child.stdout.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
-        child.stderr.on("data", (d) => logStream.write(d));
+        child.stderr.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
         child.on("error",  (err)          => resolve({ code: 1, output, error: err.message }));
         child.on("close",  (code, signal) => resolve({ code, signal, output }));
         child.stdin.end(prompt, "utf-8");
@@ -475,8 +502,7 @@ export default function configRoutes(app) {
 
       if (impl.code !== 0) {
         logStream.end();
-        const detail = impl.error ?? (impl.signal ? `signal ${impl.signal}` : `exit code ${impl.code}`);
-        updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `Execução falhou: ${detail}` });
+        updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `Execução falhou: ${failureDetail(impl, logStream.persistPath)}` });
         return;
       }
 
