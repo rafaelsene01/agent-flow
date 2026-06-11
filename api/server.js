@@ -24,7 +24,7 @@ export async function startServer({ port, apiOnly = false }) {
 
   if (!apiOnly) {
     app.use(express.static(WEB_DIST_DIR));
-    app.use((_req, res) => res.sendFile(path.join(WEB_DIST_DIR, "index.html")));
+    app.use((_req, res) => res.sendFile("index.html", { root: WEB_DIST_DIR }));
   }
 
   // Garante que erros não capturados retornem JSON, nunca "Internal Server Error" em texto.
