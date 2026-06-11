@@ -240,14 +240,7 @@ export default function configRoutes(app) {
       // ── step 5: fechar log ────────────────────────────────────────────────
       await new Promise((resolve) => logStream.end(resolve));
 
-      // ── step 6: registrar mensagem de commit pendente ─────────────────────
-      const pendingCommitMsg = impl.output
-        .split("\n").map((l) => l.trim()).filter(Boolean).reverse()
-        .find((l) => l.startsWith("COMMIT:"))
-        ?.replace(/^COMMIT:\s*/, "").replace(/^["'`]|["'`]$/g, "")
-        || "feat: implement task";
-
-      updateWorktreeStatus(id, { status: "done", pendingCommitMsg });
+      updateWorktreeStatus(id, { status: "done" });
     })();
   });
 
@@ -522,14 +515,7 @@ export default function configRoutes(app) {
       // ── step 4: fechar log ────────────────────────────────────────────────
       await new Promise((resolve) => logStream.end(resolve));
 
-      // ── step 5: registrar mensagem de commit pendente ─────────────────────
-      const pendingCommitMsg = impl.output
-        .split("\n").map((l) => l.trim()).filter(Boolean).reverse()
-        .find((l) => l.startsWith("COMMIT:"))
-        ?.replace(/^COMMIT:\s*/, "").replace(/^["'`]|["'`]$/g, "")
-        || "feat: execute spec";
-
-      updateWorktreeStatus(id, { tlcExecStatus: "done", pendingCommitMsg });
+      updateWorktreeStatus(id, { tlcExecStatus: "done" });
     })();
   });
 
@@ -541,10 +527,11 @@ export default function configRoutes(app) {
     if (!wt)                     return res.status(404).json({ error: "Worktree não encontrado na configuração." });
     if (!fs.existsSync(wt.path)) return res.status(400).json({ error: `Diretório não encontrado: ${wt.path}` });
 
-    const INTERNAL = ["CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log"];
-    for (const f of INTERNAL) {
+    const files = ["CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log"];
+    for (const f of files) {
       try { fs.rmSync(path.join(wt.path, f), { force: true }); } catch (_) {}
     }
+    try { fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true }); } catch (_) {}
 
     updateWorktreeStatus(id, { cleanupDone: true, commitPushStatus: null });
     res.json({ ok: true });
@@ -575,38 +562,30 @@ export default function configRoutes(app) {
         return;
       }
 
-      // ── step 2: verificar se há alterações ────────────────────────────────
+      // ── step 2: commitar apenas se houver alterações pendentes ──────────────
       const { stdout: statusOut } = await execFileP(
         "git", ["status", "--porcelain"], { cwd: wt.path, timeout: 10_000 },
       ).catch(() => ({ stdout: "" }));
 
-      if (!statusOut.trim()) {
-        updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: "Nenhuma alteração para commitar" });
-        return;
-      }
-
-      // ── step 3: mensagem de commit ────────────────────────────────────────
-      const currentWt = getWorktrees().find((w) => w.id === id);
-      const commitMsg = currentWt?.pendingCommitMsg || "feat: implement task";
-
-      // ── step 4: commit ────────────────────────────────────────────────────
-      try {
-        await execFileP("git", ["commit", "-m", commitMsg], { cwd: wt.path, timeout: 30_000 });
-      } catch (err) {
-        updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `git commit falhou: ${err.message}` });
-        return;
+      if (statusOut.trim()) {
+        const commitMsg = "chore: wip [agent-flow]";
+        try {
+          await execFileP("git", ["commit", "--no-verify", "-m", commitMsg], { cwd: wt.path, timeout: 30_000 });
+        } catch (err) {
+          updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `git commit falhou: ${err.message}` });
+          return;
+        }
       }
 
       // ── step 5: push ──────────────────────────────────────────────────────
       try {
-        await execFileP("git", ["push"], { cwd: wt.path, timeout: 60_000 });
+        await execFileP("git", ["push", "--no-verify"], { cwd: wt.path, timeout: 60_000 });
       } catch (err) {
         updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `Push falhou: ${err.message}` });
         return;
       }
 
-      const prevCount = getWorktrees().find((w) => w.id === id)?.commitCount ?? 0;
-      updateWorktreeStatus(id, { commitPushStatus: "done", commitCount: prevCount + 1 });
+      updateWorktreeStatus(id, { commitPushStatus: "done" });
     })();
   });
 
