@@ -16,6 +16,7 @@
     "build": "node scripts/build.mjs",
     "build:web": "npm run build --prefix web",
     "postinstall": "node -e \"const fs=require('fs');if(fs.existsSync('web/package.json'))require('child_process').execSync('npm install --prefix web',{stdio:'inherit'})\"",
+    "preuninstall": "rm -rf node_modules",
     "prepack": "npm run build"
   },
   "files": [

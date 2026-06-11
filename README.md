@@ -7,14 +7,13 @@ Kanban board para GitHub Projects V2. Roda local, interface web.
 ## Instalação
 
 ```bash
-npm install
-npm install -g .
+npm i -g @rafaelsene01/agent-flow
 ```
 
 ### Desinstalar
 
 ```bash
-npm uninstall -g agent-flow
+npm uninstall -g @rafaelsene01/agent-flow
 ```
 
 ---
@@ -24,13 +23,6 @@ npm uninstall -g agent-flow
 ```bash
 agent-flow          # sobe na porta 5522
 agent-flow -p 8080  # porta customizada
-```
-
-Sem instalação global:
-
-```bash
-npm run dev     # API (5522) + Next.js (3001) com hot reload
-npm start       # build + serve tudo via Express (produção)
 ```
 
 ---
