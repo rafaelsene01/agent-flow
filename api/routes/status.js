@@ -1,10 +1,8 @@
 import { cpSync, existsSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { join } from "path";
 import { homedir } from "os";
 import { getCache, refresh } from "../modules/status/status.cache.js";
-
-const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
+import { PACKAGE_ROOT } from "../paths.js";
 
 export default function statusRoutes(app) {
   app.get("/api/status", (_req, res) => {
@@ -26,7 +24,7 @@ export default function statusRoutes(app) {
   });
 
   app.post("/api/status/install-skill", async (_req, res) => {
-    const src  = join(PROJECT_ROOT, ".claude", "skills", "tlc-spec-driven");
+    const src  = join(PACKAGE_ROOT, ".claude", "skills", "tlc-spec-driven");
     const dest = join(homedir(), ".claude", "skills", "tlc-spec-driven");
 
     if (!existsSync(src)) {

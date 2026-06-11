@@ -2,22 +2,22 @@
   "name": "agent-flow",
   "version": "1.0.0",
   "description": "Agent Flow · Web Kanban board for Linear — open source, runs locally",
-  "main": "bin/agent-flow.js",
+  "main": "dist/agent-flow.js",
   "bin": {
-    "agent-flow": "./bin/agent-flow.js"
+    "agent-flow": "./dist/agent-flow.js"
   },
   "type": "module",
   "scripts": {
     "dev": "concurrently -n api,web -c cyan,magenta \"node api/dev.js\" \"npm run dev --prefix web\"",
-    "start": "npm run build:web && node bin/agent-flow.js",
+    "start": "node dist/agent-flow.js",
+    "build": "node scripts/build.mjs",
     "build:web": "npm run build --prefix web",
-    "postinstall": "npm install --prefix web",
-    "prepack": "npm run build --prefix web"
+    "postinstall": "node -e \"const fs=require('fs');if(fs.existsSync('web/package.json'))require('child_process').execSync('npm install --prefix web',{stdio:'inherit'})\"",
+    "prepack": "npm run build"
   },
   "files": [
-    "bin/",
-    "api/",
-    "web/out/",
+    "dist/",
+    ".claude/",
     "README.md"
   ],
   "dependencies": {
@@ -37,6 +37,8 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "concurrently": "^10.0.3"
+    "concurrently": "^10.0.3",
+    "esbuild": "^0.28.0",
+    "javascript-obfuscator": "^5.4.3"
   }
 }
