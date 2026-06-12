@@ -85,10 +85,7 @@ function TlcFileModal({ worktreeId, type, onClose }) {
   }
 
   return (
-    <div
-      className="backdrop tlc-file-backdrop"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
+    <div className="backdrop tlc-file-backdrop">
       <div className="modal tlc-file-modal">
         {/* ── top row: title + close ── */}
         <div className="tlc-file-toprow">
@@ -174,6 +171,7 @@ const TYPE_LABEL = {
 
 function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [showCreateBranch, setShowCreateBranch] = useState(false);
+  const [tlcFileModal, setTlcFileModal] = useState(null); // null | "spec" | "design" | "tasks"
   const [worktreeConfig, setWorktreeConfig] = useState(null); // null=loading false=none object=found
 
   const worktreeId =
@@ -198,7 +196,9 @@ function CardModal({ item, board, onClose, onWorktreeChange }) {
 
   useEffect(() => {
     function onKey(e) {
-      if (e.key === "Escape" && !showCreateBranch) onClose();
+      // Esc fecha apenas o modal em evidência: se um modal filho (branch ou
+      // spec/design/tasks) está aberto, ele é quem trata o Esc.
+      if (e.key === "Escape" && !showCreateBranch && !tlcFileModal) onClose();
     }
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
@@ -206,7 +206,7 @@ function CardModal({ item, board, onClose, onWorktreeChange }) {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [onClose, showCreateBranch]);
+  }, [onClose, showCreateBranch, tlcFileModal]);
 
   const isConfigured = !!worktreeConfig;
   const isChecking = worktreeConfig === null && worktreeId !== null;
@@ -217,7 +217,6 @@ function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [cleanupSending, setCleanupSending] = useState(false);
   const [commitPushSending, setCommitPushSending] = useState(false);
   const [claudeStatus, setClaudeStatus] = useState(null);
-  const [tlcFileModal, setTlcFileModal] = useState(null); // null | "spec" | "design" | "tasks"
   const [tlcFiles, setTlcFiles] = useState(null); // { spec, design, tasks } from live scan
 
   useEffect(() => {
@@ -374,10 +373,7 @@ function CardModal({ item, board, onClose, onWorktreeChange }) {
 
   return (
     <>
-      <div
-        className="backdrop"
-        onClick={(e) => e.target === e.currentTarget && onClose()}
-      >
+      <div className="backdrop">
         <div className="modal card-modal">
           <div className="card-modal-layout">
             {/* ── main ── */}
