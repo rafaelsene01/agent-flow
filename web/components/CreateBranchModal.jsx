@@ -98,7 +98,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
   const canCreate = owner && repo && originBranch && newBranch && !validationError && !creating;
 
   return (
-    <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="backdrop">
       <div className="modal create-branch-modal">
         <div className="modal-header">
           <div className="modal-id-row">

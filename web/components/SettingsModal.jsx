@@ -253,8 +253,8 @@ export default function SettingsModal({ onClose }) {
     : [];
 
   return (
-    <div className="backdrop" onClick={isLocked ? undefined : onClose}>
-      <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="backdrop">
+      <div className="modal settings-modal">
 
         <div className="modal-header">
           <div className="modal-id-row">

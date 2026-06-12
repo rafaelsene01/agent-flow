@@ -175,8 +175,8 @@ export default function InitBoardModal({ onClose, onSaved }) {
   // ── render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="backdrop" onClick={onClose}>
-      <div className="modal init-board-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="backdrop">
+      <div className="modal init-board-modal">
 
         <div className="modal-header">
           <div className="modal-id-row">
