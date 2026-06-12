@@ -33,7 +33,6 @@ function AppContent() {
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    document.documentElement.setAttribute("data-theme", next);
     document.documentElement.classList.toggle("dark", next !== "light");
     localStorage.setItem("theme", next);
   }
