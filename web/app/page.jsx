@@ -7,7 +7,7 @@ import Header from "@/components/Header.jsx";
 import SettingsModal from "@/components/SettingsModal.jsx";
 import InitBoardModal from "@/components/InitBoardModal.jsx";
 import EditBoardModal from "@/components/EditBoardModal.jsx";
-import Board from "@/components/Board.jsx";
+import Board from "@/components/board/Board.jsx";
 
 function navigate(path) {
   window.history.pushState(null, "", path);
