@@ -16,7 +16,7 @@ export default function RootLayout({ children }) {
         {/* Aplica o tema antes da primeira pintura para evitar flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);document.documentElement.classList.toggle('dark',t!=='light');}catch(e){}})()`,
+            __html: `(function(){try{var t=localStorage.getItem('theme')||'dark';document.documentElement.classList.toggle('dark',t!=='light');}catch(e){}})()`,
           }}
         />
       </head>
