@@ -40,19 +40,17 @@ export default function Board({ board }) {
 
   if (columns.length === 0) {
     return (
-      <div className="empty-board">
-        <div className="empty-board-inner">
-          <p>
-            Nenhuma coluna configurada. Edite o board para adicionar colunas.
-          </p>
-        </div>
+      <div className="flex flex-1 items-center justify-center">
+        <p className="text-sm text-muted-foreground">
+          Nenhuma coluna configurada. Edite o board para adicionar colunas.
+        </p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="board">
+      <div className="flex gap-3 px-5 py-4 overflow-x-auto flex-1 items-start">
         {columns.map((col) => (
           <Column
             key={`${board.id}:${col.id ?? col.name}`}

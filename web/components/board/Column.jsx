@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Card from "@/components/board/Card.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Skeleton } from "@/components/ui/skeleton.jsx";
+import { RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const GH_COLORS = {
   GRAY: "#7d8590",
@@ -16,10 +21,10 @@ const GH_COLORS = {
 
 function ColumnLoader() {
   return (
-    <div className="col-loader">
-      <span className="col-loader-dot" />
-      <span className="col-loader-dot" />
-      <span className="col-loader-dot" />
+    <div className="flex flex-col gap-1.5 p-2">
+      <Skeleton className="h-20 rounded-lg" />
+      <Skeleton className="h-20 rounded-lg" />
+      <Skeleton className="h-20 rounded-lg" />
     </div>
   );
 }
@@ -99,19 +104,23 @@ export default function Column({
   const accentColor = GH_COLORS[columnColor] ?? GH_COLORS.GRAY;
 
   return (
-    <div className="column" style={{ borderTop: `2px solid ${accentColor}` }}>
-      <div className="col-header">
-        <span className="col-name" style={{ color: accentColor }}>
+    <div
+      className="w-[280px] min-w-[260px] shrink-0 bg-card border rounded-xl flex flex-col max-h-[calc(100vh-90px)]"
+      style={{ borderTop: `2px solid ${accentColor}` }}
+    >
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b">
+        <span className="text-sm font-medium flex-1 truncate" style={{ color: accentColor }}>
           {columnName}
         </span>
         {!loading && (
-          <span className="col-count">
+          <Badge variant="secondary" className="text-xs">
             {items.length}
             {hasNextPage ? "+" : ""}
-          </span>
+          </Badge>
         )}
-        <button
-          className={`col-refresh-btn${loading ? " spinning" : ""}`}
+        <Button
+          variant="ghost"
+          size="icon-xs"
           title="Atualizar coluna"
           disabled={loading}
           onClick={() => {
@@ -120,14 +129,16 @@ export default function Column({
             fetchItems(null);
           }}
         >
-          ↻
-        </button>
+          <RefreshCw className={cn("size-3", loading && "animate-spin")} />
+        </Button>
       </div>
-      <div className="col-cards" onScroll={handleScroll}>
+      <div className="p-2 flex flex-col gap-1.5 overflow-y-auto flex-1" onScroll={handleScroll}>
         {loading && <ColumnLoader />}
-        {!loading && error && <p className="col-error">{error}</p>}
+        {!loading && error && (
+          <p className="text-xs text-destructive text-center py-3">{error}</p>
+        )}
         {!loading && !error && items.length === 0 && (
-          <p className="col-empty">Sem cards</p>
+          <p className="text-xs text-muted-foreground text-center py-5">Sem cards</p>
         )}
         {!loading &&
           items.map((item) => (
@@ -139,7 +150,9 @@ export default function Column({
               originRepo={originRepo}
             />
           ))}
-        {loadingMore && <p className="col-loading-more">Carregando…</p>}
+        {loadingMore && (
+          <p className="text-xs text-muted-foreground text-center py-2">Carregando…</p>
+        )}
       </div>
     </div>
   );
