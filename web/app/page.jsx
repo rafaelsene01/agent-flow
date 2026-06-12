@@ -8,6 +8,8 @@ import SettingsModal from "@/components/SettingsModal.jsx";
 import InitBoardModal from "@/components/InitBoardModal.jsx";
 import EditBoardModal from "@/components/EditBoardModal.jsx";
 import Board from "@/components/board/Board.jsx";
+import { Button } from "@/components/ui/button";
+import { Pencil, Trash2, Plus } from "lucide-react";
 
 function navigate(path) {
   window.history.pushState(null, "", path);
@@ -137,20 +139,20 @@ function AppContent() {
 
   if (initializing) {
     return (
-      <div className="init-screen">
-        <span className="init-logo">🌸</span>
-        <p className="init-msg">Verificando integrações…</p>
-        <div className="loader">
-          <span className="loader-dot" />
-          <span className="loader-dot" />
-          <span className="loader-dot" />
+      <div className="flex flex-1 min-h-screen flex-col items-center justify-center gap-4">
+        <span className="text-5xl">🌸</span>
+        <p className="text-sm text-muted-foreground">Verificando integrações…</p>
+        <div className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-muted-foreground animate-pulse [animation-delay:0ms]" />
+          <span className="size-2 rounded-full bg-muted-foreground animate-pulse [animation-delay:150ms]" />
+          <span className="size-2 rounded-full bg-muted-foreground animate-pulse [animation-delay:300ms]" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="app">
+    <div className="flex flex-col min-h-screen">
       <Header
         onSettings={() => setShowSettings(true)}
         onInitBoard={() => setShowInitBoard(true)}
@@ -163,49 +165,52 @@ function AppContent() {
       />
 
       {activeBoard ? (
-        <div className="board-view">
-          <div className="board-view-header">
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className="flex items-center justify-between px-4 py-2 border-b">
             <div>
-              <h2 className="board-view-name">{activeBoard.name}</h2>
-              <p className="board-view-repo">{activeBoard.repoName}</p>
+              <h2 className="text-sm font-bold leading-tight">{activeBoard.name}</h2>
+              <p className="text-xs text-muted-foreground">{activeBoard.repoName}</p>
             </div>
-            <div className="board-view-actions">
-              <button
-                className="btn-edit-board"
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 type="button"
                 onClick={() => setShowEditBoard(true)}
                 title="Editar colunas"
               >
-                ✎
-              </button>
-              <button
-                className="btn-delete-board-data"
+                <Pencil />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
                 type="button"
                 title="Apagar repositório e worktrees deste board"
+                className="hover:text-destructive hover:border-destructive"
                 onClick={async () => {
                   if (!confirm(`Apagar o repositório e todos os worktrees do board "${activeBoard.name}"?\nO board permanece na lista. Esta ação não pode ser desfeita.`)) return;
                   await cleanupBoardData(activeBoard);
                 }}
               >
-                🗑
-              </button>
+                <Trash2 />
+              </Button>
             </div>
           </div>
           <Board board={activeBoard} />
         </div>
       ) : (
-        <div className="empty-board">
-          <div className="empty-board-inner">
-            <span className="empty-logo">🌸</span>
-            <h2>Nenhum board inicializado</h2>
-            <p>Adicione um repositório GitHub para começar.</p>
-            <button
-              className="btn-init-board btn-init-board-home"
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <span className="text-5xl">🌸</span>
+            <h2 className="text-base font-semibold">Nenhum board inicializado</h2>
+            <p className="text-sm text-muted-foreground">Adicione um repositório GitHub para começar.</p>
+            <Button
               type="button"
               onClick={() => setShowInitBoard(true)}
             >
-              + Inicializar Board
-            </button>
+              <Plus />
+              Inicializar Board
+            </Button>
           </div>
         </div>
       )}
