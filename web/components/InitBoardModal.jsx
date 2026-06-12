@@ -1,7 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
+import { Copy, Check, GripVertical, X } from "lucide-react";
 import { boardSlug } from "@/lib/boardSlug.js";
+import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function colKey(c) {
   return c.id ?? c.name;
@@ -23,6 +35,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
   const [columnsLoading, setColumnsLoading] = useState(false);
   const [dragOver, setDragOver]           = useState(null);
   const [saving, setSaving]               = useState(false);
+  const [copied, setCopied]               = useState(false);
   const dragIdx = useRef(null);
 
   useEffect(() => {
@@ -43,12 +56,6 @@ export default function InitBoardModal({ onClose, onSaved }) {
       })
       .catch((err) => { setFetchError(err.message); setLoading(false); });
   }, []);
-
-  useEffect(() => {
-    const h = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [onClose]);
 
   function repoOptions(boardData, view) {
     const fromRepos  = (boardData?.repos ?? []).map((r) => r.fullName);
@@ -84,7 +91,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
     // Atualiza opções de repo ao selecionar uma view (o filtro pode trazer novos repos)
     setOriginRepo((prev) => {
       const opts = repoOptions(board, view);
-      if (prev && opts.includes(prev)) return prev;  // mantém seleção válida
+      if (prev && opts.includes(prev)) return prev; // mantém seleção válida
       return opts.length === 1 ? opts[0] : "";
     });
     setColumnsLoading(true);
@@ -125,6 +132,12 @@ export default function InitBoardModal({ onClose, onSaved }) {
 
   function add(col) {
     setActiveCols((prev) => [...prev, col]);
+  }
+
+  function copyScope() {
+    navigator.clipboard?.writeText("gh auth refresh -s read:project");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   const available = allCols.filter((apiCol) =>
@@ -175,59 +188,83 @@ export default function InitBoardModal({ onClose, onSaved }) {
   // ── render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="backdrop">
-      <div className="modal init-board-modal">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-[560px] p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden">
 
-        <div className="modal-header">
-          <div className="modal-id-row">
-            <span style={{ fontSize: 18 }}>⊞</span>
-            <h2 className="modal-title" style={{ fontSize: 16, marginBottom: 0 }}>
-              Inicializar Board
-            </h2>
-          </div>
-          <button className="modal-close" type="button" onClick={onClose}>✕</button>
-        </div>
+        <DialogHeader className="px-5 pt-5 pb-0 shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <span aria-hidden="true" className="text-lg leading-none">⊞</span>
+            Inicializar Board
+          </DialogTitle>
+        </DialogHeader>
 
-        <div className="sf-body">
-          <div className="sf-field">
-            <label className="sf-label">Board GitHub</label>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-3.5">
 
-            {loading && <div className="board-select-state">Carregando boards…</div>}
-            {fetchError && <div className="board-select-state err">{fetchError}</div>}
+          {/* ── Board GitHub ── */}
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Board GitHub
+            </Label>
+
+            {loading && (
+              <div className="border rounded-lg bg-muted/50 p-5 text-center text-sm text-muted-foreground">
+                Carregando boards…
+              </div>
+            )}
+
+            {fetchError && (
+              <div className="border rounded-lg bg-muted/50 p-5 text-center text-sm text-destructive">
+                {fetchError}
+              </div>
+            )}
 
             {missingScope && (
-              <div className="scope-error">
-                <p className="scope-error-msg">
-                  O token do <code>gh</code> não tem o escopo <code>read:project</code>. Execute o comando abaixo e reinicie o servidor:
+              <div className="border border-destructive/40 bg-destructive/10 rounded-lg p-3.5 flex flex-col gap-2.5">
+                <p className="text-sm text-muted-foreground">
+                  O token do{" "}
+                  <code className="font-mono text-destructive bg-destructive/10 px-1 rounded">gh</code>{" "}
+                  não tem o escopo{" "}
+                  <code className="font-mono text-destructive bg-destructive/10 px-1 rounded">read:project</code>.
+                  Execute o comando abaixo e reinicie o servidor:
                 </p>
-                <div className="scope-error-cmd">
-                  <code>gh auth refresh -s read:project</code>
-                  <button
-                    className="scope-copy-btn"
+                <div className="bg-background border rounded-lg px-3 py-2 flex items-center gap-2">
+                  <code className="flex-1 font-mono text-xs text-primary">
+                    gh auth refresh -s read:project
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="icon-xs"
                     type="button"
-                    onClick={() => navigator.clipboard?.writeText("gh auth refresh -s read:project")}
+                    onClick={copyScope}
+                    aria-label="Copiar comando"
                   >
-                    ⎘
-                  </button>
+                    {copied ? <Check /> : <Copy />}
+                  </Button>
                 </div>
               </div>
             )}
 
             {!loading && !fetchError && !missingScope && boards.length === 0 && (
-              <div className="board-select-state">Nenhum board encontrado no GitHub Projects.</div>
+              <div className="border rounded-lg bg-muted/50 p-5 text-center text-sm text-muted-foreground">
+                Nenhum board encontrado no GitHub Projects.
+              </div>
             )}
 
             {!loading && boards.length > 0 && (
-              <div className="board-select-list">
+              <div className="border rounded-lg bg-muted/40 p-1 max-h-64 overflow-y-auto flex flex-col gap-1">
                 {boards.map((b) => (
                   <button
                     key={b.id}
-                    className={`board-select-item${selected?.id === b.id ? " selected" : ""}`}
                     type="button"
                     onClick={() => selectBoard(b)}
+                    className={cn(
+                      "flex items-center justify-between gap-2.5 rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-background hover:text-foreground transition",
+                      selected?.id === b.id && "bg-background text-foreground ring-1 ring-primary"
+                    )}
                   >
-                    <span className="board-select-title">{b.title}</span>
-                    <span className="board-select-meta">#{b.number}</span>
+                    <span className="text-sm font-medium flex-1">{b.title}</span>
+                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">#{b.number}</span>
                   </button>
                 ))}
               </div>
@@ -236,34 +273,52 @@ export default function InitBoardModal({ onClose, onSaved }) {
 
           {selected && (
             <>
-              <div className="sf-field">
-                <label className="sf-label">Nome do Board</label>
-                <input
-                  className="sf-input"
+              {/* ── Nome do Board ── */}
+              <div className="flex flex-col gap-1.5">
+                <Label
+                  htmlFor="board-name-input"
+                  className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
+                  Nome do Board
+                </Label>
+                <Input
+                  id="board-name-input"
                   type="text"
                   value={boardName}
                   onChange={(e) => setBoardName(e.target.value)}
                 />
               </div>
 
-              <div className="sf-field">
-                <label className="sf-label">View</label>
-                {viewsLoading && <div className="board-select-state">Carregando views…</div>}
+              {/* ── View ── */}
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  View
+                </Label>
+                {viewsLoading && (
+                  <div className="border rounded-lg bg-muted/50 p-5 text-center text-sm text-muted-foreground">
+                    Carregando views…
+                  </div>
+                )}
                 {!viewsLoading && views.length === 0 && (
-                  <div className="board-select-state">Nenhuma view encontrada.</div>
+                  <div className="border rounded-lg bg-muted/50 p-5 text-center text-sm text-muted-foreground">
+                    Nenhuma view encontrada.
+                  </div>
                 )}
                 {!viewsLoading && views.length > 0 && (
-                  <div className="board-select-list">
+                  <div className="border rounded-lg bg-muted/40 p-1 max-h-64 overflow-y-auto flex flex-col gap-1">
                     {views.map((v) => (
                       <button
                         key={v.id}
-                        className={`board-select-item${selectedView?.id === v.id ? " selected" : ""}`}
                         type="button"
                         onClick={() => selectView(selected, v)}
+                        className={cn(
+                          "flex items-center justify-between gap-2.5 rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-background hover:text-foreground transition",
+                          selectedView?.id === v.id && "bg-background text-foreground ring-1 ring-primary"
+                        )}
                       >
-                        <span className="board-select-title">{v.name}</span>
-                        <span className="board-select-meta">
-                          {v.repo ?? <span style={{ color: "var(--text-faint)" }}>sem repo</span>}
+                        <span className="text-sm font-medium flex-1">{v.name}</span>
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                          {v.repo ?? <span className="italic">sem repo</span>}
                         </span>
                       </button>
                     ))}
@@ -271,18 +326,25 @@ export default function InitBoardModal({ onClose, onSaved }) {
                 )}
               </div>
 
+              {/* ── Repositório de Origem ── */}
               {selectedView && (() => {
                 const opts = repoOptions(selected, selectedView);
                 return (
-                  <div className="sf-field">
-                    <label className="sf-label">Repositório de Origem</label>
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Repositório de Origem
+                    </Label>
                     {opts.length === 0 ? (
-                      <div className="board-select-state">
+                      <div className="border rounded-lg bg-muted/50 p-5 text-center text-sm text-muted-foreground">
                         Nenhum repositório detectado no filtro desta view.
                       </div>
                     ) : (
                       <select
-                        className="sf-input"
+                        className={cn(
+                          "h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none",
+                          "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                          "dark:bg-input/30"
+                        )}
                         value={originRepo}
                         onChange={(e) => setOriginRepo(e.target.value)}
                       >
@@ -296,51 +358,79 @@ export default function InitBoardModal({ onClose, onSaved }) {
                 );
               })()}
 
-              <div className="sf-field">
-                <span className="sf-section-title">Colunas ativas</span>
-                {columnsLoading && <div className="board-select-state">Carregando colunas…</div>}
+              {/* ── Colunas ativas ── */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Colunas ativas
+                </span>
+                {columnsLoading && (
+                  <div className="border rounded-lg bg-muted/50 p-5 text-center text-sm text-muted-foreground">
+                    Carregando colunas…
+                  </div>
+                )}
                 {!columnsLoading && activeCols.length === 0 && (
-                  <div className="board-select-state">Nenhuma coluna selecionada.</div>
+                  <div className="border rounded-lg bg-muted/50 p-5 text-center text-sm text-muted-foreground">
+                    Nenhuma coluna selecionada.
+                  </div>
                 )}
                 {!columnsLoading && activeCols.length > 0 && (
-                  <div className="edit-col-list">
+                  <div className="border rounded-lg bg-muted/40 p-1 flex flex-col gap-0.5">
                     {activeCols.map((col, i) => (
                       <div
                         key={colKey(col)}
-                        className={`edit-col-item${dragOver === i ? " drag-over" : ""}`}
                         draggable
                         onDragStart={() => onDragStart(i)}
                         onDragEnter={() => onDragEnter(i)}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={() => onDrop(i)}
                         onDragEnd={resetDrag}
+                        className={cn(
+                          "flex items-center gap-2 rounded-md px-2 py-2 text-sm transition",
+                          dragOver === i
+                            ? "bg-accent border border-dashed border-primary/50"
+                            : "hover:bg-muted/60"
+                        )}
                       >
-                        <span className="col-drag-handle" title="Arrastar para reordenar">⠿</span>
-                        <span className="edit-col-name">{col.name}</span>
-                        <button
-                          className="btn-col-remove"
+                        <GripVertical
+                          size={14}
+                          className="text-muted-foreground/50 cursor-grab shrink-0"
+                          title="Arrastar para reordenar"
+                        />
+                        <span className="flex-1 text-sm">{col.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
                           type="button"
                           onClick={() => remove(col)}
                           title="Remover"
-                        >×</button>
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <X />
+                        </Button>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
+              {/* ── Colunas disponíveis ── */}
               {!columnsLoading && available.length > 0 && (
-                <div className="sf-field">
-                  <span className="sf-section-title">Disponíveis</span>
-                  <div className="edit-col-available-list">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Disponíveis
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
                     {available.map((col) => (
                       <button
                         key={colKey(col)}
-                        className="edit-col-add-item"
                         type="button"
                         onClick={() => add(col)}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-muted-foreground",
+                          "hover:bg-accent hover:text-accent-foreground hover:border-border transition"
+                        )}
                       >
-                        <span className="edit-col-add-icon">+</span>
+                        <span className="font-bold leading-none" aria-hidden="true">+</span>
                         {col.name}
                       </button>
                     ))}
@@ -351,23 +441,21 @@ export default function InitBoardModal({ onClose, onSaved }) {
           )}
         </div>
 
-        <div className="sf-footer">
-          <div className="sf-footer-actions">
-            <button className="btn-secondary" type="button" onClick={onClose}>
-              Cancelar
-            </button>
-            <button
-              className="btn-primary"
-              type="button"
-              disabled={!selected || !boardName || !selectedView || saving || columnsLoading || activeCols.length === 0}
-              onClick={save}
-            >
-              {saving ? "Salvando…" : "Adicionar Board"}
-            </button>
-          </div>
-        </div>
+        {/* Footer */}
+        <DialogFooter className="px-5 py-4 border-t shrink-0 sm:flex-row sm:justify-end gap-2">
+          <Button variant="secondary" type="button" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            disabled={!selected || !boardName || !selectedView || saving || columnsLoading || activeCols.length === 0}
+            onClick={save}
+          >
+            {saving ? "Salvando…" : "Adicionar Board"}
+          </Button>
+        </DialogFooter>
 
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
