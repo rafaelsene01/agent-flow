@@ -1,19 +1,43 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
+import {
+  Brush,
+  FileText,
+  GitBranch,
+  ListChecks,
+  Loader2,
+  Palette,
+  Pencil,
+  Play,
+  RotateCcw,
+  Zap,
+} from "lucide-react";
 import CreateBranchModal from "@/components/CreateBranchModal.jsx";
 import CopyCmd from "@/components/board/CopyCmd.jsx";
 import TlcFileModal from "@/components/board/TlcFileModal.jsx";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Separator } from "@/components/ui/separator.jsx";
+import { cn } from "@/lib/utils";
 
 const TYPE_LABEL = {
   Issue: "Issue",
   PullRequest: "Pull request",
   DraftIssue: "Draft issue",
 };
+
+function SidebarLabel({ children }) {
+  return (
+    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </span>
+  );
+}
 
 export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [showCreateBranch, setShowCreateBranch] = useState(false);
@@ -39,20 +63,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   }
 
   useEffect(loadWorktreeConfig, [worktreeId]);
-
-  useEffect(() => {
-    function onKey(e) {
-      // Esc fecha apenas o modal em evidência: se um modal filho (branch ou
-      // spec/design/tasks) está aberto, ele é quem trata o Esc.
-      if (e.key === "Escape" && !showCreateBranch && !tlcFileModal) onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [onClose, showCreateBranch, tlcFileModal]);
 
   const isConfigured = !!worktreeConfig;
   const isChecking = worktreeConfig === null && worktreeId !== null;
@@ -219,29 +229,36 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
   return (
     <>
-      <div className="backdrop">
-        <div className="modal card-modal">
-          <div className="card-modal-layout">
+      <Dialog
+        open
+        onOpenChange={(o) => {
+          if (!o) onClose();
+        }}
+      >
+        <DialogContent
+          aria-describedby={undefined}
+          className="w-full max-w-[1020px] sm:max-w-[1020px] max-h-[88vh] gap-0 overflow-hidden p-0"
+        >
+          <div className="flex max-h-[88vh] min-h-0">
             {/* ── main ── */}
-            <div className="card-modal-main">
-              <div className="card-modal-fixed">
-                <div className="card-modal-header">
-                  <div className="card-modal-header-left">
-                    {item.number != null && (
-                      <span className="modal-id">#{item.number}</span>
-                    )}
-                  </div>
-                  <button className="modal-close" onClick={onClose}>
-                    ✕
-                  </button>
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+              <div className="flex shrink-0 flex-col gap-2.5 px-6 pt-5 pb-3">
+                {item.number != null && (
+                  <span className="font-mono text-xs text-muted-foreground">
+                    #{item.number}
+                  </span>
+                )}
+                <DialogTitle className="text-xl font-semibold leading-snug">
+                  {item.title}
+                </DialogTitle>
+                <Separator />
+                <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Descrição
                 </div>
-                <h2 className="modal-title card-modal-title">{item.title}</h2>
-                <div className="card-modal-divider" />
-                <div className="card-modal-desc-label">Descrição</div>
               </div>
-              <div className="card-modal-scroll">
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5">
                 {item.body ? (
-                  <div className="card-modal-body md">
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       rehypePlugins={[[rehypeHighlight, { detect: false }]]}
@@ -250,47 +267,57 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     </ReactMarkdown>
                   </div>
                 ) : (
-                  <p className="card-modal-no-body">Sem descrição.</p>
+                  <p className="text-sm italic text-muted-foreground">
+                    Sem descrição.
+                  </p>
                 )}
               </div>
             </div>
 
             {/* ── sidebar ── */}
-            <aside className="card-modal-sidebar">
-              <div className="sidebar-section">
-                <span className="sidebar-label">Gatilhos</span>
-                <div className="sidebar-triggers">
-                  <div className="trigger-item-row">
-                    <button
-                      className={`trigger-item${isConfigured ? " trigger-item--done" : ""}`}
+            <aside className="flex w-[280px] shrink-0 flex-col gap-5 overflow-y-auto border-l bg-muted/30 p-5">
+              <div className="flex flex-col gap-2">
+                <SidebarLabel>Gatilhos</SidebarLabel>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
                       type="button"
                       disabled={isConfigured || isChecking}
                       onClick={() => setShowCreateBranch(true)}
+                      className={cn(
+                        "flex-1 justify-start gap-2 text-xs",
+                        isConfigured &&
+                          "border-state-completed/50 text-state-completed opacity-75",
+                      )}
                     >
-                      <span className="trigger-icon">⎇</span>
-                      <span className="trigger-label">Configurar Branch</span>
-                      <span className="trigger-run">
+                      <GitBranch className="size-3.5" />
+                      <span>Configurar Branch</span>
+                      <span className="ml-auto text-xs">
                         {isConfigured ? "✓" : "▷"}
                       </span>
-                    </button>
+                    </Button>
                     {isConfigured && (
-                      <button
-                        className="trigger-reset"
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
                         type="button"
                         title="Resetar: remove a worktree do disco e limpa a configuração do card"
                         onClick={handleResetWorktree}
                       >
-                        ↺
-                      </button>
+                        <RotateCcw className="size-3.5" />
+                      </Button>
                     )}
                   </div>
                   {isConfigured && (
-                    <div className="worktree-info">
-                      <span className="worktree-info-branch">
-                        ⎇ {worktreeConfig.branch}
+                    <div className="flex flex-col rounded-lg border bg-muted/50 px-2.5 py-1.5">
+                      <span className="flex items-center gap-1 text-xs font-semibold">
+                        <GitBranch className="size-3 shrink-0" />
+                        {worktreeConfig.branch}
                       </span>
                       <span
-                        className="worktree-info-path"
+                        className="truncate font-mono text-[11px] text-muted-foreground"
                         title={worktreeConfig.path}
                       >
                         {worktreeConfig.path}
@@ -307,15 +334,23 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       worktreeConfig?.tlcStatus === "running" || tlcSending;
                     return (
                       <>
-                        <button
-                          className={`trigger-item${isDone ? " trigger-item--done" : isError ? " trigger-item--error" : ""}`}
+                        <Button
+                          variant="outline"
+                          size="sm"
                           type="button"
                           disabled={!isConfigured || isRunning || isTlcRunning}
                           onClick={handleRunSpec}
+                          className={cn(
+                            "w-full justify-start gap-2 text-xs",
+                            isDone &&
+                              "border-state-completed/50 text-state-completed opacity-75",
+                            isError &&
+                              "border-destructive/50 text-destructive opacity-75",
+                          )}
                         >
-                          <span className="trigger-icon">✎</span>
-                          <span className="trigger-label">Executar Tarefa</span>
-                          <span className="trigger-run">
+                          <Pencil className="size-3.5" />
+                          <span>Executar Tarefa</span>
+                          <span className="ml-auto text-xs">
                             {isRunning
                               ? "…"
                               : isDone
@@ -324,20 +359,21 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                   ? "↺"
                                   : "▷"}
                           </span>
-                        </button>
+                        </Button>
                         {isRunning && (
-                          <span className="trigger-feedback trigger-feedback--running">
-                            ⟳ Executando em background…
+                          <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
+                            <Loader2 className="size-3 shrink-0 animate-spin" />
+                            Executando em background…
                           </span>
                         )}
                         {isDone && (
-                          <span className="trigger-feedback ok">
+                          <span className="text-[11px] text-state-completed">
                             ✓ Concluído · clique para re-executar
                           </span>
                         )}
                         {isError && worktreeConfig?.lastError && (
                           <span
-                            className="trigger-feedback err"
+                            className="block truncate text-[11px] text-destructive"
                             title={worktreeConfig.lastError}
                           >
                             ✕ {worktreeConfig.lastError}
@@ -358,8 +394,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       worktreeConfig?.status === "running" || specSending;
                     return (
                       <>
-                        <button
-                          className={`trigger-item${isTlcDone ? " trigger-item--done" : isTlcError ? " trigger-item--error" : ""}`}
+                        <Button
+                          variant="outline"
+                          size="sm"
                           type="button"
                           disabled={
                             !isConfigured ||
@@ -373,10 +410,17 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               : undefined
                           }
                           onClick={handleRunTlc}
+                          className={cn(
+                            "w-full justify-start gap-2 text-xs",
+                            isTlcDone &&
+                              "border-state-completed/50 text-state-completed opacity-75",
+                            isTlcError &&
+                              "border-destructive/50 text-destructive opacity-75",
+                          )}
                         >
-                          <span className="trigger-icon">⚡</span>
-                          <span className="trigger-label">Executar TLC</span>
-                          <span className="trigger-run">
+                          <Zap className="size-3.5" />
+                          <span>Executar TLC</span>
+                          <span className="ml-auto text-xs">
                             {isTlcRunning
                               ? "…"
                               : isTlcDone
@@ -385,15 +429,16 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                   ? "↺"
                                   : "▷"}
                           </span>
-                        </button>
+                        </Button>
                         {isTlcRunning && (
-                          <span className="trigger-feedback trigger-feedback--running">
-                            ⟳ Criando spec, design e tasks…
+                          <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
+                            <Loader2 className="size-3 shrink-0 animate-spin" />
+                            Criando spec, design e tasks…
                           </span>
                         )}
                         {isTlcError && worktreeConfig?.tlcLastError && (
                           <span
-                            className="trigger-feedback err"
+                            className="block truncate text-[11px] text-destructive"
                             title={worktreeConfig.tlcLastError}
                           >
                             ✕ {worktreeConfig.tlcLastError}
@@ -401,17 +446,26 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         )}
                         {isTlcDone && (
                           <>
-                            <div className="tlc-outputs">
+                            <div className="flex gap-1.5">
                               {[
-                                { type: "spec", icon: "📋", label: "Spec" },
-                                { type: "design", icon: "🎨", label: "Design" },
-                                { type: "tasks", icon: "✅", label: "Tasks" },
-                              ].map(({ type, icon, label }) => {
+                                { type: "spec", Icon: FileText, label: "Spec" },
+                                {
+                                  type: "design",
+                                  Icon: Palette,
+                                  label: "Design",
+                                },
+                                {
+                                  type: "tasks",
+                                  Icon: ListChecks,
+                                  label: "Tasks",
+                                },
+                              ].map(({ type, Icon, label }) => {
                                 const exists = tlcFiles?.[type] ?? false;
                                 return (
-                                  <button
+                                  <Button
                                     key={type}
-                                    className={`tlc-output-btn${exists ? " tlc-output-btn--active" : ""}`}
+                                    variant="outline"
+                                    size="sm"
                                     type="button"
                                     disabled={!exists}
                                     title={
@@ -420,12 +474,15 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                         : `Abrir ${label}`
                                     }
                                     onClick={() => setTlcFileModal(type)}
+                                    className={cn(
+                                      "flex-1 gap-1 text-xs",
+                                      exists &&
+                                        "border-state-completed/50 text-state-completed",
+                                    )}
                                   >
-                                    <span className="tlc-output-icon">
-                                      {icon}
-                                    </span>
+                                    <Icon className="size-3.5" />
                                     <span>{label}</span>
-                                  </button>
+                                  </Button>
                                 );
                               })}
                             </div>
@@ -438,17 +495,23 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               const isExecError = execStatus === "error";
                               return (
                                 <>
-                                  <button
-                                    className={`trigger-item${isExecDone ? " trigger-item--done" : isExecError ? " trigger-item--error" : ""}`}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
                                     type="button"
                                     disabled={isExecRunning}
                                     onClick={handleRunTlcExec}
+                                    className={cn(
+                                      "w-full justify-start gap-2 text-xs",
+                                      isExecDone &&
+                                        "border-state-completed/50 text-state-completed opacity-75",
+                                      isExecError &&
+                                        "border-destructive/50 text-destructive opacity-75",
+                                    )}
                                   >
-                                    <span className="trigger-icon">▶</span>
-                                    <span className="trigger-label">
-                                      Executar Spec
-                                    </span>
-                                    <span className="trigger-run">
+                                    <Play className="size-3.5" />
+                                    <span>Executar Spec</span>
+                                    <span className="ml-auto text-xs">
                                       {isExecRunning
                                         ? "…"
                                         : isExecDone
@@ -457,22 +520,22 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                             ? "↺"
                                             : "▷"}
                                     </span>
-                                  </button>
+                                  </Button>
                                   {isExecRunning && (
-                                    <span className="trigger-feedback trigger-feedback--running">
-                                      ⟳ Implementando, commitando e fazendo
-                                      push…
+                                    <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
+                                      <Loader2 className="size-3 shrink-0 animate-spin" />
+                                      Implementando, commitando e fazendo push…
                                     </span>
                                   )}
                                   {isExecDone && (
-                                    <span className="trigger-feedback ok">
+                                    <span className="text-[11px] text-state-completed">
                                       ✓ Concluído · clique para re-executar
                                     </span>
                                   )}
                                   {isExecError &&
                                     worktreeConfig?.tlcExecLastError && (
                                       <span
-                                        className="trigger-feedback err"
+                                        className="block truncate text-[11px] text-destructive"
                                         title={worktreeConfig.tlcExecLastError}
                                       >
                                         ✕ {worktreeConfig.tlcExecLastError}
@@ -496,14 +559,20 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       const isCommitPushDone = commitPushStatus === "done";
                       const isCommitPushError = commitPushStatus === "error";
                       return (
-                        <div className="trigger-action-row">
-                          <button
-                            className={`trigger-action-btn${cleanupDone ? " trigger-action-btn--done" : ""}`}
+                        <div className="flex flex-col gap-1.5 border-t pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
                             type="button"
                             disabled={cleanupSending}
                             onClick={handleCleanup}
+                            className={cn(
+                              "w-full justify-start gap-2 text-xs",
+                              cleanupDone &&
+                                "border-state-completed/50 text-state-completed opacity-75",
+                            )}
                           >
-                            <span className="trigger-icon">🧹</span>
+                            <Brush className="size-3.5" />
                             <span>
                               {cleanupSending
                                 ? "Limpando…"
@@ -511,10 +580,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                   ? "✓ Limpo"
                                   : "Limpar"}
                             </span>
-                          </button>
+                          </Button>
                           <CopyCmd cmd={`cd ${worktreeConfig.path}`} />
-                          <button
-                            className={`trigger-action-btn trigger-action-btn--push${isCommitPushDone ? " trigger-action-btn--done" : isCommitPushError ? " trigger-action-btn--error" : ""}`}
+                          <Button
+                            variant="outline"
+                            size="sm"
                             type="button"
                             disabled={!cleanupDone || isCommitPushRunning}
                             onClick={handleCommitPush}
@@ -525,6 +595,16 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                   ? worktreeConfig?.commitPushLastError
                                   : undefined
                             }
+                            className={cn(
+                              "w-full justify-start gap-2 text-xs",
+                              isCommitPushDone
+                                ? "border-state-completed/50 text-state-completed opacity-75"
+                                : isCommitPushError
+                                  ? "border-destructive/50 text-destructive opacity-75"
+                                  : cleanupDone &&
+                                    !isCommitPushRunning &&
+                                    "border-primary/60 text-primary",
+                            )}
                           >
                             <span>
                               {isCommitPushRunning
@@ -535,9 +615,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                     ? "↺ Tentar"
                                     : "Commit & Push"}
                             </span>
-                          </button>
+                          </Button>
                           {isCommitPushDone && (
-                            <div className="git-cmds">
+                            <div className="flex flex-col gap-1">
                               <CopyCmd
                                 cmd={`git checkout ${worktreeConfig.branch}`}
                               />
@@ -560,29 +640,31 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                 </div>
               </div>
 
-              <div className="sidebar-section">
-                <span className="sidebar-label">Assignees</span>
+              <div className="flex flex-col gap-2">
+                <SidebarLabel>Assignees</SidebarLabel>
                 {item.assignees.length > 0 ? (
-                  <div className="sidebar-assignees">
+                  <div className="flex flex-col gap-1">
                     {item.assignees.map((a) => (
-                      <span key={a} className="sidebar-assignee">
+                      <span key={a} className="text-xs text-muted-foreground">
                         @{a}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <span className="sidebar-empty">Nenhum</span>
+                  <span className="text-xs italic text-muted-foreground">
+                    Nenhum
+                  </span>
                 )}
               </div>
 
-              <div className="sidebar-section">
-                <span className="sidebar-label">Labels</span>
+              <div className="flex flex-col gap-2">
+                <SidebarLabel>Labels</SidebarLabel>
                 {item.labels.length > 0 ? (
-                  <div className="sidebar-labels">
+                  <div className="flex flex-wrap gap-1">
                     {item.labels.map((l) => (
                       <span
                         key={l.name}
-                        className="label-chip"
+                        className="rounded-full border px-2 py-px text-[11px]"
                         style={{
                           background: `#${l.color}22`,
                           color: `#${l.color}`,
@@ -594,28 +676,30 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     ))}
                   </div>
                 ) : (
-                  <span className="sidebar-empty">Nenhum</span>
+                  <span className="text-xs italic text-muted-foreground">
+                    Nenhum
+                  </span>
                 )}
               </div>
 
               {item.itemType && (
-                <div className="sidebar-section">
-                  <span className="sidebar-label">Tipo</span>
-                  <span className="sidebar-value">{item.itemType}</span>
+                <div className="flex flex-col gap-2">
+                  <SidebarLabel>Tipo</SidebarLabel>
+                  <span className="text-sm">{item.itemType}</span>
                 </div>
               )}
               {!item.itemType && item.type !== "Issue" && (
-                <div className="sidebar-section">
-                  <span className="sidebar-label">Tipo</span>
-                  <span className="sidebar-value">
+                <div className="flex flex-col gap-2">
+                  <SidebarLabel>Tipo</SidebarLabel>
+                  <span className="text-sm">
                     {TYPE_LABEL[item.type] ?? item.type}
                   </span>
                 </div>
               )}
             </aside>
           </div>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
       {showCreateBranch && board && (
         <CreateBranchModal
           board={board}
