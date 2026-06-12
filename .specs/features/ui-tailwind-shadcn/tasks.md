@@ -1,7 +1,7 @@
 # UI Tailwind + shadcn/ui Migration — Tasks
 
 **Design**: `.specs/features/ui-tailwind-shadcn/design.md`
-**Status**: Draft (aguardando aprovação)
+**Status**: Done — T1–T16 executadas e commitadas (16 commits atômicos em `feat/ui-tailwind-shadcn`); gates quick+full verdes; T17 QA visual pendente de aprovação do usuário
 
 > **Assunção de testes (confirmar)**: repo sem infra de teste (sem script `test`, sem framework) e sem `.specs/codebase/TESTING.md`. Logo: `Tests: none` em todas as tasks; gate automatizado = build. **Gate quick** = `npm run build --prefix web` · **Gate full** = `npm run build` (raiz, gera `dist/`). Verificação visual = manual no `npm run dev`.
 
