@@ -11,6 +11,7 @@
   },
   "type": "module",
   "scripts": {
+    "postinstall": "npm install --prefix web",
     "dev": "concurrently -n api,web -c cyan,magenta \"node api/dev.js\" \"npm run dev --prefix web\"",
     "start": "node dist/agent-flow.js",
     "build": "node scripts/build.mjs",
