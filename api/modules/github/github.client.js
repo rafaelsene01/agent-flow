@@ -24,6 +24,20 @@ export function clearTokenCache() {
   _cachedToken = null;
 }
 
+function checkRateLimit(res) {
+  const remaining = parseInt(res.headers.get("x-ratelimit-remaining") ?? "999", 10);
+  const resetAt   = parseInt(res.headers.get("x-ratelimit-reset")     ?? "0",   10);
+  if (remaining < 10) {
+    console.warn(`[github] rate limit baixo: ${remaining} req restantes`);
+  }
+  if (res.status === 403 && remaining === 0) {
+    const waitMin = Math.ceil((resetAt - Date.now() / 1000) / 60);
+    const err = new Error(`GitHub rate limit atingido. Aguarde ${waitMin} minuto(s).`);
+    err.status = 429;
+    throw err;
+  }
+}
+
 async function request(path, token) {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: {
@@ -32,6 +46,8 @@ async function request(path, token) {
       "X-GitHub-Api-Version": "2022-11-28",
     },
   });
+
+  checkRateLimit(res);
 
   if (!res.ok) {
     const text = await res.text();
@@ -60,6 +76,7 @@ export async function graphQL(query, token, variables = {}) {
     },
     body: JSON.stringify({ query, variables }),
   });
+  checkRateLimit(res);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`GitHub GraphQL error ${res.status}: ${text}`);

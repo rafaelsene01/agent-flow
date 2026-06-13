@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { GripVertical, X, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // Normaliza string legada para { id: null, name } ou mantém { id, name }.
 function normalizeCol(c) {
@@ -47,12 +56,6 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
       .finally(() => setLoading(false));
   }, [board.id]);
 
-  useEffect(() => {
-    const h = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [onClose]);
-
   function onDragStart(i) {
     dragIdx.current = i;
   }
@@ -96,32 +99,52 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   }
 
   return (
-    <div className="backdrop">
-      <div className="modal init-board-modal">
-
-        <div className="modal-header">
-          <div className="modal-id-row">
-            <span style={{ fontSize: 16 }}>✎</span>
-            <h2 className="modal-title" style={{ fontSize: 16, marginBottom: 0 }}>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        className="max-w-md p-0 gap-0 flex flex-col overflow-hidden"
+        showCloseButton={false}
+      >
+        {/* Header */}
+        <DialogHeader className="flex flex-row items-center justify-between px-4 py-3 border-b gap-0">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground" aria-hidden="true">✎</span>
+            <DialogTitle className="text-sm font-semibold leading-none">
               {board.name}
-            </h2>
+            </DialogTitle>
           </div>
-          <button className="modal-close" type="button" onClick={onClose}>✕</button>
-        </div>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="shrink-0"
+          >
+            <X className="size-3.5" />
+          </Button>
+        </DialogHeader>
 
-        <div className="sf-body">
+        {/* Body */}
+        <div className="flex flex-col gap-4 px-4 py-4 overflow-y-auto">
 
-          <div className="sf-field">
-            <label className="sf-label">Repositório de Origem</label>
+          {/* Repositório de Origem */}
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="edit-origin-repo"
+              className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+            >
+              Repositório de Origem
+            </label>
             {repoOptions.length === 0 ? (
-              <div className="board-select-state">
+              <p className="text-sm text-muted-foreground">
                 Nenhum repositório detectado no filtro desta view.
-              </div>
+              </p>
             ) : (
               <select
-                className="sf-input"
+                id="edit-origin-repo"
                 value={originRepo}
                 onChange={(e) => setOriginRepo(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
               >
                 <option value="">Selecione o repositório…</option>
                 {repoOptions.map((r) => (
@@ -131,16 +154,22 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
             )}
           </div>
 
-          <div className="sf-field">
-            <span className="sf-section-title">Colunas ativas</span>
+          {/* Colunas ativas */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Colunas ativas
+            </span>
             {activeCols.length === 0 ? (
-              <div className="board-select-state">Nenhuma coluna ativa.</div>
+              <p className="text-sm text-muted-foreground">Nenhuma coluna ativa.</p>
             ) : (
-              <div className="edit-col-list">
+              <div className="border rounded-lg bg-muted/40 p-1 flex flex-col gap-1">
                 {activeCols.map((col, i) => (
                   <div
                     key={colKey(col)}
-                    className={`edit-col-item${dragOver === i ? " drag-over" : ""}`}
+                    className={cn(
+                      "flex items-center gap-2 rounded-md bg-background border px-2.5 py-2 text-sm transition",
+                      dragOver === i && "border-primary bg-primary/10"
+                    )}
                     draggable
                     onDragStart={() => onDragStart(i)}
                     onDragEnter={() => onDragEnter(i)}
@@ -148,32 +177,43 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
                     onDrop={() => onDrop(i)}
                     onDragEnd={reset}
                   >
-                    <span className="col-drag-handle" title="Arrastar para reordenar">⠿</span>
-                    <span className="edit-col-name">{col.name}</span>
-                    <button
-                      className="btn-col-remove"
+                    <GripVertical
+                      className="size-3.5 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0"
+                      title="Arrastar para reordenar"
+                    />
+                    <span className="flex-1 truncate">{col.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
                       type="button"
                       onClick={() => remove(col)}
                       title="Remover"
-                    >×</button>
+                      aria-label={`Remover coluna ${col.name}`}
+                      className="shrink-0 hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <X className="size-3.5" />
+                    </Button>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
+          {/* Colunas disponíveis */}
           {!loading && available.length > 0 && (
-            <div className="sf-field">
-              <span className="sf-section-title">Disponíveis</span>
-              <div className="edit-col-available-list">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Disponíveis
+              </span>
+              <div className="border rounded-lg bg-muted/40 p-1 flex flex-col gap-1">
                 {available.map((col) => (
                   <button
                     key={colKey(col)}
-                    className="edit-col-add-item"
                     type="button"
                     onClick={() => add(col)}
+                    className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-background transition"
                   >
-                    <span className="edit-col-add-icon">+</span>
+                    <Plus className="size-3.5 text-state-completed shrink-0" />
                     {col.name}
                   </button>
                 ))}
@@ -183,23 +223,22 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
 
         </div>
 
-        <div className="sf-footer">
-          <div className="sf-footer-actions">
-            <button className="btn-secondary" type="button" onClick={onClose}>
-              Cancelar
-            </button>
-            <button
-              className="btn-primary"
-              type="button"
-              disabled={saving || activeCols.length === 0}
-              onClick={save}
-            >
-              {saving ? "Salvando…" : "Salvar"}
-            </button>
-          </div>
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t">
+          <Button variant="secondary" type="button" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            variant="default"
+            type="button"
+            disabled={saving || activeCols.length === 0}
+            onClick={save}
+          >
+            {saving ? "Salvando…" : "Salvar"}
+          </Button>
         </div>
 
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
