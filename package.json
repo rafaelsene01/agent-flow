@@ -1,6 +1,6 @@
 {
   "name": "@rafaelsene01/agent-flow",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "description": "Agent Flow · Web Kanban board for Linear — open source, runs locally",
   "main": "dist/agent-flow.js",
   "bin": {
@@ -39,7 +39,7 @@
   },
   "license": "MIT",
   "devDependencies": {
-"@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "chalk": "^5.3.0",
     "concurrently": "^10.0.3",
