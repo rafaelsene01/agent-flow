@@ -1,3 +1,15 @@
+# [1.2.0](https://github.com/rafaelsene01/agent-flow/compare/v1.1.0...v1.2.0) (2026-06-13)
+
+
+### Bug Fixes
+
+* **ci:** trigger release pipeline ([b2f1606](https://github.com/rafaelsene01/agent-flow/commit/b2f160602fb6a08c1c6f9bea83bc0ea5b4226673))
+
+
+### Features
+
+* **ui:** enhance card component with spinning border animation and update postinstall script for conditional npm install ([8bd565e](https://github.com/rafaelsene01/agent-flow/commit/8bd565e764cbdfa3a0c55883177450d677d38642))
+
 # [1.1.0](https://github.com/rafaelsene01/agent-flow/compare/v1.0.5...v1.1.0) (2026-06-13)
 
 
