@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useReducer, useState } from "react";
 import { usePathname } from "next/navigation";
 import { boardSlug } from "@/lib/boardSlug.js";
+import { appReducer, initialState } from "@/lib/appReducer.js";
 import Header from "@/components/Header.jsx";
 import SettingsModal from "@/components/SettingsModal.jsx";
 import InitBoardModal from "@/components/InitBoardModal.jsx";
@@ -17,14 +18,13 @@ function navigate(path) {
 
 function AppContent() {
   const pathname = usePathname();
+  const [state, dispatch] = useReducer(appReducer, { ...initialState, activePath: pathname });
+  const { initializing, boards, activeBoard, activePath } = state;
 
-  const [activePath,    setActivePath]    = useState(pathname);
-  const [initializing, setInitializing]   = useState(true);
   const [showSettings, setShowSettings]   = useState(false);
   const [showInitBoard, setShowInitBoard] = useState(false);
   const [showEditBoard, setShowEditBoard] = useState(false);
-  const [boards, setBoards]               = useState([]);
-  const [activeBoard, setActiveBoard]     = useState(null);
+
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     return localStorage.getItem("theme") ?? "dark";
@@ -37,9 +37,8 @@ function AppContent() {
     localStorage.setItem("theme", next);
   }
 
-  // Sincroniza activePath com botões de voltar/avançar do browser.
   useEffect(() => {
-    const onPop = () => setActivePath(window.location.pathname);
+    const onPop = () => dispatch({ type: "SET_PATH", path: window.location.pathname });
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -51,43 +50,38 @@ function AppContent() {
     ]).then(([status, config]) => {
       if (!status?.github?.connected || !status?.claude?.connected) setShowSettings(true);
       const saved = config.boards ?? [];
-      setBoards(saved);
 
-      const slug    = activePath.slice(1);
+      const slug    = pathname.slice(1);
       const fromUrl = slug ? saved.find((b) => boardSlug(b) === slug) : null;
       const initial = fromUrl ?? saved[0] ?? null;
-      setActiveBoard(initial);
 
-      // Se carregou na raiz "/", redireciona para o slug do primeiro board.
+      let newPath = pathname;
       if (!slug && initial) {
-        const path = `/${boardSlug(initial)}`;
-        setActivePath(path);
-        window.history.replaceState(null, "", path);
+        newPath = `/${boardSlug(initial)}`;
+        window.history.replaceState(null, "", newPath);
       }
 
-      setInitializing(false);
+      dispatch({ type: "INIT_DONE", boards: saved, activeBoard: initial, activePath: newPath });
     }).catch(() => {
-      setInitializing(false);
+      dispatch({ type: "INIT_DONE", boards: [], activeBoard: null, activePath: pathname });
     });
   }, []);
 
   function selectBoard(board) {
-    setActiveBoard(board);
     const path = `/${boardSlug(board)}`;
-    setActivePath(path);
+    dispatch({ type: "SELECT_BOARD", board, path });
     navigate(path);
   }
 
   function handleBoardSaved(newBoard) {
-    setBoards((prev) => [...prev, newBoard]);
+    dispatch({ type: "BOARD_ADDED", board: newBoard });
     setShowInitBoard(false);
-    selectBoard(newBoard);
+    navigate(`/${boardSlug(newBoard)}`);
   }
 
   async function handleBoardUpdated(updatedBoard) {
     const next = boards.map((b) => b.viewId === updatedBoard.viewId ? updatedBoard : b);
-    setBoards(next);
-    setActiveBoard(updatedBoard);
+    dispatch({ type: "BOARD_UPDATED", board: updatedBoard });
     setShowEditBoard(false);
     await fetch("/api/config", {
       method:  "POST",
@@ -119,15 +113,11 @@ function AppContent() {
     await cleanupBoardData(board);
 
     const next = boards.filter((b) => b.viewId !== board.viewId);
-    setBoards(next);
+    const fallback = next[0] ?? null;
+    const fallbackPath = fallback ? `/${boardSlug(fallback)}` : "/";
 
-    if (activeBoard?.viewId === board.viewId) {
-      const fallback = next[0] ?? null;
-      setActiveBoard(fallback);
-      const path = fallback ? `/${boardSlug(fallback)}` : "/";
-      setActivePath(path);
-      navigate(path);
-    }
+    dispatch({ type: "BOARD_REMOVED", boardViewId: board.viewId, fallbackBoard: fallback, fallbackPath });
+    navigate(fallbackPath);
 
     await fetch("/api/config", {
       method:  "POST",

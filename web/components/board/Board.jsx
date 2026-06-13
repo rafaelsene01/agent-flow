@@ -14,11 +14,19 @@ export default function Board({ board }) {
   const columns = normalizeColumns(board?.columns);
   const [activeCard, setActiveCard] = useState(null);
   const [worktrees, setWorktrees] = useState([]);
+  const [rateLimitError, setRateLimitError] = useState(null);
 
   function loadWorktrees() {
     fetch("/api/config/worktrees")
-      .then((r) => r.json())
-      .then(setWorktrees)
+      .then(async (r) => {
+        if (r.status === 429) {
+          const d = await r.json().catch(() => ({}));
+          setRateLimitError(d.error ?? "GitHub rate limit atingido.");
+          return null;
+        }
+        return r.json();
+      })
+      .then((data) => { if (data) setWorktrees(data); })
       .catch(() => {});
   }
 
@@ -37,6 +45,14 @@ export default function Board({ board }) {
     const timer = setInterval(loadWorktrees, 3000);
     return () => clearInterval(timer);
   }, [worktrees]);
+
+  if (rateLimitError) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <p className="text-sm text-destructive">{rateLimitError}</p>
+      </div>
+    );
+  }
 
   if (columns.length === 0) {
     return (
