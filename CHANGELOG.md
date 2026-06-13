@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/rafaelsene01/agent-flow/compare/v1.2.0...v1.2.1) (2026-06-13)
+
+
+### Bug Fixes
+
+* **postinstall:** skip web install when web/ dir does not exist (global npm install) ([7d9e6e8](https://github.com/rafaelsene01/agent-flow/commit/7d9e6e83bbc0adf460a731dcd47504c414cc90e4))
+
 # [1.2.0](https://github.com/rafaelsene01/agent-flow/compare/v1.1.0...v1.2.0) (2026-06-13)
 
 
