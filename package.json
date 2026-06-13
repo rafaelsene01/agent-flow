@@ -11,7 +11,7 @@
   },
   "type": "module",
   "scripts": {
-    "postinstall": "npm install --prefix web",
+    "postinstall": "node -e \"if(!require('fs').existsSync('web/node_modules/.package-lock.json')){require('child_process').execSync('npm install --prefix web',{stdio:'inherit'})}\"",
     "dev": "concurrently -n api,web -c cyan,magenta \"node api/dev.js\" \"npm run dev --prefix web\"",
     "start": "node dist/agent-flow.js",
     "build": "node scripts/build.mjs",
