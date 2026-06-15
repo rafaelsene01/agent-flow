@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/rafaelsene01/agent-flow/compare/v1.2.1...v1.2.2) (2026-06-13)
+
+
+### Bug Fixes
+
+* **postinstall:** use cwd web instead of --prefix to avoid infinite recursion on global install ([b5e3535](https://github.com/rafaelsene01/agent-flow/commit/b5e3535194a43c4ce7d0f94f32ca9b037e9bd75d))
+
 ## [1.2.1](https://github.com/rafaelsene01/agent-flow/compare/v1.2.0...v1.2.1) (2026-06-13)
 
 
