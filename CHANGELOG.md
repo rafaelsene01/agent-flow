@@ -1,3 +1,10 @@
+## [1.2.3](https://github.com/rafaelsene01/agent-flow/compare/v1.2.2...v1.2.3) (2026-06-15)
+
+
+### Bug Fixes
+
+* update development script to use turbopack and adjust modal component styles for improved layout ([84fce41](https://github.com/rafaelsene01/agent-flow/commit/84fce418f87c44dd0790167b4d49b0eefaa8cd17))
+
 ## [1.2.2](https://github.com/rafaelsene01/agent-flow/compare/v1.2.1...v1.2.2) (2026-06-13)
 
 
