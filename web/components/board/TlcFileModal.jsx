@@ -70,7 +70,7 @@ export default function TlcFileModal({ worktreeId, type, onClose }) {
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent
-        className="max-w-[920px] w-full h-[92vh] p-0 gap-0 flex flex-col overflow-hidden"
+        className="w-full sm:max-w-[calc(100%-2rem)] h-[92vh] p-0 gap-0 flex flex-col overflow-hidden"
         showCloseButton={false}
       >
         {/* ── header row: title + toolbar ── */}

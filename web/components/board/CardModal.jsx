@@ -237,7 +237,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       >
         <DialogContent
           aria-describedby={undefined}
-          className="w-full max-w-[1020px] sm:max-w-[1020px] max-h-[88vh] gap-0 overflow-hidden p-0"
+          className="w-full sm:max-w-[calc(100%-2rem)] max-h-[88vh] gap-0 overflow-hidden p-0"
         >
           <div className="flex max-h-[88vh] min-h-0">
             {/* ── main ── */}
