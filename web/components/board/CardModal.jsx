@@ -707,6 +707,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
           onClose={() => {
             setShowCreateBranch(false);
             loadWorktreeConfig();
+            onWorktreeChange?.();
           }}
         />
       )}

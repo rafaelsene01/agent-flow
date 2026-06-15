@@ -153,6 +153,59 @@
   animation: card-spin-border 2s linear infinite;
 }
 
+/* silver border for branch-configured cards (no execution yet) */
+.card-branch-silver {
+  background: linear-gradient(
+    135deg,
+    #3a3a3a 0%,
+    #999 25%,
+    #e0e0e0 50%,
+    #999 75%,
+    #3a3a3a 100%
+  );
+}
+
+/* golden foil border + shimmer for cards that finished an execution */
+@keyframes card-gold-shimmer {
+  0%   { transform: translateX(-150%) skewX(-15deg); }
+  100% { transform: translateX(350%) skewX(-15deg); }
+}
+
+.card-branch-gold {
+  background: linear-gradient(
+    135deg,
+    #7c5800 0%,
+    #c8860a 25%,
+    #fff8a0 50%,
+    #c8860a 75%,
+    #7c5800 100%
+  );
+}
+
+.card-branch-gold-inner {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-branch-gold-inner::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: 0;
+  width: 40%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 240, 100, 0.15) 25%,
+    rgba(255, 255, 200, 0.55) 50%,
+    rgba(255, 240, 100, 0.15) 75%,
+    transparent 100%
+  );
+  pointer-events: none;
+  animation: card-gold-shimmer 2.5s ease-in-out infinite;
+}
+
 /* scrollbar fina (exceção documentada) */
 @layer base {
   ::-webkit-scrollbar {

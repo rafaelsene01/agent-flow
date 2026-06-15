@@ -13,17 +13,28 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
       wt.tlcStatus === "running" ||
       wt.tlcExecStatus === "running" ||
       wt.commitPushStatus === "running");
+  const isFinished =
+    wt && (wt.status === "done" || wt.tlcExecStatus === "done");
+  const hasBranch = !!wt;
 
   return (
-    <div className={cn("rounded-lg", isRunning && "card-running p-[2px]")}>
+    <div
+      className={cn(
+        "rounded-lg",
+        isRunning && "card-running p-[2px]",
+        !isRunning && isFinished && "card-branch-gold p-[2px]",
+        !isRunning && !isFinished && hasBranch && "card-branch-silver p-[2px]"
+      )}
+    >
       <button
         type="button"
         className={cn(
           "cursor-pointer flex flex-col gap-1.5 p-3 rounded-lg",
           "transition hover:bg-muted hover:shadow-md hover:-translate-y-px text-left w-full",
-          isRunning
+          isRunning || hasBranch
             ? "bg-card border border-transparent"
-            : "bg-muted/40 border border-l-[3px] border-l-border"
+            : "bg-muted/40 border border-l-[3px] border-l-border",
+          !isRunning && isFinished && "card-branch-gold-inner"
         )}
         onClick={() => onOpen(item)}
       >
