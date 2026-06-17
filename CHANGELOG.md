@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/rafaelsene01/agent-flow/compare/v1.4.0...v1.5.0) (2026-06-17)
+
+
+### Features
+
+* add session management to Claude runner functions ([2e03829](https://github.com/rafaelsene01/agent-flow/commit/2e03829d2dd1aa8144045975cdda421167d798ea))
+
 # [1.4.0](https://github.com/rafaelsene01/agent-flow/compare/v1.3.0...v1.4.0) (2026-06-17)
 
 
