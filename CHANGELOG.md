@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/rafaelsene01/agent-flow/compare/v1.5.0...v1.5.1) (2026-06-17)
+
+
+### Bug Fixes
+
+* update Claude runner to hide windows during execution ([cf21a22](https://github.com/rafaelsene01/agent-flow/commit/cf21a220508f5253430da6422ee8fcc0e563a1bd))
+
 # [1.5.0](https://github.com/rafaelsene01/agent-flow/compare/v1.4.0...v1.5.0) (2026-06-17)
 
 
