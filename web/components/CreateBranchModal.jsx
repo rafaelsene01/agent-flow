@@ -115,6 +115,9 @@ export default function CreateBranchModal({ board, item, onClose }) {
           <div className="flex items-center gap-2">
             <GitBranch className="size-4 text-muted-foreground shrink-0" />
             <DialogTitle className="text-sm font-semibold leading-none">
+              {cardNumber != null && (
+                <span className="font-mono text-muted-foreground mr-1.5">#{cardNumber}</span>
+              )}
               Configurar Branch
             </DialogTitle>
           </div>
