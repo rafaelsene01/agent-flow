@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/rafaelsene01/agent-flow/compare/v1.3.0...v1.4.0) (2026-06-17)
+
+
+### Features
+
+* implement worktree file management features, including fetching changed files and displaying file content in modals ([904ccdb](https://github.com/rafaelsene01/agent-flow/commit/904ccdbe8ed391e2c7b6945d32e2ecff2857a6e5))
+
 # [1.3.0](https://github.com/rafaelsene01/agent-flow/compare/v1.2.3...v1.3.0) (2026-06-17)
 
 
