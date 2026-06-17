@@ -36,7 +36,7 @@ export function runClaude(prompt, cwd, logStream, sessionName = null) {
     const args = sessionName
       ? ["-n", sessionName, "--dangerously-skip-permissions"]
       : ["--dangerously-skip-permissions"];
-    const child = spawn("claude", args, { cwd, shell: isWin, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn("claude", args, { cwd, shell: isWin, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
     child.stdout.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
     child.stderr.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
     child.on("error",  (err)          => resolve({ code: 1, output, error: err.message }));
@@ -51,7 +51,7 @@ export function resumeClaude(prompt, cwd, logStream, sessionName) {
     const child = spawn(
       "claude",
       ["--resume", sessionName, "--dangerously-skip-permissions"],
-      { cwd, shell: isWin, stdio: ["pipe", "pipe", "pipe"] },
+      { cwd, shell: isWin, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
     );
     child.stdout.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
     child.stderr.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
