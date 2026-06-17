@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/rafaelsene01/agent-flow/compare/v1.7.0...v1.8.0) (2026-06-17)
+
+
+### Features
+
+* enhance worktree setup and UI components ([fa6b21d](https://github.com/rafaelsene01/agent-flow/commit/fa6b21dd91a3dc8aab724b5abe02f7473cd1f7b5))
+
 # [1.7.0](https://github.com/rafaelsene01/agent-flow/compare/v1.6.0...v1.7.0) (2026-06-17)
 
 
