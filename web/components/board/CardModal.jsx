@@ -620,7 +620,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                     <button
                                       type="button"
                                       className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100"
-                                      title="Excluir da worktree"
+                                      title="Descartar alterações"
                                       onClick={() => handleExcludeFile(file.path)}
                                     >
                                       <X className="size-3" />

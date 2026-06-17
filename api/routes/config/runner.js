@@ -351,10 +351,30 @@ export default function runnerRoutes(app) {
     if (!fullPath.startsWith(wtResolved + path.sep) && fullPath !== wtResolved)
       return sendError(res, 403, "Path não permitido");
     try {
-      await execFileP("git", ["checkout", "HEAD", "--", filePath], { cwd: wt.path, timeout: 10_000 })
-        .catch(() => {
-          if (fs.existsSync(fullPath)) fs.rmSync(fullPath, { force: true });
-        });
+      const { stdout: statusOut } = await execFileP(
+        "git", ["status", "--porcelain", "-z", "--", filePath],
+        { cwd: wt.path, timeout: 10_000 },
+      );
+      const statusLine = statusOut.split("\0")[0] ?? "";
+      const x = statusLine[0] ?? " "; // index
+      const y = statusLine[1] ?? " "; // worktree
+      const isUntracked = x === "?" && y === "?";
+      const isNewStaged = x === "A"; // staged new file, not in HEAD
+
+      if (isUntracked) {
+        if (fs.existsSync(fullPath)) fs.rmSync(fullPath, { recursive: true, force: true });
+      } else if (isNewStaged) {
+        // Unstage then delete
+        await execFileP("git", ["rm", "--cached", "--force", "--", filePath], { cwd: wt.path, timeout: 10_000 })
+          .catch(() => {});
+        if (fs.existsSync(fullPath)) fs.rmSync(fullPath, { recursive: true, force: true });
+      } else {
+        // Modified, deleted, renamed — restore to HEAD (staged + worktree)
+        await execFileP(
+          "git", ["checkout", "HEAD", "--", filePath],
+          { cwd: wt.path, timeout: 10_000 },
+        );
+      }
       res.json({ ok: true });
     } catch (err) {
       sendError(res, 500, err.message, err);
