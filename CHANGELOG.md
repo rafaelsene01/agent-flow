@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/rafaelsene01/agent-flow/compare/v1.5.1...v1.6.0) (2026-06-17)
+
+
+### Features
+
+* improve file handling in runner routes ([3a105e3](https://github.com/rafaelsene01/agent-flow/commit/3a105e3195c8d315dc78014b23513f96e4499de4))
+
 ## [1.5.1](https://github.com/rafaelsene01/agent-flow/compare/v1.5.0...v1.5.1) (2026-06-17)
 
 
