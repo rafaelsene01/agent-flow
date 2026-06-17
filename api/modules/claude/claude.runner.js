@@ -30,12 +30,27 @@ export function failureDetail(result, persistPath) {
   return tail ? `${reason}\n--- final do output ---\n${tail}${log}` : `${reason}${log}`;
 }
 
-export function runClaude(prompt, cwd, logStream) {
+export function runClaude(prompt, cwd, logStream, sessionName = null) {
+  return new Promise((resolve) => {
+    let output = "";
+    const args = sessionName
+      ? ["-n", sessionName, "--dangerously-skip-permissions"]
+      : ["--dangerously-skip-permissions"];
+    const child = spawn("claude", args, { cwd, shell: isWin, stdio: ["pipe", "pipe", "pipe"] });
+    child.stdout.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
+    child.stderr.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });
+    child.on("error",  (err)          => resolve({ code: 1, output, error: err.message }));
+    child.on("close",  (code, signal) => resolve({ code, signal, output }));
+    child.stdin.end(prompt, "utf-8");
+  });
+}
+
+export function resumeClaude(prompt, cwd, logStream, sessionName) {
   return new Promise((resolve) => {
     let output = "";
     const child = spawn(
       "claude",
-      ["--dangerously-skip-permissions"],
+      ["--resume", sessionName, "--dangerously-skip-permissions"],
       { cwd, shell: isWin, stdio: ["pipe", "pipe", "pipe"] },
     );
     child.stdout.on("data", (d) => { const t = d.toString(); logStream.write(t); output += t; });

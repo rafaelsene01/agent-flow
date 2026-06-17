@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { runClaude, createRunLog, failureDetail } from "../../modules/claude/claude.runner.js";
+import { runClaude, resumeClaude, createRunLog, failureDetail } from "../../modules/claude/claude.runner.js";
 import { getWorktrees, updateWorktreeStatus } from "../../modules/config/config.service.js";
 import { sendError } from "../../lib/errors.js";
 import { scanTlcFeatures } from "./tlc.js";
@@ -10,6 +10,12 @@ import { scanTlcFeatures } from "./tlc.js";
 const execFileP  = promisify(execFile);
 const INTERNAL   = ["CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log"];
 const EXCLUDE_ENTRIES = [...INTERNAL, ".specs/"];
+
+function makeSessionName(wt) {
+  const worktreeName = path.basename(wt.path);
+  const branchName = wt.branch ?? "main";
+  return `${worktreeName}-${branchName}`.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
 
 async function ensureWorktreeExclude(wtPath) {
   try {
@@ -101,6 +107,7 @@ export default function runnerRoutes(app) {
         cardContent,
         wt.path,
         logStream,
+        makeSessionName(wt),
       );
 
       if (impl.code !== 0) {
@@ -250,6 +257,7 @@ export default function runnerRoutes(app) {
         "(ex: COMMIT: feat: implement card sorting)",
         wt.path,
         logStream,
+        makeSessionName(wt),
       );
 
       if (impl.code !== 0) {
@@ -381,10 +389,21 @@ export default function runnerRoutes(app) {
       ).catch(() => ({ stdout: "" }));
 
       if (statusOut.trim()) {
-        try {
-          await execFileP("git", ["commit", "--no-verify", "-m", "chore: wip [agent-flow]"], { cwd: wt.path, timeout: 30_000 });
-        } catch (err) {
-          updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `git commit falhou: ${err.message}` });
+        const sessionName = makeSessionName(wt);
+        const logStream = createRunLog(wt, "agent-flow.log");
+
+        const commitResult = await resumeClaude(
+          "Com base em tudo que foi implementado nesta sessão, crie um commit semântico (conventional commits) " +
+          "com todas as mudanças staged. Use --no-verify. Não faça push.",
+          wt.path,
+          logStream,
+          sessionName,
+        );
+
+        await new Promise((resolve) => logStream.end(resolve));
+
+        if (commitResult.code !== 0) {
+          updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `Commit falhou: ${failureDetail(commitResult, logStream.persistPath)}` });
           return;
         }
       }
