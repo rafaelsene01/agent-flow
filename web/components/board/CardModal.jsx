@@ -6,8 +6,8 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
 import {
-  Brush,
   FileText,
+  FolderOpen,
   GitBranch,
   ListChecks,
   Loader2,
@@ -15,11 +15,13 @@ import {
   Pencil,
   Play,
   RotateCcw,
+  X,
   Zap,
 } from "lucide-react";
 import CreateBranchModal from "@/components/CreateBranchModal.jsx";
 import CopyCmd from "@/components/board/CopyCmd.jsx";
 import TlcFileModal from "@/components/board/TlcFileModal.jsx";
+import FileContentModal from "@/components/board/FileContentModal.jsx";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Separator } from "@/components/ui/separator.jsx";
@@ -30,6 +32,7 @@ const TYPE_LABEL = {
   PullRequest: "Pull request",
   DraftIssue: "Draft issue",
 };
+
 
 function SidebarLabel({ children }) {
   return (
@@ -70,10 +73,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [specSending, setSpecSending] = useState(false);
   const [tlcSending, setTlcSending] = useState(false);
   const [tlcExecSending, setTlcExecSending] = useState(false);
-  const [cleanupSending, setCleanupSending] = useState(false);
   const [commitPushSending, setCommitPushSending] = useState(false);
   const [claudeStatus, setClaudeStatus] = useState(null);
   const [tlcFiles, setTlcFiles] = useState(null); // { spec, design, tasks } from live scan
+  const [changedFiles, setChangedFiles] = useState(null); // null=not loaded, array=loaded
+  const [fileContentModal, setFileContentModal] = useState(null); // null | file path string
 
   useEffect(() => {
     fetch("/api/status")
@@ -81,6 +85,33 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       .then((d) => setClaudeStatus(d.claude ?? null))
       .catch(() => setClaudeStatus(null));
   }, []);
+
+  function loadChangedFiles() {
+    if (!worktreeId) return;
+    setChangedFiles(null);
+    fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/changed-files`)
+      .then((r) => r.json())
+      .then((d) => setChangedFiles(d.files ?? []))
+      .catch(() => setChangedFiles([]));
+  }
+
+  useEffect(() => {
+    const taskDone =
+      worktreeConfig?.status === "done" || worktreeConfig?.tlcExecStatus === "done";
+    if (taskDone) loadChangedFiles();
+  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus]);
+
+  async function handleExcludeFile(filePath) {
+    try {
+      await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/file?file=${encodeURIComponent(filePath)}`,
+        { method: "DELETE" },
+      );
+      loadChangedFiles();
+    } catch (err) {
+      console.error("[exclude-file]", err);
+    }
+  }
 
   // Scan .specs/features/ whenever TLC is done so buttons reflect real disk state.
   useEffect(() => {
@@ -163,23 +194,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       console.error("[run-tlc-exec]", err);
     } finally {
       setTlcExecSending(false);
-    }
-  }
-
-  async function handleCleanup() {
-    setCleanupSending(true);
-    try {
-      const res = await fetch(
-        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/cleanup`,
-        { method: "POST" },
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      loadWorktreeConfig();
-    } catch (err) {
-      console.error("[cleanup]", err);
-    } finally {
-      setCleanupSending(false);
     }
   }
 
@@ -311,18 +325,21 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     )}
                   </div>
                   {isConfigured && (
-                    <div className="flex flex-col rounded-lg border bg-muted/50 px-2.5 py-1.5">
-                      <span className="flex items-center gap-1 text-xs font-semibold">
-                        <GitBranch className="size-3 shrink-0" />
-                        {worktreeConfig.branch}
-                      </span>
-                      <span
-                        className="truncate font-mono text-[11px] text-muted-foreground"
-                        title={worktreeConfig.path}
-                      >
-                        {worktreeConfig.path}
-                      </span>
-                    </div>
+                    <>
+                      <div className="flex flex-col rounded-lg border bg-muted/50 px-2.5 py-1.5">
+                        <span className="flex items-center gap-1 text-xs font-semibold">
+                          <GitBranch className="size-3 shrink-0" />
+                          {worktreeConfig.branch}
+                        </span>
+                        <span
+                          className="truncate font-mono text-[11px] text-muted-foreground"
+                          title={worktreeConfig.path}
+                        >
+                          {worktreeConfig.path.split(/[\\/]/).filter(Boolean).pop()}
+                        </span>
+                      </div>
+                      <CopyCmd cmd={`cd ${worktreeConfig.path}`} />
+                    </>
                   )}
 
                   {(() => {
@@ -552,7 +569,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
                   {isConfigured &&
                     (() => {
-                      const cleanupDone = worktreeConfig?.cleanupDone === true;
                       const commitPushStatus = worktreeConfig?.commitPushStatus;
                       const isCommitPushRunning =
                         commitPushStatus === "running" || commitPushSending;
@@ -560,62 +576,88 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       const isCommitPushError = commitPushStatus === "error";
                       return (
                         <div className="flex flex-col gap-1.5 border-t pt-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            type="button"
-                            disabled={cleanupSending}
-                            onClick={handleCleanup}
-                            className={cn(
-                              "w-full justify-start gap-2 text-xs",
-                              cleanupDone &&
-                                "border-state-completed/50 text-state-completed opacity-75",
-                            )}
-                          >
-                            <Brush className="size-3.5" />
-                            <span>
-                              {cleanupSending
-                                ? "Limpando…"
-                                : cleanupDone
-                                  ? "✓ Limpo"
-                                  : "Limpar"}
-                            </span>
-                          </Button>
-                          <CopyCmd cmd={`cd ${worktreeConfig.path}`} />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            type="button"
-                            disabled={!cleanupDone || isCommitPushRunning}
-                            onClick={handleCommitPush}
-                            title={
-                              !cleanupDone
-                                ? "Execute a limpeza antes de commitar"
-                                : isCommitPushError
-                                  ? worktreeConfig?.commitPushLastError
-                                  : undefined
-                            }
-                            className={cn(
-                              "w-full justify-start gap-2 text-xs",
-                              isCommitPushDone
-                                ? "border-state-completed/50 text-state-completed opacity-75"
-                                : isCommitPushError
-                                  ? "border-destructive/50 text-destructive opacity-75"
-                                  : cleanupDone &&
-                                    !isCommitPushRunning &&
-                                    "border-primary/60 text-primary",
-                            )}
-                          >
-                            <span>
-                              {isCommitPushRunning
-                                ? "Enviando…"
-                                : isCommitPushDone
-                                  ? "✓ Enviado"
+                          {(worktreeConfig?.status === "done" || worktreeConfig?.tlcExecStatus === "done") && (
+                            <div className="flex max-h-48 flex-col gap-0.5 overflow-y-auto rounded-md border bg-muted/30 p-1.5">
+                              {changedFiles === null ? (
+                                <span className="flex items-center gap-1 px-1 text-[11px] italic text-muted-foreground">
+                                  <Loader2 className="size-3 animate-spin" />
+                                  Carregando arquivos…
+                                </span>
+                              ) : changedFiles.length === 0 ? (
+                                <span className="px-1 text-[11px] italic text-muted-foreground">
+                                  Nenhum arquivo modificado.
+                                </span>
+                              ) : (
+                                changedFiles.map((file) => (
+                                  <div
+                                    key={file.path}
+                                    className="group flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted/60"
+                                  >
+                                    <span className="w-4 shrink-0 font-mono text-[10px] text-muted-foreground">
+                                      {file.status}
+                                    </span>
+                                    {file.isDir ? (
+                                      <span
+                                        className="flex min-w-0 flex-1 items-center gap-1 truncate font-mono text-[11px] text-muted-foreground"
+                                        title={file.path}
+                                      >
+                                        <FolderOpen className="size-3 shrink-0" />
+                                        {file.path}
+                                      </span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className={cn(
+                                          "min-w-0 flex-1 truncate text-left font-mono text-[11px] hover:underline",
+                                          file.status === "D" && "line-through opacity-60",
+                                        )}
+                                        title={file.path}
+                                        onClick={() => setFileContentModal(file.path)}
+                                      >
+                                        {file.path}
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100"
+                                      title="Excluir da worktree"
+                                      onClick={() => handleExcludeFile(file.path)}
+                                    >
+                                      <X className="size-3" />
+                                    </button>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          )}
+                          {(changedFiles?.length > 0 || isCommitPushRunning || isCommitPushDone || isCommitPushError) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              type="button"
+                              disabled={isCommitPushRunning}
+                              onClick={handleCommitPush}
+                              title={isCommitPushError ? worktreeConfig?.commitPushLastError : undefined}
+                              className={cn(
+                                "w-full justify-start gap-2 text-xs",
+                                isCommitPushDone
+                                  ? "border-state-completed/50 text-state-completed opacity-75"
                                   : isCommitPushError
-                                    ? "↺ Tentar"
-                                    : "Commit & Push"}
-                            </span>
-                          </Button>
+                                    ? "border-destructive/50 text-destructive opacity-75"
+                                    : !isCommitPushRunning && "border-primary/60 text-primary",
+                              )}
+                            >
+                              <span>
+                                {isCommitPushRunning
+                                  ? "Enviando…"
+                                  : isCommitPushDone
+                                    ? "✓ Enviado"
+                                    : isCommitPushError
+                                      ? "↺ Tentar"
+                                      : "Commit & Push"}
+                              </span>
+                            </Button>
+                          )}
                           {isCommitPushDone && (
                             <div className="flex flex-col gap-1">
                               <CopyCmd
@@ -716,6 +758,13 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
           worktreeId={worktreeId}
           type={tlcFileModal}
           onClose={() => setTlcFileModal(null)}
+        />
+      )}
+      {fileContentModal && (
+        <FileContentModal
+          worktreeId={worktreeId}
+          filePath={fileContentModal}
+          onClose={() => setFileContentModal(null)}
         />
       )}
     </>

@@ -117,6 +117,21 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
     await addWorktree(["-b", newBranch], base);
   }
 
+  // Write per-worktree excludes (not committed) so internal files never appear as changed
+  try {
+    const { stdout: gitDirRaw } = await execFileP(
+      "git", ["rev-parse", "--git-dir"],
+      { cwd: worktreeDir, timeout: 5_000 },
+    );
+    const infoDir = path.join(gitDirRaw.trim(), "info");
+    const excludeFile = path.join(infoDir, "exclude");
+    fs.mkdirSync(infoDir, { recursive: true });
+    const existing = fs.existsSync(excludeFile) ? fs.readFileSync(excludeFile, "utf8") : "";
+    const entries = [".gitkeep", "CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log", ".specs/"];
+    const toAdd = entries.filter((e) => !existing.includes(e));
+    if (toAdd.length) fs.appendFileSync(excludeFile, "\n" + toAdd.join("\n") + "\n");
+  } catch (_) {}
+
   registerWorktree({ owner, repo, branch: newBranch, cardNumber, repoDir, worktreeDir });
 
   return { repoDir, worktreeDir, cloned };

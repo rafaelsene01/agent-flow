@@ -9,6 +9,19 @@ import { scanTlcFeatures } from "./tlc.js";
 
 const execFileP  = promisify(execFile);
 const INTERNAL   = ["CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log"];
+const EXCLUDE_ENTRIES = [...INTERNAL, ".specs/"];
+
+async function ensureWorktreeExclude(wtPath) {
+  try {
+    const { stdout } = await execFileP("git", ["rev-parse", "--git-dir"], { cwd: wtPath, timeout: 5_000 });
+    const infoDir = path.join(stdout.trim(), "info");
+    const excludeFile = path.join(infoDir, "exclude");
+    fs.mkdirSync(infoDir, { recursive: true });
+    const existing = fs.existsSync(excludeFile) ? fs.readFileSync(excludeFile, "utf8") : "";
+    const toAdd = EXCLUDE_ENTRIES.filter((e) => !existing.includes(e));
+    if (toAdd.length) fs.appendFileSync(excludeFile, "\n" + toAdd.join("\n") + "\n");
+  } catch (_) {}
+}
 
 function buildCardLines({ title, number, body, branch }) {
   return [
@@ -277,6 +290,69 @@ export default function runnerRoutes(app) {
     res.json({ ok: true });
   });
 
+  app.get("/api/config/worktrees/:id/changed-files", async (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
+    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    try {
+      await ensureWorktreeExclude(wt.path);
+      const { stdout } = await execFileP("git", ["status", "--porcelain", "-uall"], { cwd: wt.path, timeout: 10_000 });
+      const files = stdout.trim().split("\n")
+        .filter(Boolean)
+        .map((line) => {
+          const filePath = line.slice(3);
+          const fullPath = path.resolve(wt.path, filePath);
+          const isDir = filePath.endsWith("/") || (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory());
+          return { status: line.slice(0, 2).trim(), path: filePath, isDir };
+        })
+      res.json({ files });
+    } catch (err) {
+      sendError(res, 500, err.message, err);
+    }
+  });
+
+  app.get("/api/config/worktrees/:id/file-content", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
+    const filePath = req.query.file;
+    if (!filePath) return sendError(res, 400, "file obrigatório");
+    const wtResolved = path.resolve(wt.path);
+    const fullPath = path.resolve(wt.path, filePath);
+    if (!fullPath.startsWith(wtResolved + path.sep) && fullPath !== wtResolved)
+      return sendError(res, 403, "Path não permitido");
+    if (!fs.existsSync(fullPath)) return res.json({ content: null });
+    try {
+      const content = fs.readFileSync(fullPath, "utf8");
+      res.json({ content });
+    } catch (err) {
+      sendError(res, 500, err.message, err);
+    }
+  });
+
+  app.delete("/api/config/worktrees/:id/file", async (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
+    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    const filePath = req.query.file;
+    if (!filePath) return sendError(res, 400, "file obrigatório");
+    const wtResolved = path.resolve(wt.path);
+    const fullPath = path.resolve(wt.path, filePath);
+    if (!fullPath.startsWith(wtResolved + path.sep) && fullPath !== wtResolved)
+      return sendError(res, 403, "Path não permitido");
+    try {
+      await execFileP("git", ["checkout", "HEAD", "--", filePath], { cwd: wt.path, timeout: 10_000 })
+        .catch(() => {
+          if (fs.existsSync(fullPath)) fs.rmSync(fullPath, { force: true });
+        });
+      res.json({ ok: true });
+    } catch (err) {
+      sendError(res, 500, err.message, err);
+    }
+  });
+
   app.post("/api/config/worktrees/:id/commit-push", (req, res) => {
     const id = decodeURIComponent(req.params.id);
 
@@ -292,6 +368,7 @@ export default function runnerRoutes(app) {
     res.json({ ok: true });
 
     (async () => {
+      await ensureWorktreeExclude(wt.path);
       try {
         await execFileP("git", ["add", "-A"], { cwd: wt.path, timeout: 30_000 });
       } catch (err) {
