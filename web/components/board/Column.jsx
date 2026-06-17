@@ -108,14 +108,20 @@ export default function Column({
       className="w-[280px] min-w-[260px] shrink-0 bg-card border rounded-xl flex flex-col max-h-[calc(100vh-90px)]"
       style={{ borderTop: `2px solid ${accentColor}` }}
     >
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b bg-muted/50 backdrop-blur-sm rounded-t-xl">
         <span className="text-sm font-medium flex-1 truncate" style={{ color: accentColor }}>
           {columnName}
         </span>
         {!loading && (
-          <Badge variant="secondary" className="text-xs">
-            {items.length}
-            {hasNextPage ? "+" : ""}
+          <Badge
+            className="border text-[11px] font-mono tabular-nums px-1.5 py-0"
+            style={{
+              background: `${accentColor}18`,
+              color: accentColor,
+              borderColor: `${accentColor}40`,
+            }}
+          >
+            {items.length}{hasNextPage ? "+" : ""}
           </Badge>
         )}
         <Button

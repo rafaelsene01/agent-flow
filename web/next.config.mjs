@@ -6,6 +6,7 @@ const isDev = process.env.NODE_ENV !== "production";
 
 /** @type {import('next').NextConfig} */
 const config = {
+  allowedDevOrigins: ["*.*", "*.*.*", "*.*.*.*"],
   output: isDev ? undefined : "export",
   distDir: "out",
   images: { unoptimized: true },

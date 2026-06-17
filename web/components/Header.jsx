@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export default function Header({ onSettings, onInitBoard, boards = [], activePath = "", onSelectBoard, onRemoveBoard, theme = "dark", onToggleTheme }) {
   return (
     <TooltipProvider>
-      <header className="sticky top-0 z-50 flex items-center gap-2 border-b bg-card px-3 py-1.5">
+      <header className="sticky top-0 z-50 flex items-center gap-2 border-b glass px-3 py-1.5">
         {/* Logo + title */}
         <div className="flex items-center gap-1.5 shrink-0">
           <span aria-label="logo" className="text-base leading-none select-none">🌸</span>

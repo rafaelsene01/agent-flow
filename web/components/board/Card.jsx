@@ -30,10 +30,10 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
         type="button"
         className={cn(
           "cursor-pointer flex flex-col gap-1.5 p-3 rounded-lg",
-          "transition hover:bg-muted hover:shadow-md hover:-translate-y-px text-left w-full",
+          "transition-all duration-200 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:shadow-card-hover hover:-translate-y-0.5 hover:bg-muted/30 text-left w-full",
           isRunning || hasBranch
             ? "bg-card border border-transparent"
-            : "bg-muted/40 border border-l-[3px] border-l-border",
+            : "bg-card border border-l-[3px] border-l-border shadow-card",
           !isRunning && isFinished && "card-branch-gold-inner"
         )}
         onClick={() => onOpen(item)}
