@@ -10,7 +10,7 @@ import InitBoardModal from "@/components/InitBoardModal.jsx";
 import EditBoardModal from "@/components/EditBoardModal.jsx";
 import Board from "@/components/board/Board.jsx";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, BrushCleaning, Plus } from "lucide-react";
 
 function navigate(path) {
   window.history.pushState(null, "", path);
@@ -181,7 +181,7 @@ function AppContent() {
                   await cleanupBoardData(activeBoard);
                 }}
               >
-                <Trash2 />
+                <BrushCleaning />
               </Button>
             </div>
           </div>
