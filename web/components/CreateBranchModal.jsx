@@ -94,9 +94,9 @@ export default function CreateBranchModal({ board, item, onClose }) {
       setNewBranch("");
       setNameError(null);
       setTimeout(onClose, 1200);
+      // creating permanece true até o modal fechar
     } catch (err) {
       setCreateError(err.message);
-    } finally {
       setCreating(false);
     }
   }

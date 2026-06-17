@@ -117,6 +117,13 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
     await addWorktree(["-b", newBranch], base);
   }
 
+  // Safety: if worktree ended up on the origin branch instead of the feature branch,
+  // create and checkout the feature branch now so commits/pushes go to the right place.
+  const currentBranch = await git(worktreeDir, ["branch", "--show-current"]);
+  if (currentBranch === originBranch) {
+    await git(worktreeDir, ["checkout", "-b", newBranch]);
+  }
+
   // Write per-worktree excludes (not committed) so internal files never appear as changed
   try {
     const { stdout: gitDirRaw } = await execFileP(

@@ -658,7 +658,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               </span>
                             </Button>
                           )}
-                          {isCommitPushDone && (
+                          {(isCommitPushDone || worktreeConfig?.status === "done" || worktreeConfig?.tlcExecStatus === "done") && (
                             <div className="flex flex-col gap-1">
                               <CopyCmd
                                 cmd={`git checkout ${worktreeConfig.branch}`}
