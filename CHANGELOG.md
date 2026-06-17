@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/rafaelsene01/agent-flow/compare/v1.2.3...v1.3.0) (2026-06-17)
+
+
+### Features
+
+* enhance UI components with new styles and configurations, including updated CSS variables, header glass effect, and improved button shadows ([8a56802](https://github.com/rafaelsene01/agent-flow/commit/8a568024811713b8da1b4af8441463d7de6b0364))
+
 ## [1.2.3](https://github.com/rafaelsene01/agent-flow/compare/v1.2.2...v1.2.3) (2026-06-15)
 
 
