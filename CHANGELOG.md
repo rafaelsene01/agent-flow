@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/rafaelsene01/agent-flow/compare/v1.6.0...v1.7.0) (2026-06-17)
+
+
+### Features
+
+* display card number in CreateBranchModal title ([85f5f5d](https://github.com/rafaelsene01/agent-flow/commit/85f5f5dd5d38a8f2286852d5684851c957a5565a))
+
 # [1.6.0](https://github.com/rafaelsene01/agent-flow/compare/v1.5.1...v1.6.0) (2026-06-17)
 
 
