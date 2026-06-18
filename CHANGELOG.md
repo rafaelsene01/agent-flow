@@ -1,3 +1,11 @@
+# [1.9.0](https://github.com/rafaelsene01/agent-flow/compare/v1.8.0...v1.9.0) (2026-06-18)
+
+
+### Features
+
+* add pull and behind count functionality for worktrees ([ff779be](https://github.com/rafaelsene01/agent-flow/commit/ff779be5878aac6f29e4bf2ddc2c9ae9bc1bb6dd))
+* enhance assignee display in Card and CardModal components ([cc24266](https://github.com/rafaelsene01/agent-flow/commit/cc24266e2f593a300bdf8c1acc553830916f7838))
+
 # [1.8.0](https://github.com/rafaelsene01/agent-flow/compare/v1.7.0...v1.8.0) (2026-06-17)
 
 
