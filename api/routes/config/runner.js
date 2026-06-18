@@ -429,13 +429,64 @@ export default function runnerRoutes(app) {
       }
 
       try {
-        await execFileP("git", ["push", "--no-verify"], { cwd: wt.path, timeout: 60_000 });
+        await execFileP("git", ["push", "--no-verify", "origin", `HEAD:${wt.branch}`], { cwd: wt.path, timeout: 60_000 });
       } catch (err) {
         updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `Push falhou: ${err.message}` });
         return;
       }
 
       updateWorktreeStatus(id, { commitPushStatus: "done" });
+    })();
+  });
+
+  app.get("/api/config/worktrees/:id/behind-count", async (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt)                     return sendError(res, 404, "Worktree não encontrado.");
+    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    try {
+      await execFileP("git", ["fetch", "origin", wt.branch], { cwd: wt.path, timeout: 30_000 });
+      const { stdout } = await execFileP(
+        "git", ["rev-list", "--count", "HEAD..FETCH_HEAD"],
+        { cwd: wt.path, timeout: 10_000 },
+      );
+      res.json({ behind: parseInt(stdout.trim(), 10) || 0 });
+    } catch {
+      res.json({ behind: 0 });
+    }
+  });
+
+  app.post("/api/config/worktrees/:id/pull", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt)                     return sendError(res, 404, "Worktree não encontrado.");
+    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+
+    updateWorktreeStatus(id, { pullStatus: "running", pullLastError: null });
+    res.json({ ok: true });
+
+    (async () => {
+      const sessionName = makeSessionName(wt);
+      const logStream = createRunLog(wt, "agent-flow.log");
+
+      const pullResult = await resumeClaude(
+        `Faça pull das alterações remotas do branch '${wt.branch}' (origin/${wt.branch}) para o branch local. ` +
+        `Use --no-verify onde necessário. Se houver conflitos de merge, resolva-os mantendo as alterações locais ` +
+        `quando fizer sentido e integrando as remotas. ` +
+        `Não faça commit nem push — deixe as alterações prontas para revisão.`,
+        wt.path,
+        logStream,
+        sessionName,
+      );
+
+      await new Promise((resolve) => logStream.end(resolve));
+
+      if (pullResult.code !== 0) {
+        updateWorktreeStatus(id, { pullStatus: "error", pullLastError: failureDetail(pullResult, logStream.persistPath) });
+        return;
+      }
+
+      updateWorktreeStatus(id, { pullStatus: "done" });
     })();
   });
 }

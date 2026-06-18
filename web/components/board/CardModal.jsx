@@ -9,6 +9,7 @@ import {
   FileText,
   FolderOpen,
   GitBranch,
+  GitPullRequest,
   ListChecks,
   Loader2,
   Palette,
@@ -25,6 +26,7 @@ import FileContentModal from "@/components/board/FileContentModal.jsx";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Separator } from "@/components/ui/separator.jsx";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.jsx";
 import { cn } from "@/lib/utils";
 
 const TYPE_LABEL = {
@@ -101,6 +103,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [tlcFiles, setTlcFiles] = useState(null); // { spec, design, tasks } from live scan
   const [changedFiles, setChangedFiles] = useState(null); // null=not loaded, array=loaded
   const [fileContentModal, setFileContentModal] = useState(null); // null | file path string
+  const [pullBehind, setPullBehind] = useState(null); // null=not checked, number=count
+  const [pullSending, setPullSending] = useState(false);
 
   useEffect(() => {
     fetch("/api/status")
@@ -136,6 +140,38 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
+  function loadBehindCount() {
+    if (!worktreeId) return;
+    setPullBehind(null);
+    fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/behind-count`)
+      .then((r) => r.json())
+      .then((d) => setPullBehind(d.behind ?? 0))
+      .catch(() => setPullBehind(0));
+  }
+
+  async function handlePull() {
+    setPullSending(true);
+    try {
+      await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/pull`,
+        { method: "POST" },
+      );
+      loadWorktreeConfig();
+      loadBehindCount();
+    } catch (err) {
+      console.error("[pull]", err);
+    } finally {
+      setPullSending(false);
+    }
+  }
+
+  useEffect(() => {
+    if (worktreeConfig?.pullStatus === "done") {
+      loadBehindCount();
+      loadChangedFiles();
+    }
+  }, [worktreeConfig?.pullStatus]);
+
   // Scan .specs/features/ whenever TLC is done so buttons reflect real disk state.
   useEffect(() => {
     if (worktreeConfig?.tlcStatus !== "done" || !worktreeId) return;
@@ -151,7 +187,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       worktreeConfig?.status === "running" ||
       worktreeConfig?.tlcStatus === "running" ||
       worktreeConfig?.tlcExecStatus === "running" ||
-      worktreeConfig?.commitPushStatus === "running";
+      worktreeConfig?.commitPushStatus === "running" ||
+      worktreeConfig?.pullStatus === "running";
     if (!anyRunning) return;
     const timer = setInterval(loadWorktreeConfig, 3000);
     return () => clearInterval(timer);
@@ -160,6 +197,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.tlcStatus,
     worktreeConfig?.tlcExecStatus,
     worktreeConfig?.commitPushStatus,
+    worktreeConfig?.pullStatus,
   ]);
 
   async function handleRunTlc() {
@@ -349,6 +387,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
               <div className="flex flex-col gap-2">
                 <SidebarLabel>Gatilhos</SidebarLabel>
                 <div className="flex flex-col gap-1.5">
+                  {/* ── Configurar Branch (inalterado) ── */}
                   <div className="flex gap-1.5">
                     <Button
                       variant="outline"
@@ -398,305 +437,290 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     </>
                   )}
 
-                  {(() => {
-                    const runStatus = worktreeConfig?.status;
-                    const isRunning = runStatus === "running" || specSending;
-                    const isDone = runStatus === "done";
-                    const isError = runStatus === "error";
-                    const isTlcRunning =
-                      worktreeConfig?.tlcStatus === "running" || tlcSending;
-                    return (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          type="button"
-                          disabled={!isConfigured || isRunning || isTlcRunning}
-                          onClick={handleRunSpec}
-                          className={cn(
-                            "w-full justify-start gap-2 text-xs",
-                            isDone &&
-                              "border-state-completed/50 text-state-completed opacity-75",
-                            isError &&
-                              "border-destructive/50 text-destructive opacity-75",
-                          )}
-                        >
-                          <Pencil className="size-3.5" />
-                          <span>Executar Tarefa</span>
-                          <span className="ml-auto text-xs">
-                            {isRunning
-                              ? "…"
-                              : isDone
-                                ? "✓"
-                                : isError
-                                  ? "↺"
-                                  : "▷"}
-                          </span>
-                        </Button>
-                        {isRunning && (
-                          <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
-                            <Loader2 className="size-3 shrink-0 animate-spin" />
-                            Executando em background…
-                          </span>
-                        )}
-                        {isDone && (
-                          <span className="text-[11px] text-state-completed">
-                            ✓ Concluído · clique para re-executar
-                          </span>
-                        )}
-                        {isError && worktreeConfig?.lastError && (
-                          <span
-                            className="block truncate text-[11px] text-destructive"
-                            title={worktreeConfig.lastError}
-                          >
-                            ✕ {worktreeConfig.lastError}
-                          </span>
-                        )}
-                      </>
-                    );
-                  })()}
+                  {/* ── Abas (só quando configurado) ── */}
+                  {isConfigured && (
+                    <Tabs
+                      defaultValue="exec"
+                      onValueChange={(val) => {
+                        if (val === "files") loadChangedFiles();
+                        if (val === "git") loadBehindCount();
+                      }}
+                      className="w-full mt-1"
+                    >
+                      <TabsList className="w-full grid grid-cols-3 h-8">
+                        <TabsTrigger value="exec" title="Executar" className="px-0">
+                          <Play className="size-3.5" />
+                        </TabsTrigger>
+                        <TabsTrigger value="git" title="Git" className="px-0">
+                          <GitBranch className="size-3.5" />
+                        </TabsTrigger>
+                        <TabsTrigger value="files" title="Arquivos alterados" className="px-0">
+                          <FolderOpen className="size-3.5" />
+                        </TabsTrigger>
+                      </TabsList>
 
-                  {/* ── TLC button ── */}
-                  {(() => {
-                    const tlcStatus = worktreeConfig?.tlcStatus;
-                    const isTlcRunning = tlcStatus === "running" || tlcSending;
-                    const isTlcDone = tlcStatus === "done";
-                    const isTlcError = tlcStatus === "error";
-                    const hasTlcSkill = claudeStatus?.tlcSkill ?? false;
-                    const isRunning =
-                      worktreeConfig?.status === "running" || specSending;
-                    return (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          type="button"
-                          disabled={
-                            !isConfigured ||
-                            !hasTlcSkill ||
-                            isTlcRunning ||
-                            isRunning
-                          }
-                          title={
-                            !hasTlcSkill
-                              ? "Skill tlc-spec-driven não instalada — configure nas Configurações"
-                              : undefined
-                          }
-                          onClick={handleRunTlc}
-                          className={cn(
-                            "w-full justify-start gap-2 text-xs",
-                            isTlcDone &&
-                              "border-state-completed/50 text-state-completed opacity-75",
-                            isTlcError &&
-                              "border-destructive/50 text-destructive opacity-75",
-                          )}
-                        >
-                          <Zap className="size-3.5" />
-                          <span>Executar TLC</span>
-                          <span className="ml-auto text-xs">
-                            {isTlcRunning
-                              ? "…"
-                              : isTlcDone
-                                ? "✓"
-                                : isTlcError
-                                  ? "↺"
-                                  : "▷"}
-                          </span>
-                        </Button>
-                        {isTlcRunning && (
-                          <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
-                            <Loader2 className="size-3 shrink-0 animate-spin" />
-                            Criando spec, design e tasks…
-                          </span>
-                        )}
-                        {isTlcError && worktreeConfig?.tlcLastError && (
-                          <span
-                            className="block truncate text-[11px] text-destructive"
-                            title={worktreeConfig.tlcLastError}
-                          >
-                            ✕ {worktreeConfig.tlcLastError}
-                          </span>
-                        )}
-                        {isTlcDone && (
-                          <>
-                            <div className="flex gap-1.5">
-                              {[
-                                { type: "spec", Icon: FileText, label: "Spec" },
-                                {
-                                  type: "design",
-                                  Icon: Palette,
-                                  label: "Design",
-                                },
-                                {
-                                  type: "tasks",
-                                  Icon: ListChecks,
-                                  label: "Tasks",
-                                },
-                              ].map(({ type, Icon, label }) => {
-                                const exists = tlcFiles?.[type] ?? false;
-                                return (
-                                  <Button
-                                    key={type}
-                                    variant="outline"
-                                    size="sm"
-                                    type="button"
-                                    disabled={!exists}
-                                    title={
-                                      !exists
-                                        ? `${label} não foi gerado`
-                                        : `Abrir ${label}`
-                                    }
-                                    onClick={() => setTlcFileModal(type)}
-                                    className={cn(
-                                      "flex-1 gap-1 text-xs",
-                                      exists &&
-                                        "border-state-completed/50 text-state-completed",
-                                    )}
-                                  >
-                                    <Icon className="size-3.5" />
-                                    <span>{label}</span>
-                                  </Button>
-                                );
-                              })}
-                            </div>
-
-                            {(() => {
-                              const execStatus = worktreeConfig?.tlcExecStatus;
-                              const isExecRunning =
-                                execStatus === "running" || tlcExecSending;
-                              const isExecDone = execStatus === "done";
-                              const isExecError = execStatus === "error";
-                              return (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    type="button"
-                                    disabled={isExecRunning}
-                                    onClick={handleRunTlcExec}
-                                    className={cn(
-                                      "w-full justify-start gap-2 text-xs",
-                                      isExecDone &&
-                                        "border-state-completed/50 text-state-completed opacity-75",
-                                      isExecError &&
-                                        "border-destructive/50 text-destructive opacity-75",
-                                    )}
-                                  >
-                                    <Play className="size-3.5" />
-                                    <span>Executar Spec</span>
-                                    <span className="ml-auto text-xs">
-                                      {isExecRunning
-                                        ? "…"
-                                        : isExecDone
-                                          ? "✓"
-                                          : isExecError
-                                            ? "↺"
-                                            : "▷"}
-                                    </span>
-                                  </Button>
-                                  {isExecRunning && (
-                                    <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
-                                      <Loader2 className="size-3 shrink-0 animate-spin" />
-                                      Implementando, commitando e fazendo push…
-                                    </span>
-                                  )}
-                                  {isExecDone && (
-                                    <span className="text-[11px] text-state-completed">
-                                      ✓ Concluído · clique para re-executar
-                                    </span>
-                                  )}
-                                  {isExecError &&
-                                    worktreeConfig?.tlcExecLastError && (
-                                      <span
-                                        className="block truncate text-[11px] text-destructive"
-                                        title={worktreeConfig.tlcExecLastError}
-                                      >
-                                        ✕ {worktreeConfig.tlcExecLastError}
-                                      </span>
-                                    )}
-                                </>
-                              );
-                            })()}
-                          </>
-                        )}
-                      </>
-                    );
-                  })()}
-
-                  {isConfigured &&
-                    (() => {
-                      const commitPushStatus = worktreeConfig?.commitPushStatus;
-                      const isCommitPushRunning =
-                        commitPushStatus === "running" || commitPushSending;
-                      const isCommitPushDone = commitPushStatus === "done";
-                      const isCommitPushError = commitPushStatus === "error";
-                      return (
-                        <div className="flex flex-col gap-1.5 border-t pt-2">
-                          {(worktreeConfig?.status === "done" || worktreeConfig?.tlcExecStatus === "done") && (
-                            <div className="flex max-h-48 flex-col gap-0.5 overflow-y-auto rounded-md border bg-muted/30 p-1.5">
-                              {changedFiles === null ? (
-                                <span className="flex items-center gap-1 px-1 text-[11px] italic text-muted-foreground">
-                                  <Loader2 className="size-3 animate-spin" />
-                                  Carregando arquivos…
+                      {/* ── Aba 1: Executar ── */}
+                      <TabsContent value="exec" className="flex flex-col gap-1.5 mt-2">
+                        {(() => {
+                          const runStatus = worktreeConfig?.status;
+                          const isRunning = runStatus === "running" || specSending;
+                          const isDone = runStatus === "done";
+                          const isError = runStatus === "error";
+                          const isTlcRunning =
+                            worktreeConfig?.tlcStatus === "running" || tlcSending;
+                          return (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                type="button"
+                                disabled={isRunning || isTlcRunning}
+                                onClick={handleRunSpec}
+                                className={cn(
+                                  "w-full justify-start gap-2 text-xs",
+                                  isDone &&
+                                    "border-state-completed/50 text-state-completed opacity-75",
+                                  isError &&
+                                    "border-destructive/50 text-destructive opacity-75",
+                                )}
+                              >
+                                <Pencil className="size-3.5" />
+                                <span>Executar Tarefa</span>
+                                <span className="ml-auto text-xs">
+                                  {isRunning
+                                    ? "…"
+                                    : isDone
+                                      ? "✓"
+                                      : isError
+                                        ? "↺"
+                                        : "▷"}
                                 </span>
-                              ) : changedFiles.length === 0 ? (
-                                <span className="px-1 text-[11px] italic text-muted-foreground">
-                                  Nenhum arquivo modificado.
+                              </Button>
+                              {isRunning && (
+                                <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
+                                  <Loader2 className="size-3 shrink-0 animate-spin" />
+                                  Executando em background…
                                 </span>
-                              ) : (
-                                changedFiles.map((file) => (
-                                  <div
-                                    key={file.path}
-                                    className="group flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted/60"
-                                  >
-                                    <span className="w-4 shrink-0 font-mono text-[10px] text-muted-foreground">
-                                      {file.status}
-                                    </span>
-                                    {file.isDir ? (
-                                      <span
-                                        className="flex min-w-0 flex-1 items-center gap-1 truncate font-mono text-[11px] text-muted-foreground"
-                                        title={file.path}
-                                      >
-                                        <FolderOpen className="size-3 shrink-0" />
-                                        {file.path}
-                                      </span>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        className={cn(
-                                          "min-w-0 flex-1 truncate text-left font-mono text-[11px] hover:underline",
-                                          file.status === "D" && "line-through opacity-60",
-                                        )}
-                                        title={file.path}
-                                        onClick={() => setFileContentModal(file.path)}
-                                      >
-                                        {file.path}
-                                      </button>
-                                    )}
-                                    <button
-                                      type="button"
-                                      className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100"
-                                      title="Descartar alterações"
-                                      onClick={() => handleExcludeFile(file.path)}
-                                    >
-                                      <X className="size-3" />
-                                    </button>
-                                  </div>
-                                ))
                               )}
-                            </div>
+                              {isDone && (
+                                <span className="text-[11px] text-state-completed">
+                                  ✓ Concluído · clique para re-executar
+                                </span>
+                              )}
+                              {isError && worktreeConfig?.lastError && (
+                                <span
+                                  className="block truncate text-[11px] text-destructive"
+                                  title={worktreeConfig.lastError}
+                                >
+                                  ✕ {worktreeConfig.lastError}
+                                </span>
+                              )}
+                            </>
+                          );
+                        })()}
+
+                        {(() => {
+                          const tlcStatus = worktreeConfig?.tlcStatus;
+                          const isTlcRunning = tlcStatus === "running" || tlcSending;
+                          const isTlcDone = tlcStatus === "done";
+                          const isTlcError = tlcStatus === "error";
+                          const hasTlcSkill = claudeStatus?.tlcSkill ?? false;
+                          const isRunning =
+                            worktreeConfig?.status === "running" || specSending;
+                          return (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                type="button"
+                                disabled={!hasTlcSkill || isTlcRunning || isRunning}
+                                title={
+                                  !hasTlcSkill
+                                    ? "Skill tlc-spec-driven não instalada — configure nas Configurações"
+                                    : undefined
+                                }
+                                onClick={handleRunTlc}
+                                className={cn(
+                                  "w-full justify-start gap-2 text-xs",
+                                  isTlcDone &&
+                                    "border-state-completed/50 text-state-completed opacity-75",
+                                  isTlcError &&
+                                    "border-destructive/50 text-destructive opacity-75",
+                                )}
+                              >
+                                <Zap className="size-3.5" />
+                                <span>Executar TLC</span>
+                                <span className="ml-auto text-xs">
+                                  {isTlcRunning
+                                    ? "…"
+                                    : isTlcDone
+                                      ? "✓"
+                                      : isTlcError
+                                        ? "↺"
+                                        : "▷"}
+                                </span>
+                              </Button>
+                              {isTlcRunning && (
+                                <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
+                                  <Loader2 className="size-3 shrink-0 animate-spin" />
+                                  Criando spec, design e tasks…
+                                </span>
+                              )}
+                              {isTlcError && worktreeConfig?.tlcLastError && (
+                                <span
+                                  className="block truncate text-[11px] text-destructive"
+                                  title={worktreeConfig.tlcLastError}
+                                >
+                                  ✕ {worktreeConfig.tlcLastError}
+                                </span>
+                              )}
+                              {isTlcDone && (
+                                <>
+                                  <div className="flex gap-1.5">
+                                    {[
+                                      { type: "spec", Icon: FileText, label: "Spec" },
+                                      { type: "design", Icon: Palette, label: "Design" },
+                                      { type: "tasks", Icon: ListChecks, label: "Tasks" },
+                                    ].map(({ type, Icon, label }) => {
+                                      const exists = tlcFiles?.[type] ?? false;
+                                      return (
+                                        <Button
+                                          key={type}
+                                          variant="outline"
+                                          size="sm"
+                                          type="button"
+                                          disabled={!exists}
+                                          title={
+                                            !exists
+                                              ? `${label} não foi gerado`
+                                              : `Abrir ${label}`
+                                          }
+                                          onClick={() => setTlcFileModal(type)}
+                                          className={cn(
+                                            "flex-1 gap-1 text-xs",
+                                            exists &&
+                                              "border-state-completed/50 text-state-completed",
+                                          )}
+                                        >
+                                          <Icon className="size-3.5" />
+                                          <span>{label}</span>
+                                        </Button>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {(() => {
+                                    const execStatus = worktreeConfig?.tlcExecStatus;
+                                    const isExecRunning =
+                                      execStatus === "running" || tlcExecSending;
+                                    const isExecDone = execStatus === "done";
+                                    const isExecError = execStatus === "error";
+                                    return (
+                                      <>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          type="button"
+                                          disabled={isExecRunning}
+                                          onClick={handleRunTlcExec}
+                                          className={cn(
+                                            "w-full justify-start gap-2 text-xs",
+                                            isExecDone &&
+                                              "border-state-completed/50 text-state-completed opacity-75",
+                                            isExecError &&
+                                              "border-destructive/50 text-destructive opacity-75",
+                                          )}
+                                        >
+                                          <Play className="size-3.5" />
+                                          <span>Executar Spec</span>
+                                          <span className="ml-auto text-xs">
+                                            {isExecRunning
+                                              ? "…"
+                                              : isExecDone
+                                                ? "✓"
+                                                : isExecError
+                                                  ? "↺"
+                                                  : "▷"}
+                                          </span>
+                                        </Button>
+                                        {isExecRunning && (
+                                          <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
+                                            <Loader2 className="size-3 shrink-0 animate-spin" />
+                                            Implementando, commitando e fazendo push…
+                                          </span>
+                                        )}
+                                        {isExecDone && (
+                                          <span className="text-[11px] text-state-completed">
+                                            ✓ Concluído · clique para re-executar
+                                          </span>
+                                        )}
+                                        {isExecError &&
+                                          worktreeConfig?.tlcExecLastError && (
+                                            <span
+                                              className="block truncate text-[11px] text-destructive"
+                                              title={worktreeConfig.tlcExecLastError}
+                                            >
+                                              ✕ {worktreeConfig.tlcExecLastError}
+                                            </span>
+                                          )}
+                                      </>
+                                    );
+                                  })()}
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </TabsContent>
+
+                      {/* ── Aba 2: Git ── */}
+                      <TabsContent value="git" className="flex flex-col gap-1.5 mt-2">
+                        {/* Pull */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          disabled={pullBehind === null || pullBehind === 0 || pullSending || worktreeConfig?.pullStatus === "running"}
+                          onClick={handlePull}
+                          className="w-full justify-start gap-2 text-xs"
+                        >
+                          <GitPullRequest className="size-3.5" />
+                          <span>
+                            {pullSending || worktreeConfig?.pullStatus === "running"
+                              ? "Sincronizando…"
+                              : pullBehind === null
+                                ? "Verificando…"
+                                : pullBehind > 0
+                                  ? `Pull (${pullBehind} commit${pullBehind > 1 ? "s" : ""})`
+                                  : "Pull (atualizado)"}
+                          </span>
+                          {(pullSending || worktreeConfig?.pullStatus === "running") && (
+                            <Loader2 className="ml-auto size-3 animate-spin" />
                           )}
-                          {(changedFiles?.length > 0 || isCommitPushRunning || isCommitPushDone || isCommitPushError) && (
+                        </Button>
+
+                        {(() => {
+                          const commitPushStatus = worktreeConfig?.commitPushStatus;
+                          const isCommitPushRunning =
+                            commitPushStatus === "running" || commitPushSending;
+                          const isCommitPushDone = commitPushStatus === "done";
+                          const isCommitPushError = commitPushStatus === "error";
+                          const hasFiles = changedFiles?.length > 0;
+                          return (
                             <Button
                               variant="outline"
                               size="sm"
                               type="button"
-                              disabled={isCommitPushRunning}
+                              disabled={isCommitPushRunning || !hasFiles}
                               onClick={handleCommitPush}
-                              title={isCommitPushError ? worktreeConfig?.commitPushLastError : undefined}
+                              title={
+                                isCommitPushError
+                                  ? worktreeConfig?.commitPushLastError
+                                  : undefined
+                              }
                               className={cn(
                                 "w-full justify-start gap-2 text-xs",
-                                isCommitPushDone
+                                !hasFiles && isCommitPushDone
                                   ? "border-state-completed/50 text-state-completed opacity-75"
                                   : isCommitPushError
                                     ? "border-destructive/50 text-destructive opacity-75"
@@ -706,35 +730,84 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               <span>
                                 {isCommitPushRunning
                                   ? "Enviando…"
-                                  : isCommitPushDone
-                                    ? "✓ Enviado"
-                                    : isCommitPushError
-                                      ? "↺ Tentar"
+                                  : isCommitPushError
+                                    ? "↺ Tentar"
+                                    : !hasFiles && isCommitPushDone
+                                      ? "✓ Enviado"
                                       : "Commit & Push"}
                               </span>
                             </Button>
-                          )}
-                          {(isCommitPushDone || worktreeConfig?.status === "done" || worktreeConfig?.tlcExecStatus === "done") && (
-                            <div className="flex flex-col gap-1">
-                              <CopyCmd
-                                cmd={`git checkout ${worktreeConfig.branch}`}
-                              />
-                              <CopyCmd cmd={`git fetch origin`} />
-                              <CopyCmd
-                                cmd={`git reset --hard origin/${worktreeConfig.branch}`}
-                              />
-                              <CopyCmd cmd="git reset --soft HEAD~1" />
-                              <CopyCmd cmd="git reset" />
-                              <CopyCmd cmd="git add ." />
-                              <CopyCmd cmd='git commit -m "message"' />
-                              <CopyCmd
-                                cmd={`git push --force-with-lease origin ${worktreeConfig.branch}`}
-                              />
-                            </div>
+                          );
+                        })()}
+                        <div className="flex flex-col gap-1 mt-0.5">
+                          <CopyCmd cmd={`git checkout ${worktreeConfig.branch}`} />
+                          <CopyCmd cmd={`git fetch origin`} />
+                          <CopyCmd cmd={`git reset --hard origin/${worktreeConfig.branch}`} />
+                          <CopyCmd cmd="git reset --soft HEAD~1" />
+                          <CopyCmd cmd="git reset" />
+                          <CopyCmd cmd="git add ." />
+                          <CopyCmd cmd='git commit -m "message"' />
+                          <CopyCmd cmd={`git push --force-with-lease origin ${worktreeConfig.branch}`} />
+                        </div>
+                      </TabsContent>
+
+                      {/* ── Aba 3: Arquivos alterados ── */}
+                      <TabsContent value="files" className="flex flex-col gap-1.5 mt-2">
+                        <div className="flex flex-col gap-0.5 overflow-y-auto rounded-md border bg-muted/30 p-1.5" style={{ maxHeight: "calc(88vh - 14rem)" }}>
+                          {changedFiles === null ? (
+                            <span className="flex items-center gap-1 px-1 text-[11px] italic text-muted-foreground">
+                              <Loader2 className="size-3 animate-spin" />
+                              Carregando arquivos…
+                            </span>
+                          ) : changedFiles.length === 0 ? (
+                            <span className="px-1 text-[11px] italic text-muted-foreground">
+                              Nenhum arquivo modificado.
+                            </span>
+                          ) : (
+                            changedFiles.map((file) => (
+                              <div
+                                key={file.path}
+                                className="group flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted/60"
+                              >
+                                <span className="w-4 shrink-0 font-mono text-[10px] text-muted-foreground">
+                                  {file.status}
+                                </span>
+                                {file.isDir ? (
+                                  <span
+                                    className="flex min-w-0 flex-1 items-center gap-1 truncate font-mono text-[11px] text-muted-foreground"
+                                    title={file.path}
+                                  >
+                                    <FolderOpen className="size-3 shrink-0" />
+                                    {file.path}
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className={cn(
+                                      "min-w-0 flex-1 truncate text-left font-mono text-[11px] hover:underline",
+                                      file.status === "D" && "line-through opacity-60",
+                                    )}
+                                    title={file.path}
+                                    onClick={() => setFileContentModal(file.path)}
+                                  >
+                                    {file.path}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100"
+                                  title="Descartar alterações"
+                                  onClick={() => handleExcludeFile(file.path)}
+                                >
+                                  <X className="size-3" />
+                                </button>
+                              </div>
+                            ))
                           )}
                         </div>
-                      );
-                    })()}
+                      </TabsContent>
+                    </Tabs>
+                  )}
                 </div>
               </div>
 
