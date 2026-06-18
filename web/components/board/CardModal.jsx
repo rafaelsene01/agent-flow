@@ -34,6 +34,29 @@ const TYPE_LABEL = {
 };
 
 
+function Assignee({ login, avatarUrl, size = "size-6" }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  return (
+    <div
+      title={`@${login}`}
+      className={`${size} rounded-full border-2 border-background overflow-hidden bg-muted flex items-center justify-center shrink-0`}
+    >
+      {avatarUrl && !imgFailed ? (
+        <img
+          src={avatarUrl}
+          alt={login}
+          className="size-full object-cover"
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <span className="text-[10px] font-semibold uppercase text-muted-foreground leading-none">
+          {login[0]}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function SidebarLabel({ children }) {
   return (
     <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -257,11 +280,44 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             {/* ── main ── */}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               <div className="flex shrink-0 flex-col gap-2.5 px-6 pt-5 pb-3">
-                {item.number != null && (
-                  <span className="font-mono text-xs text-muted-foreground">
-                    #{item.number}
-                  </span>
-                )}
+                <div className="flex items-center justify-between">
+                  {item.number != null ? (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      #{item.number}
+                    </span>
+                  ) : (
+                    <span />
+                  )}
+                  <div className="flex items-center gap-2">
+                    {item.assignees?.length > 0 && (
+                      <div className="flex items-center -space-x-1.5">
+                        {item.assignees.map((a) => {
+                          const login = typeof a === "string" ? a : a?.login;
+                          const avatarUrl = typeof a === "string" ? null : a?.avatarUrl;
+                          if (!login) return null;
+                          return <Assignee key={login} login={login} avatarUrl={avatarUrl} size="size-6" />;
+                        })}
+                      </div>
+                    )}
+                    {item.labels?.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {item.labels.map((l) => (
+                          <span
+                            key={l.name}
+                            className="rounded-full border px-2 py-px text-[11px]"
+                            style={{
+                              background: `#${l.color}22`,
+                              color: `#${l.color}`,
+                              borderColor: `#${l.color}55`,
+                            }}
+                          >
+                            {l.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <DialogTitle className="text-xl font-semibold leading-snug">
                   {item.title}
                 </DialogTitle>
@@ -680,48 +736,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       );
                     })()}
                 </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <SidebarLabel>Assignees</SidebarLabel>
-                {item.assignees.length > 0 ? (
-                  <div className="flex flex-col gap-1">
-                    {item.assignees.map((a) => (
-                      <span key={a} className="text-xs text-muted-foreground">
-                        @{a}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-xs italic text-muted-foreground">
-                    Nenhum
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <SidebarLabel>Labels</SidebarLabel>
-                {item.labels.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {item.labels.map((l) => (
-                      <span
-                        key={l.name}
-                        className="rounded-full border px-2 py-px text-[11px]"
-                        style={{
-                          background: `#${l.color}22`,
-                          color: `#${l.color}`,
-                          borderColor: `#${l.color}55`,
-                        }}
-                      >
-                        {l.name}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-xs italic text-muted-foreground">
-                    Nenhum
-                  </span>
-                )}
               </div>
 
               {item.itemType && (

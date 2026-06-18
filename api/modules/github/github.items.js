@@ -12,13 +12,13 @@ const ITEMS_QUERY = `query($id: ID!, $first: Int!, $after: String) {
             ... on Issue {
               title number body
               repository { nameWithOwner }
-              assignees(first: 3) { nodes { login } }
+              assignees(first: 3) { nodes { login avatarUrl } }
               labels(first: 20) { nodes { name color } }
             }
             ... on PullRequest {
               title number body
               repository { nameWithOwner }
-              assignees(first: 3) { nodes { login } }
+              assignees(first: 3) { nodes { login avatarUrl } }
               labels(first: 20) { nodes { name color } }
             }
             ... on DraftIssue { title body }
@@ -59,7 +59,7 @@ function parseItems(raw) {
       title:          content.title ?? "(sem título)",
       number:         content.number ?? null,
       body:           content.body ?? null,
-      assignees:      (content.assignees?.nodes ?? []).map((a) => a.login),
+      assignees:      (content.assignees?.nodes ?? []).map((a) => ({ login: a.login, avatarUrl: a.avatarUrl ?? null })),
       labels:         (content.labels?.nodes ?? []).map((l) => ({ name: l.name, color: l.color })),
       // campos usados apenas no servidor para filtragem — removidos antes de enviar ao cliente
       _repoName:       content.repository?.nameWithOwner ?? null,

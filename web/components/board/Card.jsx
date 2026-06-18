@@ -1,7 +1,31 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+
+function Assignee({ login, avatarUrl }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  return (
+    <div
+      title={`@${login}`}
+      className="size-5 rounded-full border-2 border-background overflow-hidden bg-muted flex items-center justify-center shrink-0"
+    >
+      {avatarUrl && !imgFailed ? (
+        <img
+          src={avatarUrl}
+          alt={login}
+          className="size-full object-cover"
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <span className="text-[9px] font-semibold uppercase text-muted-foreground leading-none">
+          {login[0]}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function Card({ item, onOpen, worktrees = [], originRepo = null }) {
   const worktreeId =
@@ -72,10 +96,13 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
           </div>
         )}
         {item.assignees.length > 0 && (
-          <div className="mt-0.5">
-            <span className="text-xs text-muted-foreground">
-              {item.assignees.join(", ")}
-            </span>
+          <div className="mt-0.5 flex items-center -space-x-1.5">
+            {item.assignees.map((a) => {
+              const login = typeof a === "string" ? a : a?.login;
+              const avatarUrl = typeof a === "string" ? null : a?.avatarUrl;
+              if (!login) return null;
+              return <Assignee key={login} login={login} avatarUrl={avatarUrl} />;
+            })}
           </div>
         )}
       </button>
