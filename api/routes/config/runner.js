@@ -489,6 +489,10 @@ export default function runnerRoutes(app) {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    // Em dev o frontend (porta 3001) conecta direto aqui (porta 5522) para evitar
+    // o buffering do proxy do next dev. Em produção é mesma origem.
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.flushHeaders();
 
     const cleanup = registerSseClient(id, res);

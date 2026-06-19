@@ -107,9 +107,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [pullBehind, setPullBehind] = useState(null); // null=not checked, number=count
   const [pullSending, setPullSending] = useState(false);
   const [errorModal, setErrorModal] = useState(null); // null | string
-  const [logLines, setLogLines] = useState([]);
+  const [logText, setLogText] = useState("");
   const [mainTab, setMainTab] = useState("desc");
   const logRef = useRef(null);
+  const prevAnyRunningRef = useRef(null);
 
   useEffect(() => {
     fetch("/api/status")
@@ -177,37 +178,47 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }, [worktreeConfig?.pullStatus]);
 
-  // Stream logs via SSE while a run is active
+  const anyRunning =
+    worktreeConfig?.status === "running" ||
+    worktreeConfig?.tlcStatus === "running" ||
+    worktreeConfig?.tlcExecStatus === "running" ||
+    worktreeConfig?.commitPushStatus === "running" ||
+    worktreeConfig?.pullStatus === "running";
+
+  // Conecta SSE ao abrir o card e reconecta quando um novo run inicia
   useEffect(() => {
-    const logRunning =
-      worktreeConfig?.status === "running" ||
-      worktreeConfig?.tlcStatus === "running" ||
-      worktreeConfig?.tlcExecStatus === "running" ||
-      worktreeConfig?.commitPushStatus === "running" ||
-      worktreeConfig?.pullStatus === "running";
+    if (!worktreeId || !isConfigured) return;
 
-    if (!logRunning || !worktreeId) return;
+    const wasRunning = prevAnyRunningRef.current;
+    prevAnyRunningRef.current = anyRunning;
 
-    setLogLines([]);
+    // Conecta na primeira abertura (wasRunning === null) ou quando run inicia
+    const newRunStarted = anyRunning && !wasRunning;
+    if (wasRunning !== null && !newRunStarted) return;
+
+    if (anyRunning) setLogText("");
+
+    // Em dev conecta direto no backend (5522) para evitar o buffering do proxy
+    // do next dev, que segura o stream SSE. Em produção é mesma origem.
+    const base =
+      process.env.NODE_ENV === "development" ? "http://localhost:5522" : "";
     const es = new EventSource(
-      `/api/config/worktrees/${encodeURIComponent(worktreeId)}/log/stream`,
+      `${base}/api/config/worktrees/${encodeURIComponent(worktreeId)}/log/stream`,
     );
     es.onmessage = (e) => {
-      const incoming = e.data.split("\n");
-      setLogLines((prev) => [...prev, ...incoming]);
+      setLogText((prev) => prev + e.data + "\n");
     };
     es.addEventListener("done", () => es.close());
-    es.onerror = () => es.close();
     return () => es.close();
-  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus, worktreeId]);
+  }, [isConfigured, worktreeId, anyRunning]);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [logLines]);
+  }, [logText]);
 
   useEffect(() => {
-    if (logLines.length === 1) setMainTab("logs");
-  }, [logLines.length]);
+    if (logText) setMainTab((t) => (t === "desc" ? "logs" : t));
+  }, [!!logText]);
 
   // Scan .specs/features/ whenever TLC is done so buttons reflect real disk state.
   useEffect(() => {
@@ -220,12 +231,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
   // Poll while any background job is running
   useEffect(() => {
-    const anyRunning =
-      worktreeConfig?.status === "running" ||
-      worktreeConfig?.tlcStatus === "running" ||
-      worktreeConfig?.tlcExecStatus === "running" ||
-      worktreeConfig?.commitPushStatus === "running" ||
-      worktreeConfig?.pullStatus === "running";
     if (!anyRunning) return;
     const timer = setInterval(loadWorktreeConfig, 3000);
     return () => clearInterval(timer);
@@ -410,7 +415,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   >
                     Descrição
                   </button>
-                  {logLines.length > 0 && (
+                  {logText && (
                     <button
                       type="button"
                       onClick={() => setMainTab("logs")}
@@ -422,27 +427,21 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       )}
                     >
                       Logs
-                      {(worktreeConfig?.status === "running" ||
-                        worktreeConfig?.tlcStatus === "running" ||
-                        worktreeConfig?.tlcExecStatus === "running" ||
-                        worktreeConfig?.commitPushStatus === "running" ||
-                        worktreeConfig?.pullStatus === "running") && (
+                      {anyRunning && (
                         <span className="inline-block size-1.5 rounded-full bg-green-500 animate-pulse" />
                       )}
                     </button>
                   )}
                 </div>
               </div>
-              {mainTab === "logs" && logLines.length > 0 ? (
+              {mainTab === "logs" && logText ? (
                 <div
                   ref={logRef}
-                  className="min-h-0 flex-1 overflow-y-auto bg-zinc-950 px-4 py-3 font-mono text-[11px] leading-relaxed text-green-400/90"
+                  className="min-h-0 flex-1 overflow-y-auto bg-zinc-950 px-4 py-3"
                 >
-                  {logLines.map((line, i) => (
-                    <div key={i} className="whitespace-pre-wrap break-all min-h-[1.2em]">
-                      {line}
-                    </div>
-                  ))}
+                  <pre className="font-mono text-[11px] leading-relaxed text-green-400/90 whitespace-pre-wrap break-all">
+                    {logText}
+                  </pre>
                 </div>
               ) : (
                 <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5">
