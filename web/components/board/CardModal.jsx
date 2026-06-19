@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
 import {
+  AlertTriangle,
   FileText,
   FolderOpen,
   GitBranch,
@@ -105,6 +106,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [fileContentModal, setFileContentModal] = useState(null); // null | file path string
   const [pullBehind, setPullBehind] = useState(null); // null=not checked, number=count
   const [pullSending, setPullSending] = useState(false);
+  const [errorModal, setErrorModal] = useState(null); // null | string
+  const [logLines, setLogLines] = useState([]);
+  const [mainTab, setMainTab] = useState("desc");
+  const logRef = useRef(null);
 
   useEffect(() => {
     fetch("/api/status")
@@ -171,6 +176,38 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       loadChangedFiles();
     }
   }, [worktreeConfig?.pullStatus]);
+
+  // Stream logs via SSE while a run is active
+  useEffect(() => {
+    const logRunning =
+      worktreeConfig?.status === "running" ||
+      worktreeConfig?.tlcStatus === "running" ||
+      worktreeConfig?.tlcExecStatus === "running" ||
+      worktreeConfig?.commitPushStatus === "running" ||
+      worktreeConfig?.pullStatus === "running";
+
+    if (!logRunning || !worktreeId) return;
+
+    setLogLines([]);
+    const es = new EventSource(
+      `/api/config/worktrees/${encodeURIComponent(worktreeId)}/log/stream`,
+    );
+    es.onmessage = (e) => {
+      const incoming = e.data.split("\n");
+      setLogLines((prev) => [...prev, ...incoming]);
+    };
+    es.addEventListener("done", () => es.close());
+    es.onerror = () => es.close();
+    return () => es.close();
+  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus, worktreeId]);
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [logLines]);
+
+  useEffect(() => {
+    if (logLines.length === 1) setMainTab("logs");
+  }, [logLines.length]);
 
   // Scan .specs/features/ whenever TLC is done so buttons reflect real disk state.
   useEffect(() => {
@@ -312,9 +349,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       >
         <DialogContent
           aria-describedby={undefined}
-          className="w-full sm:max-w-[calc(100%-2rem)] max-h-[88vh] gap-0 overflow-hidden p-0"
+          className="w-full sm:max-w-[calc(100%-2rem)] h-[80vh] gap-0 overflow-hidden p-0"
         >
-          <div className="flex max-h-[88vh] min-h-0">
+          <div className="flex h-full min-h-0">
             {/* ── main ── */}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               <div className="flex shrink-0 flex-col gap-2.5 px-6 pt-5 pb-3">
@@ -360,26 +397,71 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   {item.title}
                 </DialogTitle>
                 <Separator />
-                <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Descrição
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setMainTab("desc")}
+                    className={cn(
+                      "text-[11px] font-bold uppercase tracking-wider transition-colors",
+                      mainTab === "desc"
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    Descrição
+                  </button>
+                  {logLines.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setMainTab("logs")}
+                      className={cn(
+                        "flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors",
+                        mainTab === "logs"
+                          ? "text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      Logs
+                      {(worktreeConfig?.status === "running" ||
+                        worktreeConfig?.tlcStatus === "running" ||
+                        worktreeConfig?.tlcExecStatus === "running" ||
+                        worktreeConfig?.commitPushStatus === "running" ||
+                        worktreeConfig?.pullStatus === "running") && (
+                        <span className="inline-block size-1.5 rounded-full bg-green-500 animate-pulse" />
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5">
-                {item.body ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[[rehypeHighlight, { detect: false }]]}
-                    >
-                      {item.body}
-                    </ReactMarkdown>
-                  </div>
-                ) : (
-                  <p className="text-sm italic text-muted-foreground">
-                    Sem descrição.
-                  </p>
-                )}
-              </div>
+              {mainTab === "logs" && logLines.length > 0 ? (
+                <div
+                  ref={logRef}
+                  className="min-h-0 flex-1 overflow-y-auto bg-zinc-950 px-4 py-3 font-mono text-[11px] leading-relaxed text-green-400/90"
+                >
+                  {logLines.map((line, i) => (
+                    <div key={i} className="whitespace-pre-wrap break-all min-h-[1.2em]">
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5">
+                  {item.body ? (
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[[rehypeHighlight, { detect: false }]]}
+                      >
+                        {item.body}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="text-sm italic text-muted-foreground">
+                      Sem descrição.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* ── sidebar ── */}
@@ -508,12 +590,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 </span>
                               )}
                               {isError && worktreeConfig?.lastError && (
-                                <span
-                                  className="block truncate text-[11px] text-destructive"
-                                  title={worktreeConfig.lastError}
+                                <button
+                                  type="button"
+                                  onClick={() => setErrorModal(worktreeConfig.lastError)}
+                                  className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
                                 >
-                                  ✕ {worktreeConfig.lastError}
-                                </span>
+                                  <AlertTriangle className="size-3 shrink-0" />
+                                  <span className="truncate">{worktreeConfig.lastError}</span>
+                                </button>
                               )}
                             </>
                           );
@@ -567,12 +651,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 </span>
                               )}
                               {isTlcError && worktreeConfig?.tlcLastError && (
-                                <span
-                                  className="block truncate text-[11px] text-destructive"
-                                  title={worktreeConfig.tlcLastError}
+                                <button
+                                  type="button"
+                                  onClick={() => setErrorModal(worktreeConfig.tlcLastError)}
+                                  className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
                                 >
-                                  ✕ {worktreeConfig.tlcLastError}
-                                </span>
+                                  <AlertTriangle className="size-3 shrink-0" />
+                                  <span className="truncate">{worktreeConfig.tlcLastError}</span>
+                                </button>
                               )}
                               {isTlcDone && (
                                 <>
@@ -656,12 +742,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                         )}
                                         {isExecError &&
                                           worktreeConfig?.tlcExecLastError && (
-                                            <span
-                                              className="block truncate text-[11px] text-destructive"
-                                              title={worktreeConfig.tlcExecLastError}
+                                            <button
+                                              type="button"
+                                              onClick={() => setErrorModal(worktreeConfig.tlcExecLastError)}
+                                              className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
                                             >
-                                              ✕ {worktreeConfig.tlcExecLastError}
-                                            </span>
+                                              <AlertTriangle className="size-3 shrink-0" />
+                                              <span className="truncate">{worktreeConfig.tlcExecLastError}</span>
+                                            </button>
                                           )}
                                       </>
                                     );
@@ -753,7 +841,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
                       {/* ── Aba 3: Arquivos alterados ── */}
                       <TabsContent value="files" className="flex flex-col gap-1.5 mt-2">
-                        <div className="flex flex-col gap-0.5 overflow-y-auto rounded-md border bg-muted/30 p-1.5" style={{ maxHeight: "calc(88vh - 14rem)" }}>
+                        <div className="flex flex-col gap-0.5 overflow-y-auto rounded-md border bg-muted/30 p-1.5" style={{ maxHeight: "calc(80vh - 14rem)" }}>
                           {changedFiles === null ? (
                             <span className="flex items-center gap-1 px-1 text-[11px] italic text-muted-foreground">
                               <Loader2 className="size-3 animate-spin" />
@@ -853,6 +941,26 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
           filePath={fileContentModal}
           onClose={() => setFileContentModal(null)}
         />
+      )}
+      {errorModal && (
+        <Dialog open onOpenChange={(o) => { if (!o) setErrorModal(null); }}>
+          <DialogContent
+            aria-describedby={undefined}
+            className="w-full sm:max-w-lg max-h-[70vh] flex flex-col gap-0 overflow-hidden p-0"
+          >
+            <div className="flex items-center gap-2 border-b px-5 py-4 shrink-0">
+              <AlertTriangle className="size-4 text-destructive shrink-0" />
+              <DialogTitle className="text-sm font-semibold text-destructive">
+                Detalhes do erro
+              </DialogTitle>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-foreground">
+                {errorModal}
+              </pre>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );

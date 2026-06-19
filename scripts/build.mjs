@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { rmSync, cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
+import { rmSync, cpSync, mkdirSync, readFileSync, writeFileSync, chmodSync, existsSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { rolldown } from "rolldown";
@@ -53,6 +53,7 @@ const obfuscated = JavaScriptObfuscator.obfuscate(code, {
   stringArrayEncoding: ["base64"],
 }).getObfuscatedCode();
 writeFileSync(OUTFILE, shebang + obfuscated);
+chmodSync(OUTFILE, 0o755);
 
 console.log("► Copiando web/out → dist/web");
 cpSync(path.join(ROOT, "web", "out"), path.join(DIST, "web"), { recursive: true });

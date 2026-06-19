@@ -6,8 +6,10 @@ const APP_DIR     = path.join(os.homedir(), ".agent-flow");
 const CONFIG_FILE = path.join(APP_DIR, "config.json");
 
 const DEFAULTS = {
-  projectsPath: path.join(APP_DIR, "projects"),
-  boards: [],
+  projectsPath:      path.join(APP_DIR, "projects"),
+  boards:            [],
+  maxConcurrentRuns: 3,
+  runTimeoutMinutes: 30,
 };
 
 function ensureDirs() {
@@ -16,8 +18,7 @@ function ensureDirs() {
 
 ensureDirs();
 
-export function getConfig() {
-  ensureDirs();
+function _readSync() {
   try {
     const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
     return { ...DEFAULTS, ...JSON.parse(raw) };
@@ -26,12 +27,29 @@ export function getConfig() {
   }
 }
 
-export function setConfig(updates) {
+// All writes go through this chain to prevent concurrent read→write races.
+let writeChain = Promise.resolve();
+
+function enqueueWrite(fn) {
+  const p = writeChain.then(() => {
+    ensureDirs();
+    const current = _readSync();
+    const next = fn(current);
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2), "utf-8");
+    return next;
+  });
+  // Keep the chain alive even if one write fails.
+  writeChain = p.catch(() => {});
+  return p;
+}
+
+export function getConfig() {
   ensureDirs();
-  const current = getConfig();
-  const next = { ...current, ...updates };
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2), "utf-8");
-  return next;
+  return _readSync();
+}
+
+export function setConfig(updates) {
+  return enqueueWrite((current) => ({ ...current, ...updates }));
 }
 
 // ── Worktrees ──────────────────────────────────────────────────────────────────
@@ -41,9 +59,8 @@ export function getWorktrees() {
 }
 
 export function registerWorktree({ owner, repo, branch, cardNumber, repoDir, worktreeDir }) {
-  const id       = `${owner}/${repo}#${cardNumber}`;
-  const existing = getWorktrees().filter((w) => w.id !== id);
-  const entry    = {
+  const id    = `${owner}/${repo}#${cardNumber}`;
+  const entry = {
     id,
     cardNumber,
     repo: `${owner}/${repo}`,
@@ -52,16 +69,23 @@ export function registerWorktree({ owner, repo, branch, cardNumber, repoDir, wor
     repoDir,
     createdAt: new Date().toISOString(),
   };
-  setConfig({ worktrees: [...existing, entry] });
+  enqueueWrite((current) => {
+    const existing = (current.worktrees ?? []).filter((w) => w.id !== id);
+    return { ...current, worktrees: [...existing, entry] };
+  });
   return entry;
 }
 
 export function removeWorktree(id) {
-  setConfig({ worktrees: getWorktrees().filter((w) => w.id !== id) });
+  return enqueueWrite((current) => ({
+    ...current,
+    worktrees: (current.worktrees ?? []).filter((w) => w.id !== id),
+  }));
 }
 
 export function updateWorktreeStatus(id, updates) {
-  setConfig({
-    worktrees: getWorktrees().map((w) => w.id === id ? { ...w, ...updates } : w),
-  });
+  return enqueueWrite((current) => ({
+    ...current,
+    worktrees: (current.worktrees ?? []).map((w) => w.id === id ? { ...w, ...updates } : w),
+  }));
 }

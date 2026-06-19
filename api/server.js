@@ -6,6 +6,25 @@ import configRoutes from "./routes/config.js";
 import githubRoutes from "./routes/github.js";
 import { warmup } from "./modules/status/status.cache.js";
 import { WEB_DIST_DIR } from "./paths.js";
+import { getWorktrees, updateWorktreeStatus } from "./modules/config/config.service.js";
+
+function recoverInterruptedRuns() {
+  const runningStatuses = [
+    ["status",          "error", "Run interrompido por reinício do servidor"],
+    ["tlcExecStatus",   "error", "Run interrompido por reinício do servidor"],
+    ["commitPushStatus","error", "Run interrompido por reinício do servidor"],
+  ];
+  for (const wt of getWorktrees()) {
+    for (const [field, , msg] of runningStatuses) {
+      if (wt[field] === "running") {
+        const errField = field === "status" ? "lastError"
+          : field === "tlcExecStatus" ? "tlcExecLastError"
+          : "commitPushLastError";
+        updateWorktreeStatus(wt.id, { [field]: "error", [errField]: msg });
+      }
+    }
+  }
+}
 
 export async function startServer({ port, apiOnly = false }) {
   if (!apiOnly && !fs.existsSync(WEB_DIST_DIR)) {
@@ -14,6 +33,8 @@ export async function startServer({ port, apiOnly = false }) {
       `  Execute "npm run build" antes de usar.`
     );
   }
+
+  recoverInterruptedRuns();
 
   const app = express();
   app.use(express.json());

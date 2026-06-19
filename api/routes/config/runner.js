@@ -2,7 +2,8 @@ import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { runClaude, resumeClaude, createRunLog, failureDetail } from "../../modules/claude/claude.runner.js";
+import { runClaude, resumeClaude, createRunLog, failureDetail, registerSseClient } from "../../modules/claude/claude.runner.js";
+import { acquireSlot, releaseSlot, registerProcess, unregisterProcess, cancelProcess } from "../../modules/claude/claude.concurrency.js";
 import { getWorktrees, updateWorktreeStatus } from "../../modules/config/config.service.js";
 import { sendError } from "../../lib/errors.js";
 import { scanTlcFeatures } from "./tlc.js";
@@ -69,8 +70,15 @@ export default function runnerRoutes(app) {
     if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
     try {
+      acquireSlot();
+    } catch (err) {
+      return sendError(res, err.status ?? 500, err.message);
+    }
+
+    try {
       fs.writeFileSync(path.join(wt.path, "CARD.md"), buildCardLines({ title, number, body, branch: wt.branch }).join("\n"), "utf-8");
     } catch (err) {
+      releaseSlot();
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
     }
 
@@ -87,64 +95,70 @@ export default function runnerRoutes(app) {
     const logStream = createRunLog(wt, "agent-flow.log");
 
     (async () => {
-      const { stdout: headBefore } = await execFileP(
-        "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
-      ).catch(() => ({ stdout: "" }));
-      const initialHead = headBefore.trim();
+      try {
+        const { stdout: headBefore } = await execFileP(
+          "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
+        ).catch(() => ({ stdout: "" }));
+        const initialHead = headBefore.trim();
 
-      logStream.write("=== Step 1: implementing task ===\n");
-      const cardContent = fs.readFileSync(path.join(wt.path, "CARD.md"), "utf-8");
+        logStream.write("=== Step 1: implementing task ===\n");
+        const cardContent = fs.readFileSync(path.join(wt.path, "CARD.md"), "utf-8");
 
-      const impl = await runClaude(
-        "You are an autonomous coding agent. Implement the task below immediately.\n" +
-        "Rules:\n" +
-        "- Use Write and Edit tools to create/modify files. Do NOT describe — just do it.\n" +
-        "- Do NOT ask questions or wait for confirmation.\n" +
-        "- Do NOT run any git commands.\n" +
-        "- When fully done, output as your LAST line exactly: COMMIT: <conventional commit message>\n" +
-        "  (e.g. COMMIT: feat: add user auth endpoint)\n\n" +
-        "TASK:\n" +
-        cardContent,
-        wt.path,
-        logStream,
-        makeSessionName(wt),
-      );
+        const impl = await runClaude(
+          "You are an autonomous coding agent. Implement the task below immediately.\n" +
+          "Rules:\n" +
+          "- Use Write and Edit tools to create/modify files. Do NOT describe — just do it.\n" +
+          "- Do NOT ask questions or wait for confirmation.\n" +
+          "- Do NOT run any git commands.\n" +
+          "- When fully done, output as your LAST line exactly: COMMIT: <conventional commit message>\n" +
+          "  (e.g. COMMIT: feat: add user auth endpoint)\n\n" +
+          "TASK:\n" +
+          cardContent,
+          wt.path,
+          logStream,
+          makeSessionName(wt),
+          (child) => registerProcess(id, child),
+        );
 
-      if (impl.code !== 0) {
-        logStream.end();
-        updateWorktreeStatus(id, { status: "error", lastError: `Implementation failed: ${failureDetail(impl, logStream.persistPath)}` });
-        return;
-      }
-
-      if (initialHead) {
-        const { stdout: countOut } = await execFileP(
-          "git", ["rev-list", "--count", `${initialHead}..HEAD`], { cwd: wt.path, timeout: 5_000 },
-        ).catch(() => ({ stdout: "0" }));
-        const claudeCommits = parseInt(countOut.trim(), 10) || 0;
-        if (claudeCommits > 0) {
-          logStream.write(`\n=== Step 2: squashing ${claudeCommits} commit(s) from Claude ===\n`);
-          await execFileP("git", ["reset", "--soft", `HEAD~${claudeCommits}`], { cwd: wt.path, timeout: 15_000 })
-            .catch((e) => logStream.write(`Warning: reset failed: ${e.message}\n`));
+        if (impl.code !== 0) {
+          logStream.end();
+          updateWorktreeStatus(id, { status: "error", lastError: `Implementation failed: ${failureDetail(impl, logStream.persistPath)}` });
+          return;
         }
+
+        if (initialHead) {
+          const { stdout: countOut } = await execFileP(
+            "git", ["rev-list", "--count", `${initialHead}..HEAD`], { cwd: wt.path, timeout: 5_000 },
+          ).catch(() => ({ stdout: "0" }));
+          const claudeCommits = parseInt(countOut.trim(), 10) || 0;
+          if (claudeCommits > 0) {
+            logStream.write(`\n=== Step 2: squashing ${claudeCommits} commit(s) from Claude ===\n`);
+            await execFileP("git", ["reset", "--soft", `HEAD~${claudeCommits}`], { cwd: wt.path, timeout: 15_000 })
+              .catch((e) => logStream.write(`Warning: reset failed: ${e.message}\n`));
+          }
+        }
+
+        const { stdout: changesOut } = await execFileP(
+          "git", ["status", "--porcelain"], { cwd: wt.path, timeout: 10_000 },
+        ).catch(() => ({ stdout: "" }));
+        const realChanges = changesOut.trim().split("\n").filter((l) => {
+          if (!l.trim()) return false;
+          const file = l.slice(3).trim();
+          return !INTERNAL.includes(file) && !file.startsWith(".specs/");
+        });
+
+        if (realChanges.length === 0) {
+          logStream.end();
+          updateWorktreeStatus(id, { status: "error", lastError: `Implementation failed: no files were changed by Claude\n(log completo: ${logStream.persistPath})` });
+          return;
+        }
+
+        await new Promise((resolve) => logStream.end(resolve));
+        updateWorktreeStatus(id, { status: "done" });
+      } finally {
+        unregisterProcess(id);
+        releaseSlot();
       }
-
-      const { stdout: changesOut } = await execFileP(
-        "git", ["status", "--porcelain"], { cwd: wt.path, timeout: 10_000 },
-      ).catch(() => ({ stdout: "" }));
-      const realChanges = changesOut.trim().split("\n").filter((l) => {
-        if (!l.trim()) return false;
-        const file = l.slice(3).trim();
-        return !INTERNAL.includes(file) && !file.startsWith(".specs/");
-      });
-
-      if (realChanges.length === 0) {
-        logStream.end();
-        updateWorktreeStatus(id, { status: "error", lastError: `Implementation failed: no files were changed by Claude\n(log completo: ${logStream.persistPath})` });
-        return;
-      }
-
-      await new Promise((resolve) => logStream.end(resolve));
-      updateWorktreeStatus(id, { status: "done" });
     })();
   });
 
@@ -221,10 +235,19 @@ export default function runnerRoutes(app) {
     if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
     if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
+    try {
+      acquireSlot();
+    } catch (err) {
+      return sendError(res, err.status ?? 500, err.message);
+    }
+
     let featurePath = wt.tlcFeaturePath;
     if (!featurePath || !fs.existsSync(featurePath)) {
       const scanned = scanTlcFeatures(wt.path);
-      if (!scanned) return sendError(res, 400, "Nenhum feature TLC encontrado na worktree.");
+      if (!scanned) {
+        releaseSlot();
+        return sendError(res, 400, "Nenhum feature TLC encontrado na worktree.");
+      }
       featurePath = scanned.tlcFeaturePath;
       updateWorktreeStatus(id, { tlcFeaturePath: featurePath, tlcFiles: scanned.tlcFiles });
     }
@@ -244,42 +267,48 @@ export default function runnerRoutes(app) {
     const logStream = createRunLog(wt, "tlc-exec.log");
 
     (async () => {
-      const { stdout: headBefore } = await execFileP(
-        "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
-      ).catch(() => ({ stdout: "" }));
-      const initialHead = headBefore.trim();
+      try {
+        const { stdout: headBefore } = await execFileP(
+          "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
+        ).catch(() => ({ stdout: "" }));
+        const initialHead = headBefore.trim();
 
-      logStream.write("=== Step 1: executando spec ===\n");
+        logStream.write("=== Step 1: executando spec ===\n");
 
-      const impl = await runClaude(
-        `Execute a spec em ${featureRelPath}/spec.md usando o máximo de subagentes possível. Não faça commits nem push.\n` +
-        "Quando totalmente concluído, sua ÚLTIMA linha deve ser exatamente: COMMIT: <mensagem conventional commit>\n" +
-        "(ex: COMMIT: feat: implement card sorting)",
-        wt.path,
-        logStream,
-        makeSessionName(wt),
-      );
+        const impl = await runClaude(
+          `Execute a spec em ${featureRelPath}/spec.md usando o máximo de subagentes possível. Não faça commits nem push.\n` +
+          "Quando totalmente concluído, sua ÚLTIMA linha deve ser exatamente: COMMIT: <mensagem conventional commit>\n" +
+          "(ex: COMMIT: feat: implement card sorting)",
+          wt.path,
+          logStream,
+          makeSessionName(wt),
+          (child) => registerProcess(id, child),
+        );
 
-      if (impl.code !== 0) {
-        logStream.end();
-        updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `Execução falhou: ${failureDetail(impl, logStream.persistPath)}` });
-        return;
-      }
-
-      if (initialHead) {
-        const { stdout: countOut } = await execFileP(
-          "git", ["rev-list", "--count", `${initialHead}..HEAD`], { cwd: wt.path, timeout: 5_000 },
-        ).catch(() => ({ stdout: "0" }));
-        const claudeCommits = parseInt(countOut.trim(), 10) || 0;
-        if (claudeCommits > 0) {
-          logStream.write(`\n=== Step 2: squashing ${claudeCommits} commit(s) intermediários ===\n`);
-          await execFileP("git", ["reset", "--soft", `HEAD~${claudeCommits}`], { cwd: wt.path, timeout: 15_000 })
-            .catch((e) => logStream.write(`Warning: reset failed: ${e.message}\n`));
+        if (impl.code !== 0) {
+          logStream.end();
+          updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `Execução falhou: ${failureDetail(impl, logStream.persistPath)}` });
+          return;
         }
-      }
 
-      await new Promise((resolve) => logStream.end(resolve));
-      updateWorktreeStatus(id, { tlcExecStatus: "done" });
+        if (initialHead) {
+          const { stdout: countOut } = await execFileP(
+            "git", ["rev-list", "--count", `${initialHead}..HEAD`], { cwd: wt.path, timeout: 5_000 },
+          ).catch(() => ({ stdout: "0" }));
+          const claudeCommits = parseInt(countOut.trim(), 10) || 0;
+          if (claudeCommits > 0) {
+            logStream.write(`\n=== Step 2: squashing ${claudeCommits} commit(s) intermediários ===\n`);
+            await execFileP("git", ["reset", "--soft", `HEAD~${claudeCommits}`], { cwd: wt.path, timeout: 15_000 })
+              .catch((e) => logStream.write(`Warning: reset failed: ${e.message}\n`));
+          }
+        }
+
+        await new Promise((resolve) => logStream.end(resolve));
+        updateWorktreeStatus(id, { tlcExecStatus: "done" });
+      } finally {
+        unregisterProcess(id);
+        releaseSlot();
+      }
     })();
   });
 
@@ -437,6 +466,33 @@ export default function runnerRoutes(app) {
 
       updateWorktreeStatus(id, { commitPushStatus: "done" });
     })();
+  });
+
+  app.delete("/api/config/worktrees/:id/run", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado na configuração.");
+
+    const result = cancelProcess(id);
+    if (result === "not-found")   return sendError(res, 404, "Nenhum run ativo para esta worktree.");
+    if (result === "already-done") return sendError(res, 409, "Run já finalizado.");
+
+    updateWorktreeStatus(id, { status: "cancelled" });
+    res.json({ ok: true });
+  });
+
+  app.get("/api/config/worktrees/:id/log/stream", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const cleanup = registerSseClient(id, res);
+    req.on("close", cleanup);
   });
 
   app.get("/api/config/worktrees/:id/behind-count", async (req, res) => {
