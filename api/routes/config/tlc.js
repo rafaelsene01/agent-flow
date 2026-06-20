@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { getWorktrees, updateWorktreeStatus } from "../../modules/config/config.service.js";
+import { getWorktrees, updateWorktreeStatus, getHelpersDir } from "../../modules/config/config.service.js";
 import { sendError } from "../../lib/errors.js";
 
 export function scanTlcFeatures(worktreePath) {
@@ -29,7 +29,7 @@ export default function tlcRoutes(app) {
     if (!wt)                     return sendError(res, 404, "Worktree não encontrado");
     if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
-    const result = scanTlcFeatures(wt.path);
+    const result = scanTlcFeatures(getHelpersDir(wt));
     if (!result) return res.json({ tlcFeaturePath: null, tlcFiles: { spec: false, design: false, tasks: false } });
 
     updateWorktreeStatus(id, { tlcFeaturePath: result.tlcFeaturePath, tlcFiles: result.tlcFiles });
@@ -46,7 +46,7 @@ export default function tlcRoutes(app) {
 
     let featurePath = wt.tlcFeaturePath;
     if (!featurePath || !fs.existsSync(featurePath)) {
-      const scanned = scanTlcFeatures(wt.path);
+      const scanned = scanTlcFeatures(getHelpersDir(wt));
       if (!scanned) return sendError(res, 404, "Nenhum feature TLC encontrado na worktree");
       featurePath = scanned.tlcFeaturePath;
       updateWorktreeStatus(id, { tlcFeaturePath: scanned.tlcFeaturePath, tlcFiles: scanned.tlcFiles });
@@ -70,7 +70,7 @@ export default function tlcRoutes(app) {
 
     let featurePath = wt.tlcFeaturePath;
     if (!featurePath || !fs.existsSync(featurePath)) {
-      const scanned = scanTlcFeatures(wt.path);
+      const scanned = scanTlcFeatures(getHelpersDir(wt));
       if (!scanned) return sendError(res, 404, "Nenhum feature TLC encontrado na worktree");
       featurePath = scanned.tlcFeaturePath;
       updateWorktreeStatus(id, { tlcFeaturePath: scanned.tlcFeaturePath, tlcFiles: scanned.tlcFiles });

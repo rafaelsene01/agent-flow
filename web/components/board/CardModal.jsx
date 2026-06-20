@@ -7,6 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
 import {
   AlertTriangle,
+  Archive,
   FileText,
   FolderOpen,
   GitBranch,
@@ -107,6 +108,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [fileContentModal, setFileContentModal] = useState(null); // null | file path string
   const [pullBehind, setPullBehind] = useState(null); // null=not checked, number=count
   const [pullSending, setPullSending] = useState(false);
+  const [helpersFiles, setHelpersFiles] = useState(null); // null=not loaded, array=loaded
+  const [helpersFileModal, setHelpersFileModal] = useState(null); // null | file path string
   const [errorModal, setErrorModal] = useState(null); // null | string
   const [logText, setLogText] = useState("");
   const [mainTab, setMainTab] = useState("desc");
@@ -154,6 +157,15 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       .then((r) => r.json())
       .then((d) => setPullBehind(d.behind ?? 0))
       .catch(() => setPullBehind(0));
+  }
+
+  function loadHelpersFiles() {
+    if (!worktreeId) return;
+    setHelpersFiles(null);
+    fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/helpers-files`)
+      .then((r) => r.json())
+      .then((d) => setHelpersFiles(d.files ?? []))
+      .catch(() => setHelpersFiles([]));
   }
 
   async function handlePull() {
@@ -554,10 +566,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       onValueChange={(val) => {
                         if (val === "files") loadChangedFiles();
                         if (val === "git") loadBehindCount();
+                        if (val === "helpers") loadHelpersFiles();
                       }}
                       className="w-full mt-1"
                     >
-                      <TabsList className="w-full grid grid-cols-3 h-8">
+                      <TabsList className="w-full grid grid-cols-4 h-8">
                         <TabsTrigger value="exec" title="Executar" className="px-0">
                           <Play className="size-3.5" />
                         </TabsTrigger>
@@ -566,6 +579,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         </TabsTrigger>
                         <TabsTrigger value="files" title="Arquivos alterados" className="px-0">
                           <FolderOpen className="size-3.5" />
+                        </TabsTrigger>
+                        <TabsTrigger value="helpers" title="Helpers" className="px-0">
+                          <Archive className="size-3.5" />
                         </TabsTrigger>
                       </TabsList>
 
@@ -1010,6 +1026,34 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                           )}
                         </div>
                       </TabsContent>
+
+                      {/* ── Aba 4: Helpers ── */}
+                      <TabsContent value="helpers" className="flex flex-col gap-1.5 mt-2">
+                        <div className="flex flex-col gap-0.5 overflow-y-auto rounded-md border bg-muted/30 p-1.5" style={{ maxHeight: "calc(80vh - 14rem)" }}>
+                          {helpersFiles === null ? (
+                            <span className="flex items-center gap-1 px-1 text-[11px] italic text-muted-foreground">
+                              <Loader2 className="size-3 animate-spin" />
+                              Carregando arquivos…
+                            </span>
+                          ) : helpersFiles.length === 0 ? (
+                            <span className="px-1 text-[11px] italic text-muted-foreground">
+                              Nenhum arquivo na pasta de helpers.
+                            </span>
+                          ) : (
+                            helpersFiles.map((file) => (
+                              <button
+                                key={file}
+                                type="button"
+                                className="min-w-0 w-full truncate text-left font-mono text-[11px] px-1 py-0.5 rounded hover:bg-muted/60 hover:underline"
+                                title={file}
+                                onClick={() => setHelpersFileModal(file)}
+                              >
+                                {file}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </TabsContent>
                     </Tabs>
                   )}
                 </div>
@@ -1056,6 +1100,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
           worktreeId={worktreeId}
           filePath={fileContentModal}
           onClose={() => setFileContentModal(null)}
+        />
+      )}
+      {helpersFileModal && (
+        <FileContentModal
+          worktreeId={worktreeId}
+          filePath={helpersFileModal}
+          fetchUrl={`/api/config/worktrees/${encodeURIComponent(worktreeId)}/helpers-file?file=${encodeURIComponent(helpersFileModal)}`}
+          onClose={() => setHelpersFileModal(null)}
         />
       )}
       {errorModal && (

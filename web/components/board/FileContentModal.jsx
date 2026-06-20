@@ -13,22 +13,22 @@ function isMarkdownFile(filePath) {
   return /\.(md|markdown|mdx)$/i.test(filePath ?? "");
 }
 
-export default function FileContentModal({ worktreeId, filePath, onClose }) {
+export default function FileContentModal({ worktreeId, filePath, onClose, fetchUrl }) {
   const [content, setContent] = useState(null);
   const [error, setError] = useState(null);
   const [markdown, setMarkdown] = useState(isMarkdownFile(filePath));
 
   useEffect(() => {
-    fetch(
-      `/api/config/worktrees/${encodeURIComponent(worktreeId)}/file-content?file=${encodeURIComponent(filePath)}`,
-    )
+    const url = fetchUrl ??
+      `/api/config/worktrees/${encodeURIComponent(worktreeId)}/file-content?file=${encodeURIComponent(filePath)}`;
+    fetch(url)
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
         setContent(d.content ?? "(arquivo vazio ou deletado)");
       })
       .catch((err) => setError(err.message));
-  }, [worktreeId, filePath]);
+  }, [worktreeId, filePath, fetchUrl]);
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>

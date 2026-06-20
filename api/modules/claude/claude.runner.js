@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { spawn } from "child_process";
-import { getConfig } from "../config/config.service.js";
+import { getConfig, getHelpersDir } from "../config/config.service.js";
 
 const LOGS_DIR = path.join(os.homedir(), ".agent-flow", "logs");
 const isWin = process.platform === "win32";
@@ -89,12 +89,10 @@ export function createRunLog(wt, name) {
   activeRuns.add(wt.id);
   logBuffers.set(wt.id, "");
   fs.mkdirSync(LOGS_DIR, { recursive: true });
+  const helpersDir  = getHelpersDir(wt);
   const persistPath = path.join(LOGS_DIR, `${path.basename(wt.path)}-${name}`);
   const streams = [
-    fs.createWriteStream(path.join(wt.path, name), {
-      flags: "w",
-      encoding: "utf-8",
-    }),
+    fs.createWriteStream(path.join(helpersDir, name), { flags: "w", encoding: "utf-8" }),
     fs.createWriteStream(persistPath, { flags: "w", encoding: "utf-8" }),
   ];
   const id = wt.id;

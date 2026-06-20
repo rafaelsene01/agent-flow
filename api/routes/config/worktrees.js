@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { getConfig, setConfig, getWorktrees, removeWorktree } from "../../modules/config/config.service.js";
+import { getConfig, setConfig, getWorktrees, removeWorktree, getHelpersDir } from "../../modules/config/config.service.js";
 import { sendError } from "../../lib/errors.js";
 
 const execFileP = promisify(execFile);
@@ -27,6 +27,10 @@ export default function worktreesRoutes(app) {
         }
         if (wt.path && fs.existsSync(wt.path)) {
           fs.rmSync(wt.path, { recursive: true, force: true });
+        }
+        const helpersDir = wt.helpersDir ?? (wt.path + "-helpers");
+        if (helpersDir && fs.existsSync(helpersDir)) {
+          fs.rmSync(helpersDir, { recursive: true, force: true });
         }
       }
       removeWorktree(id);
@@ -54,6 +58,8 @@ export default function worktreesRoutes(app) {
     for (const wt of worktrees) {
       if (wt.path)    dirsToDelete.add(wt.path);
       if (wt.repoDir) dirsToDelete.add(wt.repoDir);
+      const helpersDir = wt.helpersDir ?? (wt.path + "-helpers");
+      if (helpersDir) dirsToDelete.add(helpersDir);
     }
 
     setConfig({ worktrees: getWorktrees().filter((w) => w.repo !== originRepo) });

@@ -4,7 +4,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { runClaude, resumeClaude, createRunLog, failureDetail, registerSseClient } from "../../modules/claude/claude.runner.js";
 import { acquireSlot, releaseSlot, registerProcess, unregisterProcess, cancelProcess } from "../../modules/claude/claude.concurrency.js";
-import { getWorktrees, updateWorktreeStatus } from "../../modules/config/config.service.js";
+import { getWorktrees, updateWorktreeStatus, getHelpersDir } from "../../modules/config/config.service.js";
 import { sendError } from "../../lib/errors.js";
 import { scanTlcFeatures } from "./tlc.js";
 
@@ -30,13 +30,22 @@ async function ensureWorktreeExclude(wtPath) {
   } catch (_) {}
 }
 
-function findSpecContent(wtPath) {
-  const scanned = scanTlcFeatures(wtPath);
+function findSpecContent(basePath) {
+  const scanned = scanTlcFeatures(basePath);
   if (scanned?.tlcFiles?.spec) {
     const specPath = path.join(scanned.tlcFeaturePath, "spec.md");
     if (fs.existsSync(specPath)) return { specPath };
   }
   return null;
+}
+
+function migrateSpecsToHelpers(wtPath, helpersDir) {
+  const src = path.join(wtPath, ".specs");
+  if (!fs.existsSync(src)) return;
+  try {
+    fs.cpSync(src, path.join(helpersDir, ".specs"), { recursive: true, force: true });
+    fs.rmSync(src, { recursive: true, force: true });
+  } catch (_) {}
 }
 
 async function computeBaseRef(wtPath) {
@@ -79,7 +88,8 @@ export default function runnerRoutes(app) {
       if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
       if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
-      const filePath = path.join(wt.path, "CARD.md");
+      const helpersDir = getHelpersDir(wt);
+      const filePath   = path.join(helpersDir, "CARD.md");
       fs.writeFileSync(filePath, buildCardLines({ title, number, body, branch: wt.branch }).join("\n"), "utf-8");
       res.json({ ok: true, filePath });
     } catch (err) {
@@ -102,7 +112,7 @@ export default function runnerRoutes(app) {
     }
 
     try {
-      fs.writeFileSync(path.join(wt.path, "CARD.md"), buildCardLines({ title, number, body, branch: wt.branch }).join("\n"), "utf-8");
+      fs.writeFileSync(path.join(getHelpersDir(wt), "CARD.md"), buildCardLines({ title, number, body, branch: wt.branch }).join("\n"), "utf-8");
     } catch (err) {
       releaseSlot();
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
@@ -128,7 +138,7 @@ export default function runnerRoutes(app) {
         const initialHead = headBefore.trim();
 
         logStream.write("=== Step 1: implementing task ===\n");
-        const cardContent = fs.readFileSync(path.join(wt.path, "CARD.md"), "utf-8");
+        const cardContent = fs.readFileSync(path.join(getHelpersDir(wt), "CARD.md"), "utf-8");
 
         const impl = await runClaude(
           "You are an autonomous coding agent. Implement the task below immediately.\n" +
@@ -196,8 +206,9 @@ export default function runnerRoutes(app) {
     if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
     if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
+    const tlcHelpersDir = getHelpersDir(wt);
     try {
-      fs.writeFileSync(path.join(wt.path, "CARD.md"), buildCardLines({ title, number, body, branch: wt.branch }).join("\n"), "utf-8");
+      fs.writeFileSync(path.join(tlcHelpersDir, "CARD.md"), buildCardLines({ title, number, body, branch: wt.branch }).join("\n"), "utf-8");
     } catch (err) {
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
     }
@@ -213,7 +224,7 @@ export default function runnerRoutes(app) {
 
     (async () => {
       logStream.write("=== TLC: Criando spec, design e tasks ===\n");
-      const cardContent = fs.readFileSync(path.join(wt.path, "CARD.md"), "utf-8");
+      const cardContent = fs.readFileSync(path.join(tlcHelpersDir, "CARD.md"), "utf-8");
 
       const result = await runClaude(
         "/tlc-spec-driven\n\n" +
@@ -229,10 +240,11 @@ export default function runnerRoutes(app) {
         return;
       }
 
-      fs.rmSync(path.join(wt.path, "CARD.md"), { force: true });
+      fs.rmSync(path.join(tlcHelpersDir, "CARD.md"), { force: true });
+      migrateSpecsToHelpers(wt.path, tlcHelpersDir);
       logStream.end();
 
-      const featuresDir = path.join(wt.path, ".specs", "features");
+      const featuresDir = path.join(tlcHelpersDir, ".specs", "features");
       let tlcFeaturePath = null;
       const tlcFiles = { spec: false, design: false, tasks: false };
 
@@ -269,7 +281,7 @@ export default function runnerRoutes(app) {
 
     let featurePath = wt.tlcFeaturePath;
     if (!featurePath || !fs.existsSync(featurePath)) {
-      const scanned = scanTlcFeatures(wt.path);
+      const scanned = scanTlcFeatures(getHelpersDir(wt));
       if (!scanned) {
         releaseSlot();
         return sendError(res, 400, "Nenhum feature TLC encontrado na worktree.");
@@ -278,7 +290,7 @@ export default function runnerRoutes(app) {
       updateWorktreeStatus(id, { tlcFeaturePath: featurePath, tlcFiles: scanned.tlcFiles });
     }
 
-    const featureRelPath = path.relative(wt.path, featurePath).replace(/\\/g, "/");
+    const specFilePath = path.join(featurePath, "spec.md").replace(/\\/g, "/");
 
     updateWorktreeStatus(id, {
       tlcExecStatus:    "running",
@@ -302,7 +314,7 @@ export default function runnerRoutes(app) {
         logStream.write("=== Step 1: executando spec ===\n");
 
         const impl = await runClaude(
-          `Execute a spec em ${featureRelPath}/spec.md usando o máximo de subagentes possível. Não faça commits nem push.\n` +
+          `Execute a spec em ${specFilePath} usando o máximo de subagentes possível. Não faça commits nem push.\n` +
           "Quando totalmente concluído, sua ÚLTIMA linha deve ser exatamente: COMMIT: <mensagem conventional commit>\n" +
           "(ex: COMMIT: feat: implement card sorting)",
           wt.path,
@@ -363,11 +375,12 @@ export default function runnerRoutes(app) {
 
     (async () => {
       try {
-        const spec    = findSpecContent(wt.path);
+        const evalHelpersDir = getHelpersDir(wt);
+        const spec    = findSpecContent(evalHelpersDir);
         const baseRef = await computeBaseRef(wt.path);
 
         const specSection = spec
-          ? `A especificação (PRD) está em \`${path.relative(wt.path, spec.specPath).replace(/\\/g, "/")}\`. ` +
+          ? `A especificação (PRD) está em \`${spec.specPath.replace(/\\/g, "/")}\`. ` +
             `Leia esse arquivo e use-o como ground truth da avaliação.`
           : "Não há spec.md gerado nesta worktree. Use a descrição do card abaixo como a especificação (PRD) — " +
             "ground truth da avaliação:\n\n" +
@@ -383,6 +396,9 @@ export default function runnerRoutes(app) {
             "commits do branch (incluindo os já enviados ao remote) E as alterações locais não commitadas/staged " +
             "(`git diff`, `git status`).";
 
+        const evalOutputDir = path.join(evalHelpersDir, ".specs", "evaluations").replace(/\\/g, "/");
+        fs.mkdirSync(path.join(evalHelpersDir, ".specs", "evaluations"), { recursive: true });
+
         logStream.write("=== Spec-Eval: avaliando implementação contra a spec ===\n");
 
         const result = await runClaude(
@@ -392,7 +408,7 @@ export default function runnerRoutes(app) {
           specSection + "\n\n" +
           baseSection + "\n\n" +
           "Não modifique o código sob avaliação e não faça commits nem push. " +
-          "Escreva o relatório com a nota final em `.specs/evaluations/`.",
+          `Escreva o relatório com a nota final em \`${evalOutputDir}\`.`,
           wt.path,
           logStream,
           null, // nova sessão: sem -n e sem --resume
@@ -420,6 +436,9 @@ export default function runnerRoutes(app) {
     if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
     if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
+    const cleanHelpersDir = getHelpersDir(wt);
+    try { fs.rmSync(path.join(cleanHelpersDir, "CARD.md"), { force: true }); } catch (_) {}
+    // Backward compat: clean up from worktree too (old worktrees may still have files there)
     for (const f of INTERNAL) {
       try { fs.rmSync(path.join(wt.path, f), { force: true }); } catch (_) {}
     }
@@ -581,6 +600,61 @@ export default function runnerRoutes(app) {
 
     updateWorktreeStatus(id, { status: "cancelled" });
     res.json({ ok: true });
+  });
+
+  app.get("/api/config/worktrees/:id/helpers-files", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
+
+    const helpersDir = getHelpersDir(wt);
+    const files = [];
+
+    if (fs.existsSync(path.join(helpersDir, "CARD.md"))) files.push("CARD.md");
+
+    try {
+      for (const entry of fs.readdirSync(helpersDir, { withFileTypes: true })) {
+        if (entry.isFile() && entry.name.endsWith(".log")) files.push(entry.name);
+      }
+    } catch (_) {}
+
+    function collectMd(dir, relBase) {
+      if (!fs.existsSync(dir)) return;
+      try {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const rel = relBase ? `${relBase}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) collectMd(path.join(dir, entry.name), rel);
+          else if (entry.isFile() && entry.name.endsWith(".md")) files.push(rel);
+        }
+      } catch (_) {}
+    }
+    collectMd(path.join(helpersDir, ".specs"), ".specs");
+
+    res.json({ files });
+  });
+
+  app.get("/api/config/worktrees/:id/helpers-file", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
+
+    const filePath = req.query.file;
+    if (!filePath) return sendError(res, 400, "file obrigatório");
+
+    const helpersDir = getHelpersDir(wt);
+    const resolved   = path.resolve(helpersDir);
+    const fullPath   = path.resolve(helpersDir, filePath);
+
+    if (!fullPath.startsWith(resolved + path.sep) && fullPath !== resolved)
+      return sendError(res, 403, "Path não permitido");
+
+    if (!fs.existsSync(fullPath)) return res.json({ content: null });
+
+    try {
+      res.json({ content: fs.readFileSync(fullPath, "utf8") });
+    } catch (err) {
+      sendError(res, 500, err.message, err);
+    }
   });
 
   app.get("/api/config/worktrees/:id/log/stream", (req, res) => {

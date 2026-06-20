@@ -49,6 +49,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
   const [createError, setCreateError]   = useState(null);
   const [lastCreated, setLastCreated]   = useState(null);
   const [worktreeDir, setWorktreeDir]   = useState(null);
+  const [helpersDir, setHelpersDir]     = useState(null);
 
   // Radix Dialog handles Esc natively — no manual keydown listener needed.
 
@@ -72,6 +73,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
     setCreateError(null);
     setLastCreated(null);
     setWorktreeDir(null);
+    setHelpersDir(null);
   }
 
   async function handleCreate() {
@@ -91,6 +93,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
       if (data.error) throw new Error(data.error);
       setLastCreated(newBranch);
       setWorktreeDir(data.worktreeDir ?? null);
+      setHelpersDir(data.helpersDir ?? null);
       setNewBranch("");
       setNameError(null);
       setTimeout(onClose, 1200);
@@ -262,6 +265,14 @@ export default function CreateBranchModal({ board, item, onClose }) {
                   Worktree em{" "}
                   <code className="font-mono text-[11px] bg-muted border rounded px-1 break-all">
                     {worktreeDir}
+                  </code>
+                </p>
+              )}
+              {helpersDir && (
+                <p className="text-xs text-state-completed break-all">
+                  Helpers em{" "}
+                  <code className="font-mono text-[11px] bg-muted border rounded px-1 break-all">
+                    {helpersDir}
                   </code>
                 </p>
               )}

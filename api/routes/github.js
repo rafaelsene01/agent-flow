@@ -86,14 +86,14 @@ export default function githubRoutes(app) {
       }
 
       if (cardNumber != null) {
-        const { worktreeDir, cloned } = await setupWorktree({
+        const { worktreeDir, helpersDir, cloned } = await setupWorktree({
           owner:        req.params.owner,
           repo:         req.params.repo,
           newBranch,
           originBranch,
           cardNumber,
         });
-        return res.json({ ok: true, worktreeDir, cloned });
+        return res.json({ ok: true, worktreeDir, helpersDir, cloned });
       }
 
       res.json({ ok: true });

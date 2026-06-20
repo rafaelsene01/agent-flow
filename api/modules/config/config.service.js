@@ -59,13 +59,16 @@ export function getWorktrees() {
 }
 
 export function registerWorktree({ owner, repo, branch, cardNumber, repoDir, worktreeDir }) {
-  const id    = `${owner}/${repo}#${cardNumber}`;
+  const id         = `${owner}/${repo}#${cardNumber}`;
+  const helpersDir = worktreeDir + "-helpers";
+  fs.mkdirSync(helpersDir, { recursive: true });
   const entry = {
     id,
     cardNumber,
     repo: `${owner}/${repo}`,
     branch,
     path:      worktreeDir,
+    helpersDir,
     repoDir,
     createdAt: new Date().toISOString(),
   };
@@ -74,6 +77,12 @@ export function registerWorktree({ owner, repo, branch, cardNumber, repoDir, wor
     return { ...current, worktrees: [...existing, entry] };
   });
   return entry;
+}
+
+export function getHelpersDir(wt) {
+  const dir = wt.helpersDir ?? (wt.path + "-helpers");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
 }
 
 export function removeWorktree(id) {
