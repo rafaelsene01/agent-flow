@@ -9,7 +9,7 @@ import { sendError } from "../../lib/errors.js";
 import { scanTlcFeatures } from "./tlc.js";
 
 const execFileP  = promisify(execFile);
-const INTERNAL   = ["CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log"];
+const INTERNAL   = ["CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log", "spec-eval.log"];
 const EXCLUDE_ENTRIES = [...INTERNAL, ".specs/"];
 
 function makeSessionName(wt) {
@@ -28,6 +28,32 @@ async function ensureWorktreeExclude(wtPath) {
     const toAdd = EXCLUDE_ENTRIES.filter((e) => !existing.includes(e));
     if (toAdd.length) fs.appendFileSync(excludeFile, "\n" + toAdd.join("\n") + "\n");
   } catch (_) {}
+}
+
+function findSpecContent(wtPath) {
+  const scanned = scanTlcFeatures(wtPath);
+  if (scanned?.tlcFiles?.spec) {
+    const specPath = path.join(scanned.tlcFeaturePath, "spec.md");
+    if (fs.existsSync(specPath)) return { specPath };
+  }
+  return null;
+}
+
+async function computeBaseRef(wtPath) {
+  try {
+    const { stdout: originHead } = await execFileP(
+      "git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+      { cwd: wtPath, timeout: 5_000 },
+    );
+    const base = originHead.trim();
+    if (!base) return null;
+    const { stdout: mb } = await execFileP(
+      "git", ["merge-base", "HEAD", base], { cwd: wtPath, timeout: 5_000 },
+    );
+    return mb.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 function buildCardLines({ title, number, body, branch }) {
@@ -305,6 +331,82 @@ export default function runnerRoutes(app) {
 
         await new Promise((resolve) => logStream.end(resolve));
         updateWorktreeStatus(id, { tlcExecStatus: "done" });
+      } finally {
+        unregisterProcess(id);
+        releaseSlot();
+      }
+    })();
+  });
+
+  app.post("/api/config/worktrees/:id/run-spec-eval", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const { title, number, body } = req.body ?? {};
+
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+
+    try {
+      acquireSlot();
+    } catch (err) {
+      return sendError(res, err.status ?? 500, err.message);
+    }
+
+    updateWorktreeStatus(id, {
+      specEvalStatus:    "running",
+      specEvalLastRunAt: new Date().toISOString(),
+      specEvalLastError: null,
+    });
+    res.json({ ok: true });
+
+    const logStream = createRunLog(wt, "spec-eval.log");
+
+    (async () => {
+      try {
+        const spec    = findSpecContent(wt.path);
+        const baseRef = await computeBaseRef(wt.path);
+
+        const specSection = spec
+          ? `A especificação (PRD) está em \`${path.relative(wt.path, spec.specPath).replace(/\\/g, "/")}\`. ` +
+            `Leia esse arquivo e use-o como ground truth da avaliação.`
+          : "Não há spec.md gerado nesta worktree. Use a descrição do card abaixo como a especificação (PRD) — " +
+            "ground truth da avaliação:\n\n" +
+            buildCardLines({ title, number, body, branch: wt.branch }).join("\n");
+
+        const baseSection = baseRef
+          ? `O ponto base da implementação é o commit \`${baseRef}\`. ` +
+            "A implementação a avaliar é TUDO que mudou desde esse base nesta worktree. Considere a UNIÃO de:\n" +
+            `- commits já feitos no branch, inclusive os que já foram enviados ao remote: \`git diff ${baseRef}..HEAD\`;\n` +
+            `- alterações locais ainda não commitadas e em stage: \`git diff ${baseRef}\` (cobre o working tree) ` +
+            "e `git status --porcelain` para arquivos novos não rastreados."
+          : "Determine o ponto base da implementação (merge-base de HEAD com origin/HEAD) e avalie a UNIÃO de: " +
+            "commits do branch (incluindo os já enviados ao remote) E as alterações locais não commitadas/staged " +
+            "(`git diff`, `git status`).";
+
+        logStream.write("=== Spec-Eval: avaliando implementação contra a spec ===\n");
+
+        const result = await runClaude(
+          "/spec-driven-eval\n\n" +
+          "Siga a guideline spec-driven-eval e avalie (grade) a implementação no branch atual desta worktree, " +
+          "produzindo a nota final comparável.\n\n" +
+          specSection + "\n\n" +
+          baseSection + "\n\n" +
+          "Não modifique o código sob avaliação e não faça commits nem push. " +
+          "Escreva o relatório com a nota final em `.specs/evaluations/`.",
+          wt.path,
+          logStream,
+          null, // nova sessão: sem -n e sem --resume
+          (child) => registerProcess(id, child),
+        );
+
+        if (result.code !== 0) {
+          logStream.end();
+          updateWorktreeStatus(id, { specEvalStatus: "error", specEvalLastError: `Spec-eval falhou: ${failureDetail(result, logStream.persistPath)}` });
+          return;
+        }
+
+        await new Promise((resolve) => logStream.end(resolve));
+        updateWorktreeStatus(id, { specEvalStatus: "done" });
       } finally {
         unregisterProcess(id);
         releaseSlot();

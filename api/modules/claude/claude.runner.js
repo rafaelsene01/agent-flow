@@ -138,7 +138,7 @@ function stripAnsi(str) {
 function formatStreamEvent(event) {
   const parts = [];
 
-  if (event.type === "system" && event.subtype === "init") {
+  if (event.type === "system" && event.subtype === "init" && event.sessionId) {
     parts.push(`\n┌─[SESSION] ${event.sessionId ?? "?"}`);
     parts.push(`└${SEP}`);
   } else if (

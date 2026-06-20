@@ -99,6 +99,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [specSending, setSpecSending] = useState(false);
   const [tlcSending, setTlcSending] = useState(false);
   const [tlcExecSending, setTlcExecSending] = useState(false);
+  const [specEvalSending, setSpecEvalSending] = useState(false);
   const [commitPushSending, setCommitPushSending] = useState(false);
   const [claudeStatus, setClaudeStatus] = useState(null);
   const [tlcFiles, setTlcFiles] = useState(null); // { spec, design, tasks } from live scan
@@ -182,6 +183,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.status === "running" ||
     worktreeConfig?.tlcStatus === "running" ||
     worktreeConfig?.tlcExecStatus === "running" ||
+    worktreeConfig?.specEvalStatus === "running" ||
     worktreeConfig?.commitPushStatus === "running" ||
     worktreeConfig?.pullStatus === "running";
 
@@ -238,6 +240,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.status,
     worktreeConfig?.tlcStatus,
     worktreeConfig?.tlcExecStatus,
+    worktreeConfig?.specEvalStatus,
     worktreeConfig?.commitPushStatus,
     worktreeConfig?.pullStatus,
   ]);
@@ -297,6 +300,32 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       console.error("[run-tlc-exec]", err);
     } finally {
       setTlcExecSending(false);
+    }
+  }
+
+  async function handleRunSpecEval() {
+    setSpecEvalSending(true);
+    try {
+      const res = await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run-spec-eval`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: item.title,
+            number: item.number,
+            body: item.body,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      loadWorktreeConfig();
+      onWorktreeChange?.();
+    } catch (err) {
+      console.error("[run-spec-eval]", err);
+    } finally {
+      setSpecEvalSending(false);
     }
   }
 
@@ -660,101 +689,189 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 </button>
                               )}
                               {isTlcDone && (
-                                <>
-                                  <div className="flex gap-1.5">
-                                    {[
-                                      { type: "spec", Icon: FileText, label: "Spec" },
-                                      { type: "design", Icon: Palette, label: "Design" },
-                                      { type: "tasks", Icon: ListChecks, label: "Tasks" },
-                                    ].map(({ type, Icon, label }) => {
-                                      const exists = tlcFiles?.[type] ?? false;
-                                      return (
-                                        <Button
-                                          key={type}
-                                          variant="outline"
-                                          size="sm"
-                                          type="button"
-                                          disabled={!exists}
-                                          title={
-                                            !exists
-                                              ? `${label} não foi gerado`
-                                              : `Abrir ${label}`
-                                          }
-                                          onClick={() => setTlcFileModal(type)}
-                                          className={cn(
-                                            "flex-1 gap-1 text-xs",
-                                            exists &&
-                                              "border-state-completed/50 text-state-completed",
-                                          )}
-                                        >
-                                          <Icon className="size-3.5" />
-                                          <span>{label}</span>
-                                        </Button>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {(() => {
-                                    const execStatus = worktreeConfig?.tlcExecStatus;
-                                    const isExecRunning =
-                                      execStatus === "running" || tlcExecSending;
-                                    const isExecDone = execStatus === "done";
-                                    const isExecError = execStatus === "error";
+                                <div className="flex gap-1.5">
+                                  {[
+                                    { type: "spec", Icon: FileText, label: "Spec" },
+                                    { type: "design", Icon: Palette, label: "Design" },
+                                    { type: "tasks", Icon: ListChecks, label: "Tasks" },
+                                  ].map(({ type, Icon, label }) => {
+                                    const exists = tlcFiles?.[type] ?? false;
                                     return (
-                                      <>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          type="button"
-                                          disabled={isExecRunning}
-                                          onClick={handleRunTlcExec}
-                                          className={cn(
-                                            "w-full justify-start gap-2 text-xs",
-                                            isExecDone &&
-                                              "border-state-completed/50 text-state-completed opacity-75",
-                                            isExecError &&
-                                              "border-destructive/50 text-destructive opacity-75",
-                                          )}
-                                        >
-                                          <Play className="size-3.5" />
-                                          <span>Executar Spec</span>
-                                          <span className="ml-auto text-xs">
-                                            {isExecRunning
-                                              ? "…"
-                                              : isExecDone
-                                                ? "✓"
-                                                : isExecError
-                                                  ? "↺"
-                                                  : "▷"}
-                                          </span>
-                                        </Button>
-                                        {isExecRunning && (
-                                          <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
-                                            <Loader2 className="size-3 shrink-0 animate-spin" />
-                                            Implementando, commitando e fazendo push…
-                                          </span>
+                                      <Button
+                                        key={type}
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                        disabled={!exists}
+                                        title={
+                                          !exists
+                                            ? `${label} não foi gerado`
+                                            : `Abrir ${label}`
+                                        }
+                                        onClick={() => setTlcFileModal(type)}
+                                        className={cn(
+                                          "flex-1 gap-1 text-xs",
+                                          exists &&
+                                            "border-state-completed/50 text-state-completed",
                                         )}
-                                        {isExecDone && (
-                                          <span className="text-[11px] text-state-completed">
-                                            ✓ Concluído · clique para re-executar
-                                          </span>
-                                        )}
-                                        {isExecError &&
-                                          worktreeConfig?.tlcExecLastError && (
-                                            <button
-                                              type="button"
-                                              onClick={() => setErrorModal(worktreeConfig.tlcExecLastError)}
-                                              className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
-                                            >
-                                              <AlertTriangle className="size-3 shrink-0" />
-                                              <span className="truncate">{worktreeConfig.tlcExecLastError}</span>
-                                            </button>
-                                          )}
-                                      </>
+                                      >
+                                        <Icon className="size-3.5" />
+                                        <span>{label}</span>
+                                      </Button>
                                     );
-                                  })()}
-                                </>
+                                  })}
+                                </div>
                               )}
+
+                              {(() => {
+                                const execStatus = worktreeConfig?.tlcExecStatus;
+                                const isExecRunning =
+                                  execStatus === "running" || tlcExecSending;
+                                const isExecDone = execStatus === "done";
+                                const isExecError = execStatus === "error";
+                                return (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      type="button"
+                                      disabled={!isTlcDone || isExecRunning}
+                                      title={
+                                        !isTlcDone
+                                          ? "Execute o TLC antes de executar a Spec"
+                                          : undefined
+                                      }
+                                      onClick={handleRunTlcExec}
+                                      className={cn(
+                                        "w-full justify-start gap-2 text-xs",
+                                        isExecDone &&
+                                          "border-state-completed/50 text-state-completed opacity-75",
+                                        isExecError &&
+                                          "border-destructive/50 text-destructive opacity-75",
+                                      )}
+                                    >
+                                      <Play className="size-3.5" />
+                                      <span>Executar Spec</span>
+                                      <span className="ml-auto text-xs">
+                                        {isExecRunning
+                                          ? "…"
+                                          : isExecDone
+                                            ? "✓"
+                                            : isExecError
+                                              ? "↺"
+                                              : "▷"}
+                                      </span>
+                                    </Button>
+                                    {isExecRunning && (
+                                      <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
+                                        <Loader2 className="size-3 shrink-0 animate-spin" />
+                                        Implementando, commitando e fazendo push…
+                                      </span>
+                                    )}
+                                    {isExecDone && (
+                                      <span className="text-[11px] text-state-completed">
+                                        ✓ Concluído · clique para re-executar
+                                      </span>
+                                    )}
+                                    {isExecError &&
+                                      worktreeConfig?.tlcExecLastError && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setErrorModal(worktreeConfig.tlcExecLastError)}
+                                          className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
+                                        >
+                                          <AlertTriangle className="size-3 shrink-0" />
+                                          <span className="truncate">{worktreeConfig.tlcExecLastError}</span>
+                                        </button>
+                                      )}
+                                  </>
+                                );
+                              })()}
+                            </>
+                          );
+                        })()}
+
+                        {(() => {
+                          const specEvalStatus = worktreeConfig?.specEvalStatus;
+                          const isEvalRunning =
+                            specEvalStatus === "running" || specEvalSending;
+                          const isEvalDone = specEvalStatus === "done";
+                          const isEvalError = specEvalStatus === "error";
+                          const hasEvalSkill =
+                            claudeStatus?.specDrivenEvalSkill ?? false;
+                          // Liberado quando "Executar Tarefa" ou "Executar Spec" concluiu
+                          const ranImpl =
+                            worktreeConfig?.status === "done" ||
+                            worktreeConfig?.tlcExecStatus === "done";
+                          const anyOtherRunning =
+                            worktreeConfig?.status === "running" ||
+                            worktreeConfig?.tlcStatus === "running" ||
+                            worktreeConfig?.tlcExecStatus === "running" ||
+                            specSending ||
+                            tlcSending ||
+                            tlcExecSending;
+                          return (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                type="button"
+                                disabled={
+                                  !hasEvalSkill ||
+                                  !ranImpl ||
+                                  isEvalRunning ||
+                                  anyOtherRunning
+                                }
+                                title={
+                                  !hasEvalSkill
+                                    ? "Skill spec-driven-eval não instalada — configure nas Configurações"
+                                    : !ranImpl
+                                      ? "Execute a Tarefa ou a Spec antes de avaliar"
+                                      : undefined
+                                }
+                                onClick={handleRunSpecEval}
+                                className={cn(
+                                  "w-full justify-start gap-2 text-xs",
+                                  isEvalDone &&
+                                    "border-state-completed/50 text-state-completed opacity-75",
+                                  isEvalError &&
+                                    "border-destructive/50 text-destructive opacity-75",
+                                )}
+                              >
+                                <ListChecks className="size-3.5" />
+                                <span>Executar Spec-Eval</span>
+                                <span className="ml-auto text-xs">
+                                  {isEvalRunning
+                                    ? "…"
+                                    : isEvalDone
+                                      ? "✓"
+                                      : isEvalError
+                                        ? "↺"
+                                        : "▷"}
+                                </span>
+                              </Button>
+                              {isEvalRunning && (
+                                <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
+                                  <Loader2 className="size-3 shrink-0 animate-spin" />
+                                  Avaliando implementação contra a spec…
+                                </span>
+                              )}
+                              {isEvalDone && (
+                                <span className="text-[11px] text-state-completed">
+                                  ✓ Avaliação concluída · clique para re-avaliar
+                                </span>
+                              )}
+                              {isEvalError &&
+                                worktreeConfig?.specEvalLastError && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setErrorModal(worktreeConfig.specEvalLastError)}
+                                    className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
+                                  >
+                                    <AlertTriangle className="size-3 shrink-0" />
+                                    <span className="truncate">{worktreeConfig.specEvalLastError}</span>
+                                  </button>
+                                )}
                             </>
                           );
                         })()}
