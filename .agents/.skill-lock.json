@@ -14,6 +14,20 @@
       ],
       "method": "copy",
       "global": false
+    },
+    "spec-driven-eval": {
+      "name": "spec-driven-eval",
+      "source": "local",
+      "contentHash": "168d6860c6e84809a02c2abface032a4a625bdd81fec6131615e00a2cf87e311",
+      "installedAt": "2026-06-20T01:03:07.154Z",
+      "updatedAt": "2026-06-20T01:03:07.169Z",
+      "agents": [
+        "cursor",
+        "claude-code",
+        "windsurf"
+      ],
+      "method": "copy",
+      "global": false
     }
   }
 }
