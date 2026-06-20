@@ -191,14 +191,18 @@ function IntegrationCard({ name, logo, loading, data, commands }) {
 }
 
 /* ── SkillCard ───────────────────────────────────────────────────────────── */
-function SkillCard({ loading, installed, onInstalled }) {
+function SkillCard({ loading, installed, onInstalled, skill, name, description }) {
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState(null);
 
   function install() {
     setInstalling(true);
     setInstallError(null);
-    fetch("/api/status/install-skill", { method: "POST" })
+    fetch("/api/status/install-skill", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ skill }),
+    })
       .then((r) => r.json())
       .then((data) => {
         if (data.error) throw new Error(data.error);
@@ -221,7 +225,7 @@ function SkillCard({ loading, installed, onInstalled }) {
         <div className={logoClass}>⚡</div>
 
         <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-          <span className="text-sm font-semibold leading-tight">Skill: tlc-spec-driven</span>
+          <span className="text-sm font-semibold leading-tight">Skill: {name}</span>
 
           {loading && (
             <span className="text-xs text-muted-foreground">Verificando…</span>
@@ -249,7 +253,7 @@ function SkillCard({ loading, installed, onInstalled }) {
                 <span className="text-xs text-destructive mt-0.5">{installError}</span>
               )}
               <span className="text-xs text-muted-foreground">
-                Recomendada para planejamento de features com IA
+                {description}
               </span>
             </>
           )}
@@ -382,6 +386,18 @@ export default function SettingsModal({ onClose }) {
             loading={loading}
             installed={status?.claude?.tlcSkill ?? false}
             onInstalled={setStatus}
+            skill="tlc-spec-driven"
+            name="tlc-spec-driven"
+            description="Recomendada para planejamento de features com IA"
+          />
+
+          <SkillCard
+            loading={loading}
+            installed={status?.claude?.specDrivenEvalSkill ?? false}
+            onInstalled={setStatus}
+            skill="spec-driven-eval"
+            name="spec-driven-eval"
+            description="Recomendada para avaliar implementações contra a spec/PRD"
           />
 
           {/* Projects path card */}

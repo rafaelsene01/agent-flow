@@ -23,9 +23,17 @@ export default function statusRoutes(app) {
     }
   });
 
-  app.post("/api/status/install-skill", async (_req, res) => {
-    const src  = join(PACKAGE_ROOT, ".claude", "skills", "tlc-spec-driven");
-    const dest = join(homedir(), ".claude", "skills", "tlc-spec-driven");
+  const INSTALLABLE_SKILLS = ["tlc-spec-driven", "spec-driven-eval"];
+
+  app.post("/api/status/install-skill", async (req, res) => {
+    const skill = req.body?.skill ?? "tlc-spec-driven";
+
+    if (!INSTALLABLE_SKILLS.includes(skill)) {
+      return res.status(400).json({ error: "Skill inválida." });
+    }
+
+    const src  = join(PACKAGE_ROOT, ".claude", "skills", skill);
+    const dest = join(homedir(), ".claude", "skills", skill);
 
     if (!existsSync(src)) {
       return res.status(404).json({ error: "Skill não encontrada no projeto." });

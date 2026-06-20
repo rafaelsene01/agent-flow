@@ -3,10 +3,10 @@ import { existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
-function checkTlcSkill() {
+function checkSkill(name) {
   const base = join(homedir(), ".claude", "skills");
-  return existsSync(join(base, "tlc-spec-driven")) ||
-         existsSync(join(base, "tlc-spec-driven.md"));
+  return existsSync(join(base, name)) ||
+         existsSync(join(base, `${name}.md`));
 }
 
 export async function getStatus() {
@@ -14,8 +14,14 @@ export async function getStatus() {
     const version = execSync("claude --version", {
       stdio: "pipe", encoding: "utf-8", timeout: 5000,
     }).trim();
-    return { connected: true, method: "claude-cli", version, tlcSkill: checkTlcSkill() };
+    return {
+      connected: true,
+      method: "claude-cli",
+      version,
+      tlcSkill: checkSkill("tlc-spec-driven"),
+      specDrivenEvalSkill: checkSkill("spec-driven-eval"),
+    };
   } catch {
-    return { connected: false, tlcSkill: false };
+    return { connected: false, tlcSkill: false, specDrivenEvalSkill: false };
   }
 }
