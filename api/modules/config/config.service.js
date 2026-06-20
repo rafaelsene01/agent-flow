@@ -10,6 +10,7 @@ const DEFAULTS = {
   boards:            [],
   maxConcurrentRuns: 3,
   runTimeoutMinutes: 30,
+  language:          "en",
 };
 
 function ensureDirs() {
@@ -46,6 +47,10 @@ function enqueueWrite(fn) {
 export function getConfig() {
   ensureDirs();
   return _readSync();
+}
+
+export function getLanguage() {
+  return _readSync().language ?? "en";
 }
 
 export function setConfig(updates) {

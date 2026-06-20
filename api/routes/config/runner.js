@@ -4,7 +4,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { runClaude, resumeClaude, createRunLog, failureDetail, registerSseClient } from "../../modules/claude/claude.runner.js";
 import { acquireSlot, releaseSlot, registerProcess, unregisterProcess, cancelProcess } from "../../modules/claude/claude.concurrency.js";
-import { getWorktrees, updateWorktreeStatus, getHelpersDir } from "../../modules/config/config.service.js";
+import { getWorktrees, updateWorktreeStatus, getHelpersDir, getLanguage } from "../../modules/config/config.service.js";
 import { sendError } from "../../lib/errors.js";
 import { scanTlcFeatures } from "./tlc.js";
 
@@ -63,6 +63,13 @@ async function computeBaseRef(wtPath) {
   } catch {
     return null;
   }
+}
+
+function langInstruction() {
+  const lang = getLanguage();
+  return lang === "pt"
+    ? "Responda em português do Brasil.\n\n"
+    : "Respond in English.\n\n";
 }
 
 function buildCardLines({ title, number, body, branch }) {
@@ -141,6 +148,7 @@ export default function runnerRoutes(app) {
         const cardContent = fs.readFileSync(path.join(getHelpersDir(wt), "CARD.md"), "utf-8");
 
         const impl = await runClaude(
+          langInstruction() +
           "You are an autonomous coding agent. Implement the task below immediately.\n" +
           "Rules:\n" +
           "- Use Write and Edit tools to create/modify files. Do NOT describe — just do it.\n" +
@@ -227,6 +235,7 @@ export default function runnerRoutes(app) {
       const cardContent = fs.readFileSync(path.join(tlcHelpersDir, "CARD.md"), "utf-8");
 
       const result = await runClaude(
+        langInstruction() +
         "/tlc-spec-driven\n\n" +
         "Leia o conteúdo abaixo e execute as fases Specify, Design e Tasks completas.\n\n" +
         cardContent,
@@ -314,6 +323,7 @@ export default function runnerRoutes(app) {
         logStream.write("=== Step 1: executando spec ===\n");
 
         const impl = await runClaude(
+          langInstruction() +
           `Execute a spec em ${specFilePath} usando o máximo de subagentes possível. Não faça commits nem push.\n` +
           "Quando totalmente concluído, sua ÚLTIMA linha deve ser exatamente: COMMIT: <mensagem conventional commit>\n" +
           "(ex: COMMIT: feat: implement card sorting)",
@@ -402,6 +412,7 @@ export default function runnerRoutes(app) {
         logStream.write("=== Spec-Eval: avaliando implementação contra a spec ===\n");
 
         const result = await runClaude(
+          langInstruction() +
           "/spec-driven-eval\n\n" +
           "Siga a guideline spec-driven-eval e avalie (grade) a implementação no branch atual desta worktree, " +
           "produzindo a nota final comparável.\n\n" +
@@ -563,6 +574,7 @@ export default function runnerRoutes(app) {
         const logStream = createRunLog(wt, "agent-flow.log");
 
         const commitResult = await resumeClaude(
+          langInstruction() +
           "Com base em tudo que foi implementado nesta sessão, crie um commit semântico (conventional commits) " +
           "com todas as mudanças staged. Use --no-verify. Não faça push.",
           wt.path,
@@ -706,6 +718,7 @@ export default function runnerRoutes(app) {
       const logStream = createRunLog(wt, "agent-flow.log");
 
       const pullResult = await resumeClaude(
+        langInstruction() +
         `Faça pull das alterações remotas do branch '${wt.branch}' (origin/${wt.branch}) para o branch local. ` +
         `Use --no-verify onde necessário. Se houver conflitos de merge, resolva-os mantendo as alterações locais ` +
         `quando fizer sentido e integrando as remotas. ` +

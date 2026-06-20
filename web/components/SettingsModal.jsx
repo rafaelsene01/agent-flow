@@ -271,6 +271,30 @@ function SkillCard({ loading, installed, onInstalled, skill, name, description }
   );
 }
 
+/* ── LangSwitch ──────────────────────────────────────────────────────────── */
+function LangSwitch({ value, onChange }) {
+  const options = ["en", "pt"];
+  return (
+    <div className="flex items-center gap-0.5 rounded-md border bg-muted p-0.5">
+      {options.map((lang) => (
+        <button
+          key={lang}
+          type="button"
+          onClick={() => onChange(lang)}
+          className={cn(
+            "px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide transition-colors",
+            value === lang
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {lang}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /* ── SettingsModal ───────────────────────────────────────────────────────── */
 export default function SettingsModal({ onClose }) {
   const [status, setStatus]             = useState(null);
@@ -279,6 +303,7 @@ export default function SettingsModal({ onClose }) {
   const [pathInput, setPathInput]       = useState("");
   const [pathSaving, setPathSaving]     = useState(false);
   const [pathSaved, setPathSaved]       = useState(false);
+  const [language, setLanguage]         = useState("en");
 
   const fetchStatus = useCallback((force = false) => {
     setLoading(true);
@@ -291,9 +316,22 @@ export default function SettingsModal({ onClose }) {
   useEffect(() => {
     fetch("/api/config")
       .then((r) => r.json())
-      .then((c) => { setProjectsPath(c.projectsPath ?? ""); setPathInput(c.projectsPath ?? ""); })
+      .then((c) => {
+        setProjectsPath(c.projectsPath ?? "");
+        setPathInput(c.projectsPath ?? "");
+        setLanguage(c.language ?? "en");
+      })
       .catch(() => {});
   }, []);
+
+  function saveLanguage(lang) {
+    setLanguage(lang);
+    fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language: lang }),
+    }).catch(() => {});
+  }
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
 
@@ -345,17 +383,20 @@ export default function SettingsModal({ onClose }) {
             <Settings className="size-4 text-muted-foreground" />
             <DialogTitle className="text-base leading-none">Integrações</DialogTitle>
           </div>
-          {!isLocked && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              type="button"
-              onClick={onClose}
-              aria-label="Fechar"
-            >
-              ✕
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <LangSwitch value={language} onChange={saveLanguage} />
+            {!isLocked && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                onClick={onClose}
+                aria-label="Fechar"
+              >
+                ✕
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Lock message */}
