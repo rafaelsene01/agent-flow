@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/rafaelsene01/agent-flow/compare/v1.11.0...v1.12.0) (2026-06-21)
+
+
+### Features
+
+* enable minification in build process ([a5f47a5](https://github.com/rafaelsene01/agent-flow/commit/a5f47a5a17ad97d0dfea94b6eea4e116c43c515e))
+
 # [1.11.0](https://github.com/rafaelsene01/agent-flow/compare/v1.10.0...v1.11.0) (2026-06-21)
 
 
