@@ -1,3 +1,11 @@
+# [1.14.0](https://github.com/rafaelsene01/agent-flow/compare/v1.13.0...v1.14.0) (2026-06-21)
+
+
+### Features
+
+* add message sending functionality to worktrees ([b159b4a](https://github.com/rafaelsene01/agent-flow/commit/b159b4a193724ee3f1bd3473a74d39cbac6ddbaf))
+* implement chat session management in worktree configuration ([f16610d](https://github.com/rafaelsene01/agent-flow/commit/f16610d1d8d1ea2e4d779a31711b25b6453d6d89))
+
 # [1.13.0](https://github.com/rafaelsene01/agent-flow/compare/v1.12.0...v1.13.0) (2026-06-21)
 
 
