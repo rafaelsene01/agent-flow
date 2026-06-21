@@ -28,6 +28,7 @@ const bundle = await rolldown({
 await bundle.write({
   file: OUTFILE,
   format: "esm",
+  minify: true,
 });
 
 let code = readFileSync(OUTFILE, "utf8");
