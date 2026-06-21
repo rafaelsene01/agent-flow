@@ -7,7 +7,7 @@ Kanban board para GitHub Projects V2. Roda local, interface web.
 ## Instalação
 
 ```bash
-npm i -g @rafaelsene01/agent-flow
+npm i -g .
 ```
 
 ### Desinstalar
