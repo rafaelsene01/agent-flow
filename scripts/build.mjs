@@ -3,7 +3,6 @@ import { rmSync, cpSync, mkdirSync, readFileSync, writeFileSync, chmodSync, exis
 import path from "path";
 import { fileURLToPath } from "url";
 import { rolldown } from "rolldown";
-import JavaScriptObfuscator from "javascript-obfuscator";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = path.join(ROOT, "dist");
@@ -31,28 +30,9 @@ await bundle.write({
   format: "esm",
 });
 
-console.log("► Ofuscando bundle da api");
 let code = readFileSync(OUTFILE, "utf8");
-let shebang = "";
-if (code.startsWith("#!")) {
-  const nl = code.indexOf("\n") + 1;
-  shebang = code.slice(0, nl);
-  code = code.slice(nl);
-}
 code = code.replaceAll("process.env.AGENT_FLOW_BUNDLED", '"1"');
-const obfuscated = JavaScriptObfuscator.obfuscate(code, {
-  target: "node",
-  compact: true,
-  identifierNamesGenerator: "hexadecimal",
-  renameGlobals: false,
-  selfDefending: false,
-  deadCodeInjection: false,
-  controlFlowFlattening: false,
-  stringArray: true,
-  stringArrayThreshold: 0.75,
-  stringArrayEncoding: ["base64"],
-}).getObfuscatedCode();
-writeFileSync(OUTFILE, shebang + obfuscated);
+writeFileSync(OUTFILE, code);
 chmodSync(OUTFILE, 0o755);
 
 console.log("► Copiando web/out → dist/web");

@@ -3,6 +3,10 @@
   "version": "1.9.0",
   "description": "Agent Flow · Web Kanban board for Linear — open source, runs locally",
   "main": "dist/agent-flow.js",
+  "workspaces": [
+    "api",
+    "web"
+  ],
   "bin": {
     "agent-flow": "dist/agent-flow.js"
   },
@@ -11,7 +15,6 @@
   },
   "type": "module",
   "scripts": {
-    "postinstall": "node -e \"const fs=require('fs'),cp=require('child_process');if(fs.existsSync('web')&&!fs.existsSync('web/node_modules/.package-lock.json')){cp.execSync('npm install',{cwd:'web',stdio:'inherit'})}\"",
     "dev": "concurrently -n api,web -c cyan,magenta \"node api/dev.js\" \"npm run dev --prefix web\"",
     "start": "node dist/agent-flow.js",
     "build": "node scripts/build.mjs",
@@ -43,10 +46,7 @@
     "@emnapi/runtime": "^1.11.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
-    "chalk": "^5.3.0",
     "concurrently": "^10.0.3",
-    "express": "^5.1.0",
-    "javascript-obfuscator": "^5.4.3",
     "rolldown": "^1.0.0",
     "semantic-release": "^24.2.9"
   }

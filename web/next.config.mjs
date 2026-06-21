@@ -10,7 +10,7 @@ const config = {
   output: isDev ? undefined : "export",
   distDir: "out",
   images: { unoptimized: true },
-  outputFileTracingRoot: path.resolve(__dirname, ".."),
+  turbopack: { root: path.resolve(__dirname, "..") },
   ...(isDev && {
     async rewrites() {
       return [
