@@ -319,25 +319,31 @@ export function resumeClaude(
   logStream,
   sessionName,
   onSpawn = null,
+  opts = {},
 ) {
   return new Promise((resolve) => {
     let output = "";
     let settled = false;
-    const child = spawn(
-      "claude",
-      [
-        "--resume",
-        sessionName,
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--dangerously-skip-permissions",
-      ],
-      { cwd, shell: isWin, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
-    );
+    const { model = null, effort = null } = opts;
+    const args = [
+      "--resume",
+      sessionName,
+      ...(model ? ["--model", model] : []),
+      ...(effort ? ["--effort", effort] : []),
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--dangerously-skip-permissions",
+    ];
+    const child = spawn("claude", args, {
+      cwd,
+      shell: isWin,
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
 
     logStream.write(
-      `\n>>> claude --resume ${sessionName} --output-format stream-json --verbose (pid ${child.pid})\n`,
+      `\n>>> claude ${args.filter((a) => !a.includes("skip")).join(" ")} (pid ${child.pid})\n`,
     );
     onSpawn?.(child);
 

@@ -18,6 +18,10 @@ function makeSessionName(wt) {
   return `${worktreeName}-${branchName}`.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
 
+function makeChatSessionName(wt) {
+  return `${makeSessionName(wt)}-chat-${Date.now().toString(36)}`;
+}
+
 async function ensureWorktreeExclude(wtPath) {
   try {
     const { stdout } = await execFileP("git", ["rev-parse", "--git-dir"], { cwd: wtPath, timeout: 5_000 });
@@ -207,6 +211,18 @@ export default function runnerRoutes(app) {
     })();
   });
 
+  // Gera/rotaciona a sessão de chat: só grava na config. A sessão Claude é
+  // de fato criada no próximo envio de mensagem (runClaude com -n; depois resume).
+  app.post("/api/config/worktrees/:id/session", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado na configuração.");
+
+    const chatSession = makeChatSessionName(wt);
+    updateWorktreeStatus(id, { chatSession, chatSessionStarted: false });
+    res.json({ ok: true, chatSession });
+  });
+
   app.post("/api/config/worktrees/:id/message", (req, res) => {
     const id = decodeURIComponent(req.params.id);
     const { message, model, effort } = req.body ?? {};
@@ -215,12 +231,17 @@ export default function runnerRoutes(app) {
     if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
     if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
     if (!message?.trim())        return sendError(res, 400, "Mensagem obrigatória.");
+    if (!wt.chatSession)         return sendError(res, 400, "Gere uma sessão antes de enviar mensagens.");
 
     try {
       acquireSlot();
     } catch (err) {
       return sendError(res, err.status ?? 500, err.message);
     }
+
+    // Sessão reutilizável guardada na config.
+    const chatSession = wt.chatSession;
+    const chatSessionStarted = wt.chatSessionStarted ?? false;
 
     updateWorktreeStatus(id, {
       messageStatus:    "running",
@@ -233,15 +254,16 @@ export default function runnerRoutes(app) {
 
     (async () => {
       try {
-        logStream.write("=== Mensagem do usuário ===\n");
-        const result = await runClaude(
-          langInstruction() + message.trim(),
-          wt.path,
-          logStream,
-          makeSessionName(wt),
-          (child) => registerProcess(id, child),
-          { model: model || "sonnet", effort: effort || "medium" },
+        const prompt = langInstruction() + message.trim();
+        const opts = { model: model || "sonnet", effort: effort || "medium" };
+        logStream.write(
+          `=== Mensagem do usuário (sessão ${chatSession}${chatSessionStarted ? ", resume" : ", nova"}) ===\n`,
         );
+
+        // Primeira mensagem da sessão: cria com -n. Demais: --resume pelo nome.
+        const result = chatSessionStarted
+          ? await resumeClaude(prompt, wt.path, logStream, chatSession, (child) => registerProcess(id, child), opts)
+          : await runClaude(prompt, wt.path, logStream, chatSession, (child) => registerProcess(id, child), opts);
 
         if (result.code !== 0) {
           logStream.end();
@@ -250,7 +272,7 @@ export default function runnerRoutes(app) {
         }
 
         await new Promise((resolve) => logStream.end(resolve));
-        updateWorktreeStatus(id, { messageStatus: "done" });
+        updateWorktreeStatus(id, { messageStatus: "done", chatSessionStarted: true });
       } finally {
         unregisterProcess(id);
         releaseSlot();
