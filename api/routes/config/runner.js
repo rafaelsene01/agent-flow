@@ -162,6 +162,7 @@ export default function runnerRoutes(app) {
           logStream,
           makeSessionName(wt),
           (child) => registerProcess(id, child),
+          { model: "sonnet", effort: "medium" },
         );
 
         if (impl.code !== 0) {
@@ -241,6 +242,9 @@ export default function runnerRoutes(app) {
         cardContent,
         wt.path,
         logStream,
+        null,
+        null,
+        { model: "opus", effort: "high" },
       );
 
       if (result.code !== 0) {
@@ -331,6 +335,7 @@ export default function runnerRoutes(app) {
           logStream,
           makeSessionName(wt),
           (child) => registerProcess(id, child),
+          { model: "sonnet", effort: "medium" },
         );
 
         if (impl.code !== 0) {
@@ -424,6 +429,7 @@ export default function runnerRoutes(app) {
           logStream,
           null, // nova sessão: sem -n e sem --resume
           (child) => registerProcess(id, child),
+          { model: "opus", effort: "high" },
         );
 
         if (result.code !== 0) {

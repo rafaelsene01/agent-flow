@@ -241,11 +241,15 @@ export function runClaude(
   logStream,
   sessionName = null,
   onSpawn = null,
+  opts = {},
 ) {
   return new Promise((resolve) => {
     let output = "";
     let settled = false;
+    const { model = null, effort = null } = opts;
     const baseArgs = [
+      ...(model ? ["--model", model] : []),
+      ...(effort ? ["--effort", effort] : []),
       "--output-format",
       "stream-json",
       "--verbose",
