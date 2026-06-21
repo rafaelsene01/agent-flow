@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/rafaelsene01/agent-flow/compare/v1.12.0...v1.13.0) (2026-06-21)
+
+
+### Features
+
+* enhance Claude runner with model and effort options ([477617d](https://github.com/rafaelsene01/agent-flow/commit/477617dc1e5c45e4f34ba63a276260f1492da7c3))
+
 # [1.12.0](https://github.com/rafaelsene01/agent-flow/compare/v1.11.0...v1.12.0) (2026-06-21)
 
 
