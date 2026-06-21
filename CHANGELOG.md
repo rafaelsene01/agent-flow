@@ -1,3 +1,22 @@
+# [1.10.0](https://github.com/rafaelsene01/agent-flow/compare/v1.9.0...v1.10.0) (2026-06-21)
+
+
+### Bug Fixes
+
+* update npm publish configuration in release settings ([4a24ffb](https://github.com/rafaelsene01/agent-flow/commit/4a24ffb7598e36cbdef4fad4a57579c2198adace))
+
+
+### Features
+
+* add language selection feature to settings modal and config service ([b2dcba5](https://github.com/rafaelsene01/agent-flow/commit/b2dcba536eca8be627668aba6e80ad6ea1c179a5))
+* add spec evaluation functionality to worktree management ([0296975](https://github.com/rafaelsene01/agent-flow/commit/02969756cd5742c1bdc650388f52ab351a0caaae))
+* add spec-driven-eval configuration to skill-lock files ([b5c2326](https://github.com/rafaelsene01/agent-flow/commit/b5c23263184473dbead02d43690a9f8cc0b3ea7a))
+* enhance skill management in Claude service and UI ([d35d621](https://github.com/rafaelsene01/agent-flow/commit/d35d621728d85e78ada7afb9be06a901c9316fea))
+* implement helpers directory management for worktrees ([25c0a78](https://github.com/rafaelsene01/agent-flow/commit/25c0a78fd2970758da0fe01014522f3756052eb6))
+* implement worktree concurrency management and log streaming ([9a0d4bb](https://github.com/rafaelsene01/agent-flow/commit/9a0d4bb874d4e93d64857b5b2d44ad63696d824e))
+* improve log streaming and SSE handling in CardModal and backend ([74afe77](https://github.com/rafaelsene01/agent-flow/commit/74afe77cb3d923ef91b47d8e66e9c37f7d3fefd9))
+* remove outdated design specifications and tasks for UI Tailwind + shadcn/ui migration ([1e10f16](https://github.com/rafaelsene01/agent-flow/commit/1e10f16b02c1c347d60bf72c907824a8f5d4cc20))
+
 # [1.9.0](https://github.com/rafaelsene01/agent-flow/compare/v1.8.0...v1.9.0) (2026-06-18)
 
 
