@@ -207,6 +207,57 @@ export default function runnerRoutes(app) {
     })();
   });
 
+  app.post("/api/config/worktrees/:id/message", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const { message, model, effort } = req.body ?? {};
+
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!message?.trim())        return sendError(res, 400, "Mensagem obrigatória.");
+
+    try {
+      acquireSlot();
+    } catch (err) {
+      return sendError(res, err.status ?? 500, err.message);
+    }
+
+    updateWorktreeStatus(id, {
+      messageStatus:    "running",
+      messageLastRunAt: new Date().toISOString(),
+      messageLastError: null,
+    });
+    res.json({ ok: true });
+
+    const logStream = createRunLog(wt, "agent-flow.log");
+
+    (async () => {
+      try {
+        logStream.write("=== Mensagem do usuário ===\n");
+        const result = await runClaude(
+          langInstruction() + message.trim(),
+          wt.path,
+          logStream,
+          makeSessionName(wt),
+          (child) => registerProcess(id, child),
+          { model: model || "sonnet", effort: effort || "medium" },
+        );
+
+        if (result.code !== 0) {
+          logStream.end();
+          updateWorktreeStatus(id, { messageStatus: "error", messageLastError: `Mensagem falhou: ${failureDetail(result, logStream.persistPath)}` });
+          return;
+        }
+
+        await new Promise((resolve) => logStream.end(resolve));
+        updateWorktreeStatus(id, { messageStatus: "done" });
+      } finally {
+        unregisterProcess(id);
+        releaseSlot();
+      }
+    })();
+  });
+
   app.post("/api/config/worktrees/:id/run-tlc", (req, res) => {
     const id = decodeURIComponent(req.params.id);
     const { title, number, body } = req.body ?? {};

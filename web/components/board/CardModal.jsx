@@ -18,6 +18,7 @@ import {
   Pencil,
   Play,
   RotateCcw,
+  Send,
   X,
   Zap,
 } from "lucide-react";
@@ -27,7 +28,15 @@ import TlcFileModal from "@/components/board/TlcFileModal.jsx";
 import FileContentModal from "@/components/board/FileContentModal.jsx";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.jsx";
 import { Button } from "@/components/ui/button.jsx";
+import { Textarea } from "@/components/ui/textarea.jsx";
 import { Separator } from "@/components/ui/separator.jsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.jsx";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.jsx";
 import { cn } from "@/lib/utils";
 
@@ -113,6 +122,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [errorModal, setErrorModal] = useState(null); // null | string
   const [logText, setLogText] = useState("");
   const [mainTab, setMainTab] = useState("desc");
+  const [messageText, setMessageText] = useState("");
+  const [messageModel, setMessageModel] = useState("sonnet");
+  const [messageEffort, setMessageEffort] = useState("medium");
+  const [messageSending, setMessageSending] = useState(false);
   const logRef = useRef(null);
   const prevAnyRunningRef = useRef(null);
 
@@ -197,7 +210,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.tlcExecStatus === "running" ||
     worktreeConfig?.specEvalStatus === "running" ||
     worktreeConfig?.commitPushStatus === "running" ||
-    worktreeConfig?.pullStatus === "running";
+    worktreeConfig?.pullStatus === "running" ||
+    worktreeConfig?.messageStatus === "running";
 
   // Conecta SSE ao abrir o card e reconecta quando um novo run inicia
   useEffect(() => {
@@ -255,7 +269,37 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.specEvalStatus,
     worktreeConfig?.commitPushStatus,
     worktreeConfig?.pullStatus,
+    worktreeConfig?.messageStatus,
   ]);
+
+  async function handleSendMessage() {
+    const text = messageText.trim();
+    if (!text) return;
+    setMessageSending(true);
+    try {
+      const res = await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/message`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            model: messageModel,
+            effort: messageEffort,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setMessageText("");
+      loadWorktreeConfig();
+      onWorktreeChange?.();
+    } catch (err) {
+      console.error("[send-message]", err);
+    } finally {
+      setMessageSending(false);
+    }
+  }
 
   async function handleRunTlc() {
     setTlcSending(true);
@@ -503,6 +547,73 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       Sem descrição.
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* ── campo fixo de mensagem ── */}
+              {isConfigured && (
+                <div className="shrink-0 border-t bg-muted/20 px-6 py-3">
+                  <Textarea
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        if (!anyRunning && !messageSending) handleSendMessage();
+                      }
+                    }}
+                    placeholder="Enviar uma mensagem ao agente nesta worktree…"
+                    className="min-h-16 resize-none text-sm"
+                    disabled={anyRunning || messageSending}
+                  />
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={messageModel}
+                        onValueChange={setMessageModel}
+                        disabled={anyRunning || messageSending}
+                      >
+                        <SelectTrigger size="sm" className="text-xs" title="Model">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="haiku">Haiku</SelectItem>
+                          <SelectItem value="sonnet">Sonnet</SelectItem>
+                          <SelectItem value="opus">Opus</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={messageEffort}
+                        onValueChange={setMessageEffort}
+                        disabled={anyRunning || messageSending}
+                      >
+                        <SelectTrigger size="sm" className="text-xs" title="Effort">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">low</SelectItem>
+                          <SelectItem value="medium">medium</SelectItem>
+                          <SelectItem value="high">high</SelectItem>
+                          <SelectItem value="xhigh">xhigh</SelectItem>
+                          <SelectItem value="max">max</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      size="sm"
+                      type="button"
+                      className="gap-2"
+                      disabled={!messageText.trim() || anyRunning || messageSending}
+                      onClick={handleSendMessage}
+                    >
+                      {messageSending ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Send className="size-3.5" />
+                      )}
+                      <span>Enviar</span>
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
