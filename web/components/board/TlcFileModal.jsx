@@ -68,7 +68,7 @@ export default function TlcFileModal({ worktreeId, type, onClose }) {
   const Icon = TLC_LUCIDE[type] ?? FileText;
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog open modal={false} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent
         className="w-full sm:max-w-[calc(100%-2rem)] h-[92vh] p-0 gap-0 flex flex-col overflow-hidden"
         showCloseButton={false}

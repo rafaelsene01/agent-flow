@@ -31,10 +31,10 @@ export default function FileContentModal({ worktreeId, filePath, onClose, fetchU
   }, [worktreeId, filePath, fetchUrl]);
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog open modal={false} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent
         aria-describedby={undefined}
-        className="w-full sm:max-w-[calc(100%-2rem)] max-h-[85vh] flex flex-col gap-0 overflow-hidden p-0"
+        className="w-full sm:max-w-[calc(100%-2rem)] min-h-[80vh] max-h-[85vh] flex flex-col gap-0 overflow-hidden p-0"
       >
         <div className="flex items-center gap-2 border-b pl-4 pr-12 py-3 shrink-0">
           <DialogTitle className="flex-1 truncate font-mono text-sm" title={filePath}>

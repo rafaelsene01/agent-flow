@@ -108,7 +108,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
   const canCreate = owner && repo && originBranch && newBranch && !validationError && !creating;
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open modal={false} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         className="max-w-[480px] p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden"
         showCloseButton={false}

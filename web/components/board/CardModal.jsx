@@ -386,17 +386,20 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   }
 
   return (
-    <>
-      <Dialog
-        open
-        onOpenChange={(o) => {
-          if (!o) onClose();
-        }}
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!o && !fileContentModal && !helpersFileModal && !tlcFileModal && !showCreateBranch && !errorModal) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent
+        aria-describedby={undefined}
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        className="w-full sm:max-w-[calc(100%-2rem)] h-[80vh] gap-0 overflow-hidden p-0"
       >
-        <DialogContent
-          aria-describedby={undefined}
-          className="w-full sm:max-w-[calc(100%-2rem)] h-[80vh] gap-0 overflow-hidden p-0"
-        >
           <div className="flex h-full min-h-0">
             {/* ── main ── */}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -1076,7 +1079,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             </aside>
           </div>
         </DialogContent>
-      </Dialog>
       {showCreateBranch && board && (
         <CreateBranchModal
           board={board}
@@ -1111,7 +1113,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
         />
       )}
       {errorModal && (
-        <Dialog open onOpenChange={(o) => { if (!o) setErrorModal(null); }}>
+        <Dialog open modal={false} onOpenChange={(o) => { if (!o) setErrorModal(null); }}>
           <DialogContent
             aria-describedby={undefined}
             className="w-full sm:max-w-lg max-h-[70vh] flex flex-col gap-0 overflow-hidden p-0"
@@ -1130,6 +1132,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
           </DialogContent>
         </Dialog>
       )}
-    </>
+    </Dialog>
   );
 }
