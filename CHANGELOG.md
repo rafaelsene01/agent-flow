@@ -1,3 +1,15 @@
+# [1.11.0](https://github.com/rafaelsene01/agent-flow/compare/v1.10.0...v1.11.0) (2026-06-21)
+
+
+### Bug Fixes
+
+* update Dialog components to prevent closing on interaction ([a9ad361](https://github.com/rafaelsene01/agent-flow/commit/a9ad361cc2ae15ed3cc9a0ab84567e98e0b15ff0))
+
+
+### Features
+
+* update package configuration and build process ([f1619f1](https://github.com/rafaelsene01/agent-flow/commit/f1619f1e1b02c3e14c01097e976ccbe70905ee51))
+
 # [1.10.0](https://github.com/rafaelsene01/agent-flow/compare/v1.9.0...v1.10.0) (2026-06-21)
 
 
