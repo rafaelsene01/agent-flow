@@ -15,7 +15,7 @@ npm i -g .      # instala global
 ### Desinstalar
 
 ```bash
-npm uninstall -g @rafaelsene01/agent-flow
+npm uninstall -g agent-flow
 ```
 
 ---

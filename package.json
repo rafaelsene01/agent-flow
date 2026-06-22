@@ -1,5 +1,5 @@
 {
-  "name": "@rafaelsene01/agent-flow",
+  "name": "agent-flow",
   "version": "1.14.1",
   "description": "Agent Flow · Web Kanban board for Linear — open source, runs locally",
   "main": "dist/agent-flow.js",
