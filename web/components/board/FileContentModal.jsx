@@ -31,7 +31,7 @@ export default function FileContentModal({ worktreeId, filePath, onClose, fetchU
   }, [worktreeId, filePath, fetchUrl]);
 
   return (
-    <Dialog open modal={false} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent
         aria-describedby={undefined}
         className="w-full sm:max-w-[calc(100%-2rem)] min-h-[80vh] max-h-[85vh] flex flex-col gap-0 overflow-hidden p-0"
