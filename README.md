@@ -7,7 +7,9 @@ Kanban board para GitHub Projects V2. Roda local, interface web.
 ## Instalação
 
 ```bash
-npm i -g .
+npm install     # instala os pacotes
+npm run build   # gera o build
+npm i -g .      # instala global
 ```
 
 ### Desinstalar
