@@ -1,3 +1,10 @@
+## [1.14.1](https://github.com/rafaelsene01/agent-flow/compare/v1.14.0...v1.14.1) (2026-06-21)
+
+
+### Bug Fixes
+
+* update installation command in README ([e4e834e](https://github.com/rafaelsene01/agent-flow/commit/e4e834e253643259bf7cd45d3f5e1f4ab1004932))
+
 # [1.14.0](https://github.com/rafaelsene01/agent-flow/compare/v1.13.0...v1.14.0) (2026-06-21)
 
 
