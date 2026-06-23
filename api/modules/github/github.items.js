@@ -158,7 +158,13 @@ async function getAllProjectItems(projectId) {
     if (disk) { _cache.set(projectId, disk); entry = disk; }
   }
   if (entry) {
-    if (Date.now() - entry.ts >= CACHE_TTL_MS) refreshInBackground(projectId);
+    // Revalidação em background: nunca propaga rejeição (ex: 401 por token
+    // rotacionado), senão uma unhandled rejection derruba o processo.
+    if (Date.now() - entry.ts >= CACHE_TTL_MS) {
+      refreshInBackground(projectId).catch((err) =>
+        console.error("[items] erro na revalidação em background:", err.message),
+      );
+    }
     return entry.items;
   }
   return refreshInBackground(projectId);
