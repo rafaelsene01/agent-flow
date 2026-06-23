@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/rafaelsene01/agent-flow/compare/v1.18.0...v1.19.0) (2026-06-23)
+
+
+### Features
+
+* implement timeout handling for GitHub API requests ([f61d80b](https://github.com/rafaelsene01/agent-flow/commit/f61d80b55e0a8e17643fa64d9d1e157207dbc6bc))
+
 # [1.18.0](https://github.com/rafaelsene01/agent-flow/compare/v1.17.0...v1.18.0) (2026-06-23)
 
 
