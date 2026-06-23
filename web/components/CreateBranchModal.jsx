@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { GitBranch, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -40,6 +40,12 @@ export default function CreateBranchModal({ board, item, onClose }) {
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [branchesError, setBranchesError]     = useState(null);
   const [originBranch, setOriginBranch]       = useState(null);
+  // hasMore: o repo tem mais branches que o limite de uma busca → o filtro passa
+  // a buscar no servidor (debounce) em vez de filtrar apenas a fatia carregada.
+  const [hasMore, setHasMore]           = useState(false);
+  // loaded: a carga inicial já concluiu. Mantém o campo de filtro montado durante
+  // as buscas seguintes (senão o input desmonta e o foco se perde ao digitar).
+  const [loaded, setLoaded]             = useState(false);
 
   const [branchFilter, setBranchFilter] = useState("");
 
@@ -53,18 +59,56 @@ export default function CreateBranchModal({ board, item, onClose }) {
 
   // Radix Dialog handles Esc natively — no manual keydown listener needed.
 
+  // Evita uma busca redundante logo após a carga inicial detectar `hasMore`.
+  const skipInitialSearch = useRef(true);
+
+  // Carga inicial (sem filtro): define a lista e se há mais que o limite.
   useEffect(() => {
     if (!owner || !repo) return;
+    let active = true;
+    skipInitialSearch.current = true;
+    setLoaded(false);
     setBranchesLoading(true);
+    setBranchesError(null);
     fetch(`/api/github/repos/${owner}/${repo}/branches`)
       .then((r) => r.json())
       .then((data) => {
+        if (!active) return;
         if (data.error) throw new Error(data.error);
-        setBranches(data);
+        setBranches(data.branches ?? []);
+        setHasMore(Boolean(data.hasMore));
       })
-      .catch((err) => setBranchesError(err.message))
-      .finally(() => setBranchesLoading(false));
+      .catch((err) => { if (active) setBranchesError(err.message); })
+      .finally(() => { if (active) { setBranchesLoading(false); setLoaded(true); } });
+    return () => { active = false; };
   }, [owner, repo]);
+
+  // Busca server-side com debounce (500ms): só quando o repo tem mais branches
+  // que o limite carregado. Caso contrário, o filtro é resolvido no cliente.
+  useEffect(() => {
+    if (!owner || !repo || !hasMore) return;
+    if (skipInitialSearch.current) {
+      // A lista inicial já está carregada; não rebusca à toa.
+      skipInitialSearch.current = false;
+      return;
+    }
+    let active = true;
+    const handle = setTimeout(() => {
+      setBranchesLoading(true);
+      setBranchesError(null);
+      const qs = branchFilter ? `?q=${encodeURIComponent(branchFilter)}` : "";
+      fetch(`/api/github/repos/${owner}/${repo}/branches${qs}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (!active) return;
+          if (data.error) throw new Error(data.error);
+          setBranches(data.branches ?? []);
+        })
+        .catch((err) => { if (active) setBranchesError(err.message); })
+        .finally(() => { if (active) setBranchesLoading(false); });
+    }, 500);
+    return () => { active = false; clearTimeout(handle); };
+  }, [branchFilter, hasMore, owner, repo]);
 
   function handleNameChange(e) {
     const val = e.target.value;
@@ -162,19 +206,20 @@ export default function CreateBranchModal({ board, item, onClose }) {
                 Branch de Origem
               </Label>
 
-              {branchesLoading && (
+              {!loaded && branchesLoading && (
                 <p className="text-xs text-muted-foreground">Carregando branches…</p>
               )}
               {branchesError && (
                 <p className="text-xs text-destructive">{branchesError}</p>
               )}
-              {!branchesLoading && !branchesError && branches.length === 0 && (
-                <p className="text-xs text-muted-foreground">Nenhuma branch encontrada.</p>
-              )}
-              {!branchesLoading && !branchesError && branches.length > 0 && (() => {
-                const filtered = branches.filter((b) =>
-                  b.name.toLowerCase().includes(branchFilter.toLowerCase())
-                );
+              {loaded && !branchesError && (() => {
+                // Com `hasMore`, o servidor já filtrou (GraphQL `refs(query:)`),
+                // então a lista vem pronta; sem ele, filtramos a fatia no cliente.
+                const filtered = hasMore
+                  ? branches
+                  : branches.filter((b) =>
+                      b.name.toLowerCase().includes(branchFilter.toLowerCase())
+                    );
                 return (
                   <>
                     <Input
@@ -187,9 +232,13 @@ export default function CreateBranchModal({ board, item, onClose }) {
                       className="h-8 text-xs"
                     />
                     <div className="border rounded-lg bg-muted/40 p-1 max-h-52 overflow-y-auto flex flex-col gap-1">
-                      {filtered.length === 0 ? (
+                      {branchesLoading ? (
+                        <p className="text-xs text-muted-foreground px-3 py-2">Buscando…</p>
+                      ) : filtered.length === 0 ? (
                         <p className="text-xs text-muted-foreground px-3 py-2">
-                          Nenhuma branch encontrada para &ldquo;{branchFilter}&rdquo;.
+                          {branchFilter
+                            ? <>Nenhuma branch encontrada para &ldquo;{branchFilter}&rdquo;.</>
+                            : "Nenhuma branch encontrada."}
                         </p>
                       ) : (
                         filtered.map((b) => (

@@ -79,7 +79,8 @@ export default function githubRoutes(app) {
 
   app.get("/api/github/repos/:owner/:repo/branches", async (req, res) => {
     try {
-      res.json(await listBranches(req.params.owner, req.params.repo));
+      const query = req.query.q || "";
+      res.json(await listBranches(req.params.owner, req.params.repo, query));
     } catch (err) {
       sendError(res, err);
     }

@@ -1,6 +1,29 @@
-import { getToken } from "./github.client.js";
+import { getToken, graphQL } from "./github.client.js";
 
 const BASE_URL = "https://api.github.com";
+
+// Teto de branches retornadas numa única busca. Quando o repo tem mais que isso,
+// o frontend passa a usar o filtro como busca server-side (GraphQL `refs(query:)`).
+const BRANCH_PAGE_SIZE = 100;
+
+const BRANCHES_QUERY = `
+  query($owner: String!, $repo: String!, $query: String, $first: Int!) {
+    repository(owner: $owner, name: $repo) {
+      refs(
+        refPrefix: "refs/heads/"
+        query: $query
+        first: $first
+        orderBy: { field: ALPHABETICAL, direction: ASC }
+      ) {
+        pageInfo { hasNextPage }
+        nodes {
+          name
+          target { oid }
+        }
+      }
+    }
+  }
+`;
 
 function requireToken() {
   const token = getToken();
@@ -26,10 +49,25 @@ async function ghFetch(path, token, options = {}) {
   return res.json();
 }
 
-export async function listBranches(owner, repo) {
+// Lista branches do repo. Sem `query`, traz as primeiras `BRANCH_PAGE_SIZE` em
+// ordem alfabética; com `query`, deixa o GitHub filtrar por nome no servidor —
+// essencial para repos com mais branches do que o limite cabe numa página.
+// Retorna { branches, hasMore }: `hasMore` sinaliza ao cliente que deve buscar
+// no servidor (via filtro) em vez de filtrar só a fatia já carregada.
+export async function listBranches(owner, repo, query = "") {
   const token = requireToken();
-  const data  = await ghFetch(`/repos/${owner}/${repo}/branches?per_page=100`, token);
-  return data.map((b) => ({ name: b.name, sha: b.commit.sha }));
+  const q     = (query ?? "").trim();
+  const res   = await graphQL(BRANCHES_QUERY, token, {
+    owner,
+    repo,
+    query: q || null,
+    first: BRANCH_PAGE_SIZE,
+  });
+  if (res.errors?.length) throw new Error(res.errors[0].message);
+
+  const refs     = res.data?.repository?.refs;
+  const branches = (refs?.nodes ?? []).map((n) => ({ name: n.name, sha: n.target?.oid ?? null }));
+  return { branches, hasMore: Boolean(refs?.pageInfo?.hasNextPage) };
 }
 
 export async function createBranch(owner, repo, newBranch, originBranch) {
