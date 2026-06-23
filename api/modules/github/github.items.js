@@ -99,13 +99,27 @@ const FETCH_MAX_PAGES = 100; // teto de segurança: até 10k itens por projeto
 const _cache    = new Map(); // projectId -> { items, ts }
 const _inflight = new Map(); // projectId -> Promise<items> (dedupe de concorrência)
 
+async function fetchPage(token, variables, attempt = 0) {
+  try {
+    return parseItems(await graphQL(ITEMS_QUERY, token, variables));
+  } catch (err) {
+    // TypeError cobre "fetch failed" e "terminated" (erros de rede do undici).
+    // Tentamos até 2 vezes com backoff crescente antes de desistir.
+    if (attempt < 2 && err instanceof TypeError) {
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      return fetchPage(token, variables, attempt + 1);
+    }
+    throw err;
+  }
+}
+
 async function fetchAllPages(projectId) {
   const token = getToken();
   if (!token) throw new Error("GitHub não autenticado. Configure GH_TOKEN ou execute 'gh auth login'.");
   const all = [];
   let after = null, hasMore = true, pages = 0;
   while (hasMore && pages < FETCH_MAX_PAGES) {
-    const page = parseItems(await graphQL(ITEMS_QUERY, token, { id: projectId, first: 100, after }));
+    const page = await fetchPage(token, { id: projectId, first: 100, after });
     all.push(...page.items);
     hasMore = page.hasNextPage;
     after   = page.endCursor;

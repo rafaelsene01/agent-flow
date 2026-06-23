@@ -78,6 +78,7 @@ async function request(path, token) {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
       },
+      signal: AbortSignal.timeout(30_000),
     }),
   );
 
@@ -110,6 +111,7 @@ export async function graphQL(query, token, variables = {}) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(30_000),
     }),
   );
   checkRateLimit(res);
