@@ -1,3 +1,10 @@
+# [1.18.0](https://github.com/rafaelsene01/agent-flow/compare/v1.17.0...v1.18.0) (2026-06-23)
+
+
+### Features
+
+* enhance branch listing functionality with server-side filtering ([7b024eb](https://github.com/rafaelsene01/agent-flow/commit/7b024eb9c35fdce5fa33690bdc6ba34a9255c6cd))
+
 # [1.17.0](https://github.com/rafaelsene01/agent-flow/compare/v1.16.0...v1.17.0) (2026-06-23)
 
 
