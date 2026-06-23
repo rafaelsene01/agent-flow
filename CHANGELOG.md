@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/rafaelsene01/agent-flow/compare/v1.16.0...v1.17.0) (2026-06-23)
+
+
+### Features
+
+* enhance GitHub token management and background cache validation ([985b8e6](https://github.com/rafaelsene01/agent-flow/commit/985b8e665ff620eda2f6282298e51f2fe84c20aa))
+
 # [1.16.0](https://github.com/rafaelsene01/agent-flow/compare/v1.15.0...v1.16.0) (2026-06-23)
 
 
