@@ -8,6 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton.jsx";
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Intervalo do auto-refresh silencioso. Com o stale-while-revalidate do backend,
+// rebuscar periodicamente faz mudanças feitas no GitHub aparecerem sozinhas.
+const AUTO_REFRESH_MS = 60_000;
+
 const GH_COLORS = {
   GRAY: "#7d8590",
   BLUE: "#58a6ff",
@@ -46,6 +50,8 @@ export default function Column({
 
   const fetchingRef = useRef(false);
   const pageRef = useRef({ hasNextPage: false, cursor: null });
+  const countRef = useRef(0); // nº de cards já carregados, para o refresh preservar a janela
+  useEffect(() => { countRef.current = items.length; }, [items.length]);
 
   const fetchItems = useCallback(
     async (cursor = null) => {
@@ -85,11 +91,46 @@ export default function Column({
     [boardId, columnId, columnName, viewFilter],
   );
 
+  // Rebusca silenciosa da janela já carregada: sem skeleton, sem resetar scroll.
+  // Substitui os itens pela versão fresca (React reconcilia por key, sem flicker).
+  const silentRefresh = useCallback(async () => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    try {
+      const qs = new URLSearchParams({ first: String(Math.max(30, countRef.current)) });
+      if (columnId) qs.set("columnId", columnId);
+      else qs.set("columnName", columnName);
+      if (viewFilter) qs.set("viewFilter", viewFilter);
+
+      const res = await fetch(
+        `/api/github/boards/${encodeURIComponent(boardId)}/items?${qs}`,
+      );
+      const data = await res.json();
+      if (data.error) return; // refresh silencioso não mostra erro
+      setItems(data.items);
+      pageRef.current = { hasNextPage: data.hasNextPage, cursor: data.endCursor };
+    } catch {
+      /* silencioso */
+    } finally {
+      fetchingRef.current = false;
+    }
+  }, [boardId, columnId, columnName, viewFilter]);
+
   useEffect(() => {
     setItems([]);
     pageRef.current = { hasNextPage: false, cursor: null };
     fetchItems(null);
   }, [fetchItems]);
+
+  // Auto-refresh periódico (pausado quando a aba está em segundo plano).
+  useEffect(() => {
+    const tick = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      silentRefresh();
+    };
+    const timer = setInterval(tick, AUTO_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [silentRefresh]);
 
   function handleScroll(e) {
     const el = e.currentTarget;

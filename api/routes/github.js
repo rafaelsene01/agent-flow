@@ -29,7 +29,10 @@ export default function githubRoutes(app) {
 
   app.get("/api/github/boards/:id/items", async (req, res) => {
     try {
-      const first      = Math.min(parseInt(req.query.first, 10) || 20, 100);
+      // Teto alto: os itens vêm do cache em memória, então um `first` grande é só
+      // uma fatia maior (sem chamadas extras). Permite o auto-refresh silencioso
+      // rebuscar de uma vez a janela já carregada (scroll) sem colapsar a coluna.
+      const first      = Math.min(parseInt(req.query.first, 10) || 20, 500);
       const after      = req.query.after      || null;
       const columnId   = req.query.columnId   || null;
       const columnName = req.query.columnName || req.query.column || null;
