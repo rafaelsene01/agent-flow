@@ -62,19 +62,31 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
         )}
         onClick={() => onOpen(item)}
       >
-        <div className="flex items-center gap-1.5">
-          {item.number != null && (
-            <span className="font-mono text-[11px] text-muted-foreground">
-              #{item.number}
-            </span>
-          )}
-          {item.type === "PullRequest" && (
-            <Badge
-              variant="outline"
-              className="text-[10px] text-primary border-primary/40 px-1.5 py-0"
-            >
-              PR
-            </Badge>
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5">
+            {item.number != null && (
+              <span className="font-mono text-[11px] text-muted-foreground">
+                #{item.number}
+              </span>
+            )}
+            {item.type === "PullRequest" && (
+              <Badge
+                variant="outline"
+                className="text-[10px] text-primary border-primary/40 px-1.5 py-0"
+              >
+                PR
+              </Badge>
+            )}
+          </div>
+          {item.assignees.length > 0 && (
+            <div className="flex items-center -space-x-1.5">
+              {item.assignees.map((a) => {
+                const login = typeof a === "string" ? a : a?.login;
+                const avatarUrl = typeof a === "string" ? null : a?.avatarUrl;
+                if (!login) return null;
+                return <Assignee key={login} login={login} avatarUrl={avatarUrl} />;
+              })}
+            </div>
           )}
         </div>
         <p className="text-[13px] font-medium leading-snug">{item.title}</p>
@@ -93,16 +105,6 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
                 {l.name}
               </span>
             ))}
-          </div>
-        )}
-        {item.assignees.length > 0 && (
-          <div className="mt-0.5 flex items-center -space-x-1.5">
-            {item.assignees.map((a) => {
-              const login = typeof a === "string" ? a : a?.login;
-              const avatarUrl = typeof a === "string" ? null : a?.avatarUrl;
-              if (!login) return null;
-              return <Assignee key={login} login={login} avatarUrl={avatarUrl} />;
-            })}
           </div>
         )}
       </button>

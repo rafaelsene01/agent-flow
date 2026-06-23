@@ -5,8 +5,9 @@ import statusRoutes from "./routes/status.js";
 import configRoutes from "./routes/config.js";
 import githubRoutes from "./routes/github.js";
 import { warmup } from "./modules/status/status.cache.js";
+import { warmItemsCache } from "./modules/github/github.items.js";
 import { WEB_DIST_DIR } from "./paths.js";
-import { getWorktrees, updateWorktreeStatus } from "./modules/config/config.service.js";
+import { getConfig, getWorktrees, updateWorktreeStatus } from "./modules/config/config.service.js";
 
 function recoverInterruptedRuns() {
   const runningStatuses = [
@@ -65,7 +66,15 @@ export async function startServer({ port, apiOnly = false }) {
     });
   });
 
+  // Requisições de items com viewFilter podem varrer várias páginas do GitHub
+  // (>30s). Mantém timeouts generosos para não cortar a resposta no meio.
+  server.requestTimeout = 180_000; // tempo total da requisição
+  server.headersTimeout = 185_000; // deve ser > requestTimeout
+  server.keepAliveTimeout = 125_000; // > proxyTimeout do Next (120s)
+
   warmup();
+  // Pré-aquece o cache de itens de cada board para o board carregar instantâneo.
+  for (const b of getConfig().boards ?? []) warmItemsCache(b.id);
 
   return { app, server, url: `http://${host}:${port}` };
 }

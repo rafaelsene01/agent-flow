@@ -40,33 +40,13 @@ function AppContent() {
     localStorage.setItem("theme", next);
   }
 
+  // O Next App Router já faz o patch de pushState/replaceState e mantém o
+  // usePathname() em sincronia (inclusive em voltar/avançar). Basta espelhar a
+  // mudança de rota no reducer — patchar history aqui colidia com o patch
+  // interno do Next e disparava "useInsertionEffect must not schedule updates".
   useEffect(() => {
-    const sync = () => dispatch({ type: "SET_PATH", path: window.location.pathname });
-
-    // popstate só dispara em voltar/avançar; pushState/replaceState (de qualquer
-    // script) não disparam evento nativo, então emitimos um evento próprio.
-    const origPush    = window.history.pushState;
-    const origReplace = window.history.replaceState;
-    window.history.pushState = function (...args) {
-      const ret = origPush.apply(this, args);
-      window.dispatchEvent(new Event("locationchange"));
-      return ret;
-    };
-    window.history.replaceState = function (...args) {
-      const ret = origReplace.apply(this, args);
-      window.dispatchEvent(new Event("locationchange"));
-      return ret;
-    };
-
-    window.addEventListener("popstate", sync);
-    window.addEventListener("locationchange", sync);
-    return () => {
-      window.history.pushState    = origPush;
-      window.history.replaceState = origReplace;
-      window.removeEventListener("popstate", sync);
-      window.removeEventListener("locationchange", sync);
-    };
-  }, []);
+    dispatch({ type: "SET_PATH", path: pathname });
+  }, [pathname]);
 
   // Mantém o rascunho do filtro alinhado ao board ativo (ex: troca de tab).
   useEffect(() => {
@@ -204,9 +184,6 @@ function AppContent() {
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex items-center justify-between px-4 py-2 border-b">
             <div className="min-w-0 flex-1 flex items-center gap-3">
-              <h2 className="text-sm font-bold leading-tight whitespace-nowrap shrink-0">
-                {activeBoard.viewName ? `${activeBoard.name} - ${activeBoard.viewName}` : activeBoard.name}
-              </h2>
               <input
                 type="text"
                 value={filterDraft}

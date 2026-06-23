@@ -11,6 +11,10 @@ const config = {
   distDir: "out",
   images: { unoptimized: true },
   turbopack: { root: path.resolve(__dirname, "..") },
+  // Boards com viewFilter de repo esparso fazem varredura server-side de várias
+  // páginas do GitHub e podem levar >30s. O proxy de dev do Next corta em ~30s
+  // por padrão (socket hang up / ECONNRESET); subimos para 2min.
+  experimental: { proxyTimeout: 120_000 },
   ...(isDev && {
     async rewrites() {
       return [

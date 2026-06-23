@@ -1,4 +1,9 @@
+import fs   from "fs";
+import os   from "os";
+import path from "path";
 import { graphQL, getToken } from "./github.client.js";
+
+const CACHE_DIR = path.join(os.homedir(), ".agent-flow", "cache");
 
 const ITEMS_QUERY = `query($id: ID!, $first: Int!, $after: String) {
   node(id: $id) {
@@ -75,14 +80,107 @@ function parseItems(raw) {
   };
 }
 
-async function fetchPage(projectId, variables) {
+// ── Cache de itens por projeto ─────────────────────────────────────────────
+// A API ProjectV2 do GitHub não filtra itens por repo/label/texto, então todo
+// filtro é feito no servidor sobre a lista completa. Sem cache, cada coluna do
+// board disparava sua própria varredura do projeto inteiro (dezenas de chamadas
+// GraphQL em paralelo), estourando o rate limit. Buscamos o projeto UMA vez e
+// servimos todas as colunas, filtros e páginas a partir dessa lista.
+//
+// Como a varredura é limitada pela latência do GitHub (~1.8s/página × ~30 páginas
+// ≈ 30s, independente do payload), nunca deixamos o usuário esperar por ela:
+//   • stale-while-revalidate — havendo cache (mesmo vencido), retorna na hora e
+//     revalida em background; só bloqueia na primeiríssima vez, sem cache nenhum;
+//   • persistência em disco — o cache sobrevive a restarts do servidor;
+//   • warm no boot — a varredura começa quando a API sobe (ver warmItemsCache).
+const CACHE_TTL_MS = 60_000;
+const FETCH_MAX_PAGES = 100; // teto de segurança: até 10k itens por projeto
+
+const _cache    = new Map(); // projectId -> { items, ts }
+const _inflight = new Map(); // projectId -> Promise<items> (dedupe de concorrência)
+
+async function fetchAllPages(projectId) {
   const token = getToken();
   if (!token) throw new Error("GitHub não autenticado. Configure GH_TOKEN ou execute 'gh auth login'.");
-  return parseItems(await graphQL(ITEMS_QUERY, token, variables));
+  const all = [];
+  let after = null, hasMore = true, pages = 0;
+  while (hasMore && pages < FETCH_MAX_PAGES) {
+    const page = parseItems(await graphQL(ITEMS_QUERY, token, { id: projectId, first: 100, after }));
+    all.push(...page.items);
+    hasMore = page.hasNextPage;
+    after   = page.endCursor;
+    pages++;
+  }
+  return all;
+}
+
+const _diskPath = (projectId) => path.join(CACHE_DIR, `items-${projectId}.json`);
+
+async function loadDisk(projectId) {
+  try {
+    const { items, ts } = JSON.parse(await fs.promises.readFile(_diskPath(projectId), "utf-8"));
+    if (Array.isArray(items)) return { items, ts: ts || 0 };
+  } catch { /* sem cache em disco ou inválido */ }
+  return null;
+}
+
+async function saveDisk(projectId, entry) {
+  try {
+    await fs.promises.mkdir(CACHE_DIR, { recursive: true });
+    await fs.promises.writeFile(_diskPath(projectId), JSON.stringify(entry));
+  } catch (err) {
+    console.error("[items] erro ao gravar cache em disco:", err.message);
+  }
+}
+
+// Dispara (ou reusa) uma varredura completa, atualizando memória e disco.
+function refreshInBackground(projectId) {
+  if (_inflight.has(projectId)) return _inflight.get(projectId);
+  const p = fetchAllPages(projectId)
+    .then((items) => {
+      const entry = { items, ts: Date.now() };
+      _cache.set(projectId, entry);
+      saveDisk(projectId, entry); // fire-and-forget
+      return items;
+    })
+    .finally(() => { _inflight.delete(projectId); });
+  _inflight.set(projectId, p);
+  return p;
+}
+
+// Retorna todos os itens do projeto. Serve cache fresco direto; cache vencido
+// (memória ou disco) é servido na hora com revalidação em background; só bloqueia
+// quando não há cache algum.
+async function getAllProjectItems(projectId) {
+  let entry = _cache.get(projectId);
+  if (!entry) {
+    const disk = await loadDisk(projectId);
+    if (disk) { _cache.set(projectId, disk); entry = disk; }
+  }
+  if (entry) {
+    if (Date.now() - entry.ts >= CACHE_TTL_MS) refreshInBackground(projectId);
+    return entry.items;
+  }
+  return refreshInBackground(projectId);
+}
+
+// Pré-aquece o cache de um projeto (chamado no boot do servidor para cada board).
+export function warmItemsCache(projectId) {
+  if (!projectId) return;
+  getAllProjectItems(projectId).catch((err) => console.error("[items] erro no warm:", err.message));
+}
+
+// Invalida o cache em memória (ex: após mover um card). Sem argumento, limpa tudo.
+export function clearItemsCache(projectId) {
+  if (projectId) _cache.delete(projectId);
+  else _cache.clear();
 }
 
 function repoMatches(itemRepo, repoFilter) {
-  if (!repoFilter || !itemRepo) return true;
+  if (!repoFilter) return true;
+  // Filtro de repo ativo: drafts (sem repositório, sem número) não pertencem a
+  // repo nenhum, então não devem aparecer.
+  if (!itemRepo) return false;
   return repoFilter.split(",").some((r) => r.trim() === itemRepo);
 }
 
@@ -104,6 +202,22 @@ function textMatches(item, text) {
   });
 }
 
+function matchesFilters(item, { repoName, labels, text }) {
+  return repoMatches(item._repoName, repoName)
+      && labelsMatch(item.labels, labels)
+      && textMatches(item, text);
+}
+
+// Paginação por offset sobre a lista filtrada em memória. O cursor é só o índice
+// do próximo item; o frontend o devolve em `after` transparentemente.
+function paginate(list, after, first) {
+  const offset = after ? Math.max(0, parseInt(after, 10) || 0) : 0;
+  const slice  = list.slice(offset, offset + first);
+  const nextOffset  = offset + slice.length;
+  const hasNextPage = nextOffset < list.length;
+  return { slice, hasNextPage, endCursor: hasNextPage ? String(nextOffset) : null };
+}
+
 function toClientItem({ id, type, itemType, title, number, body, assignees, labels }) {
   return { id, type, itemType, title, number, body, assignees, labels };
 }
@@ -113,123 +227,27 @@ function toClientItemWithColumn({ id, type, itemType, title, number, body, assig
 }
 
 export async function listItems(projectId, { first = 30, after = null, repoName = null, labels = null, text = null } = {}) {
-  const page = await fetchPage(projectId, { id: projectId, first, after });
-  const items = page.items
-    .filter((i) => repoMatches(i._repoName, repoName) && labelsMatch(i.labels, labels) && textMatches(i, text))
-    .map(toClientItem);
-  return { ...page, items };
+  const all     = await getAllProjectItems(projectId);
+  const matched = all.filter((i) => matchesFilters(i, { repoName, labels, text }));
+  const { slice, hasNextPage, endCursor } = paginate(matched, after, first);
+  return { items: slice.map(toClientItem), hasNextPage, endCursor };
 }
 
-// Busca todas as páginas de uma vez (até 10 páginas / 1000 itens).
-// Se chamado com `after`, busca apenas a próxima página (modo scroll).
-export async function listAllItems(projectId, { after = null, repoName = null, labels = null, text = null } = {}) {
-  const allItems = [];
-  let cursor  = after;
-  let hasMore = true;
-  let pages   = 0;
-  const MAX_PAGES = after ? 1 : 10;
-
-  while (hasMore && pages < MAX_PAGES) {
-    const page = await fetchPage(projectId, { id: projectId, first: 100, after: cursor });
-    pages++;
-    const filtered = page.items
-      .filter((i) => repoMatches(i._repoName, repoName) && labelsMatch(i.labels, labels) && textMatches(i, text))
-      .map(toClientItemWithColumn);
-    allItems.push(...filtered);
-    hasMore = page.hasNextPage;
-    cursor  = page.endCursor;
-  }
-
-  return { items: allItems, hasNextPage: hasMore, endCursor: cursor ?? null };
-}
-
-// Cursor format: null | "<githubCursor>" | "<githubCursor>|<skip>" | "|<skip>"
-// githubCursor = posição global no projeto; skip = matches a pular na primeira página desse cursor.
-// Isso evita re-buscar do início a cada página — só re-busca 1 página quando há overflow.
-function parseCursor(after) {
-  if (!after) return { globalCursor: null, skip: 0 };
-  const pipeIdx = after.indexOf("|");
-  if (pipeIdx >= 0 && /^\d+$/.test(after.slice(pipeIdx + 1))) {
-    return {
-      globalCursor: after.slice(0, pipeIdx) || null,
-      skip:         parseInt(after.slice(pipeIdx + 1), 10),
-    };
-  }
-  return { globalCursor: after, skip: 0 };
+export async function listAllItems(projectId, { first = 50, after = null, repoName = null, labels = null, text = null } = {}) {
+  const all     = await getAllProjectItems(projectId);
+  const matched = all.filter((i) => matchesFilters(i, { repoName, labels, text }));
+  const { slice, hasNextPage, endCursor } = paginate(matched, after, first);
+  return { items: slice.map(toClientItemWithColumn), hasNextPage, endCursor };
 }
 
 export async function listItemsByColumn(projectId, { columnId, columnName }, { first = 20, after = null, repoName = null, labels = null, text = null } = {}) {
-  const { globalCursor, skip } = parseCursor(after);
-
-  const collected = [];
-  let cursor   = globalCursor;
-  let hasMore  = true;
-  let pages    = 0;
-  const MAX_PAGES = 20;
-  let isFirstPage = true;
-  let skipped     = 0;
-
-  // Dados da última página para calcular o cursor de paginação seguinte.
-  let lastPageCursorBefore = globalCursor;
-  let lastPageTotalMatches = 0; // matches após aplicar skip inicial
-  let lastPageConsumed     = 0;
-  let lastPageWasFirst     = false;
-
-  while (collected.length < first && hasMore && pages < MAX_PAGES) {
-    const page = await fetchPage(projectId, { id: projectId, first: 100, after: cursor });
-    pages++;
-
-    lastPageCursorBefore = cursor;
-    lastPageTotalMatches = 0;
-    lastPageConsumed     = 0;
-    lastPageWasFirst     = isFirstPage;
-
-    for (const item of page.items) {
-      if (!repoMatches(item._repoName, repoName) || !labelsMatch(item.labels, labels) || !textMatches(item, text)) continue;
-      const matchById   = columnId   && item._statusOptionId === columnId;
-      const matchByName = columnName && item._status?.toLowerCase() === columnName.toLowerCase();
-      const match = matchById || (!columnId && matchByName) || (columnId && !item._statusOptionId && matchByName);
-      if (!match) continue;
-
-      // Pula os primeiros `skip` matches apenas na primeira página buscada.
-      if (isFirstPage && skipped < skip) { skipped++; continue; }
-
-      lastPageTotalMatches++;
-      if (collected.length < first) {
-        collected.push(item);
-        lastPageConsumed++;
-      }
-    }
-
-    isFirstPage = false;
-    cursor  = page.endCursor;
-    hasMore = page.hasNextPage;
-  }
-
-  if (collected.length < first) {
-    // Esgotamos as páginas (MAX_PAGES ou fim do projeto).
-    // Se o GitHub ainda tem páginas, preserva o cursor para o scroll carregar o restante.
-    return { items: collected.map(toClientItem), hasNextPage: hasMore, endCursor: hasMore ? cursor : null };
-  }
-
-  const leftover  = lastPageTotalMatches - lastPageConsumed;
-  const moreExist = leftover > 0 || hasMore;
-
-  if (!moreExist) {
-    return { items: collected.map(toClientItem), hasNextPage: false, endCursor: null };
-  }
-
-  let endCursor;
-  if (leftover > 0) {
-    // Overflow na última página: próxima requisição recomeça nessa página com skip.
-    const nextSkip = lastPageWasFirst ? skip + lastPageConsumed : lastPageConsumed;
-    endCursor = lastPageCursorBefore
-      ? `${lastPageCursorBefore}|${nextSkip}`
-      : `|${nextSkip}`;
-  } else {
-    // Sem overflow: próxima requisição começa do cursor após a última página.
-    endCursor = cursor;
-  }
-
-  return { items: collected.map(toClientItem), hasNextPage: true, endCursor };
+  const all = await getAllProjectItems(projectId);
+  const matched = all.filter((item) => {
+    if (!matchesFilters(item, { repoName, labels, text })) return false;
+    const matchById   = columnId   && item._statusOptionId === columnId;
+    const matchByName = columnName && item._status?.toLowerCase() === columnName.toLowerCase();
+    return matchById || (!columnId && matchByName) || (columnId && !item._statusOptionId && matchByName);
+  });
+  const { slice, hasNextPage, endCursor } = paginate(matched, after, first);
+  return { items: slice.map(toClientItem), hasNextPage, endCursor };
 }

@@ -41,6 +41,9 @@ export function appReducer(state, action) {
       };
     }
     case "SET_PATH": {
+      // Path inalterado: retorna o mesmo estado para evitar re-render (e o loop
+      // causado por replaceState interno do Next disparando locationchange).
+      if (action.path === state.activePath) return state;
       const slug    = action.path.slice(1);
       const matched = slug ? state.boards.find((b) => boardSlug(b) === slug) : null;
       return {
