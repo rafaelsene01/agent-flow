@@ -1,3 +1,5 @@
+import { boardSlug } from "@/lib/boardSlug.js";
+
 export const initialState = {
   initializing: true,
   boards: [],
@@ -38,8 +40,15 @@ export function appReducer(state, action) {
         activePath:  action.fallbackPath ?? "/",
       };
     }
-    case "SET_PATH":
-      return { ...state, activePath: action.path };
+    case "SET_PATH": {
+      const slug    = action.path.slice(1);
+      const matched = slug ? state.boards.find((b) => boardSlug(b) === slug) : null;
+      return {
+        ...state,
+        activePath:  action.path,
+        activeBoard: matched ?? state.activeBoard,
+      };
+    }
     default:
       return state;
   }

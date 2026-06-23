@@ -25,6 +25,9 @@ function AppContent() {
   const [showInitBoard, setShowInitBoard] = useState(false);
   const [showEditBoard, setShowEditBoard] = useState(false);
 
+  // Edição inline do filtro da view (com debounce antes de relistar/persistir).
+  const [filterDraft, setFilterDraft] = useState(activeBoard?.viewFilter ?? "");
+
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     return localStorage.getItem("theme") ?? "dark";
@@ -38,10 +41,54 @@ function AppContent() {
   }
 
   useEffect(() => {
-    const onPop = () => dispatch({ type: "SET_PATH", path: window.location.pathname });
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+    const sync = () => dispatch({ type: "SET_PATH", path: window.location.pathname });
+
+    // popstate só dispara em voltar/avançar; pushState/replaceState (de qualquer
+    // script) não disparam evento nativo, então emitimos um evento próprio.
+    const origPush    = window.history.pushState;
+    const origReplace = window.history.replaceState;
+    window.history.pushState = function (...args) {
+      const ret = origPush.apply(this, args);
+      window.dispatchEvent(new Event("locationchange"));
+      return ret;
+    };
+    window.history.replaceState = function (...args) {
+      const ret = origReplace.apply(this, args);
+      window.dispatchEvent(new Event("locationchange"));
+      return ret;
+    };
+
+    window.addEventListener("popstate", sync);
+    window.addEventListener("locationchange", sync);
+    return () => {
+      window.history.pushState    = origPush;
+      window.history.replaceState = origReplace;
+      window.removeEventListener("popstate", sync);
+      window.removeEventListener("locationchange", sync);
+    };
   }, []);
+
+  // Mantém o rascunho do filtro alinhado ao board ativo (ex: troca de tab).
+  useEffect(() => {
+    setFilterDraft(activeBoard?.viewFilter ?? "");
+  }, [activeBoard?.viewId]);
+
+  // Debounce de 500ms: aplica o filtro editado, relista os cards e persiste.
+  useEffect(() => {
+    if (!activeBoard) return;
+    if (filterDraft === (activeBoard.viewFilter ?? "")) return;
+    const timer = setTimeout(() => {
+      const updated = { ...activeBoard, viewFilter: filterDraft.trim() };
+      const next    = boards.map((b) => b.viewId === updated.viewId ? updated : b);
+      dispatch({ type: "BOARD_UPDATED", board: updated });
+      fetch("/api/config", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ boards: next }),
+      }).catch(() => {});
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [filterDraft, activeBoard, boards]);
 
   useEffect(() => {
     Promise.all([
@@ -156,9 +203,19 @@ function AppContent() {
       {activeBoard ? (
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex items-center justify-between px-4 py-2 border-b">
-            <div>
-              <h2 className="text-sm font-bold leading-tight">{activeBoard.name}</h2>
-              <p className="text-xs text-muted-foreground">{activeBoard.repoName}</p>
+            <div className="min-w-0 flex-1 flex items-center gap-3">
+              <h2 className="text-sm font-bold leading-tight whitespace-nowrap shrink-0">
+                {activeBoard.viewName ? `${activeBoard.name} - ${activeBoard.viewName}` : activeBoard.name}
+              </h2>
+              <input
+                type="text"
+                value={filterDraft}
+                onChange={(e) => setFilterDraft(e.target.value)}
+                spellCheck={false}
+                placeholder="Filtrar cards (repo:… label:… texto ou número)"
+                aria-label="Filtro da view"
+                className="flex-1 min-w-0 max-w-xl bg-transparent text-xs text-muted-foreground font-mono outline-none border-b border-transparent hover:border-border focus:border-ring transition-colors py-0.5"
+              />
             </div>
             <div className="flex items-center gap-1">
               <Button

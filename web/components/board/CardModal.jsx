@@ -14,7 +14,6 @@ import {
   GitPullRequest,
   ListChecks,
   Loader2,
-  MessageSquarePlus,
   Palette,
   Pencil,
   Play,
@@ -45,6 +44,14 @@ const TYPE_LABEL = {
   Issue: "Issue",
   PullRequest: "Pull request",
   DraftIssue: "Draft issue",
+};
+
+const ORIGIN_LABEL = {
+  task: "tarefa",
+  spec: "spec",
+  eval: "eval",
+  tlc: "tlc",
+  chat: "chat",
 };
 
 
@@ -127,7 +134,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [messageModel, setMessageModel] = useState("sonnet");
   const [messageEffort, setMessageEffort] = useState("medium");
   const [messageSending, setMessageSending] = useState(false);
-  const [sessionCreating, setSessionCreating] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState("__new__");
   const logRef = useRef(null);
   const prevAnyRunningRef = useRef(null);
 
@@ -274,24 +281,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.messageStatus,
   ]);
 
-  async function handleNewSession() {
-    if (!worktreeId) return;
-    setSessionCreating(true);
-    try {
-      const res = await fetch(
-        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/session`,
-        { method: "POST" },
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      loadWorktreeConfig();
-    } catch (err) {
-      console.error("[new-session]", err);
-    } finally {
-      setSessionCreating(false);
-    }
-  }
-
   async function handleSendMessage() {
     const text = messageText.trim();
     if (!text) return;
@@ -306,12 +295,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             message: text,
             model: messageModel,
             effort: messageEffort,
+            sessionId: selectedSessionId === "__new__" ? undefined : selectedSessionId,
           }),
         },
       );
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setMessageText("");
+      if (data.sessionId) setSelectedSessionId(data.sessionId);
       loadWorktreeConfig();
       onWorktreeChange?.();
     } catch (err) {
@@ -573,50 +564,26 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
               {/* ── campo fixo de mensagem ── */}
               {isConfigured && (
                 <div className="shrink-0 border-t bg-muted/20 px-6 py-3">
-                  <div className="mb-2 flex items-center gap-2">
-                    {worktreeConfig?.chatSession ? (
-                      <>
-                        <span
-                          className="truncate font-mono text-[11px] text-muted-foreground"
-                          title={`Sessão: ${worktreeConfig.chatSession}`}
-                        >
-                          Sessão: {worktreeConfig.chatSession}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          type="button"
-                          className="ml-auto h-7 gap-1.5 text-xs"
-                          disabled={anyRunning || messageSending || sessionCreating}
-                          title="Cria uma nova sessão; passa a valer na próxima mensagem"
-                          onClick={handleNewSession}
-                        >
-                          {sessionCreating ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            <RotateCcw className="size-3.5" />
-                          )}
-                          <span>Nova sessão</span>
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        type="button"
-                        className="gap-1.5 text-xs"
-                        disabled={anyRunning || messageSending || sessionCreating}
-                        title="Gera uma sessão reutilizada a cada mensagem"
-                        onClick={handleNewSession}
-                      >
-                        {sessionCreating ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <MessageSquarePlus className="size-3.5" />
-                        )}
-                        <span>Gerar sessão</span>
-                      </Button>
-                    )}
+                  <div className="mb-2">
+                    <Select
+                      value={selectedSessionId}
+                      onValueChange={setSelectedSessionId}
+                      disabled={anyRunning || messageSending}
+                    >
+                      <SelectTrigger size="sm" className="text-xs w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__new__">Nova Sessão</SelectItem>
+                        {[...(worktreeConfig?.chatSessions ?? [])]
+                          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                          .map((s) => (
+                            <SelectItem key={s.id} value={s.id} title={s.description}>
+                              [{ORIGIN_LABEL[s.origin] ?? s.origin}] {s.description}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <Textarea
                     value={messageText}
@@ -627,13 +594,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         if (!anyRunning && !messageSending) handleSendMessage();
                       }
                     }}
-                    placeholder={
-                      worktreeConfig?.chatSession
-                        ? "Enviar uma mensagem ao agente nesta worktree…"
-                        : "Gere uma sessão para enviar mensagens…"
-                    }
+                    placeholder="Enviar uma mensagem ao agente nesta worktree…"
                     className="min-h-16 resize-none text-sm"
-                    disabled={!worktreeConfig?.chatSession || anyRunning || messageSending}
+                    disabled={anyRunning || messageSending}
                   />
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -672,7 +635,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       size="sm"
                       type="button"
                       className="gap-2"
-                      disabled={!worktreeConfig?.chatSession || !messageText.trim() || anyRunning || messageSending}
+                      disabled={!messageText.trim() || anyRunning || messageSending}
                       onClick={handleSendMessage}
                     >
                       {messageSending ? (

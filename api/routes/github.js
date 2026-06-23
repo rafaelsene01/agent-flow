@@ -36,9 +36,13 @@ export default function githubRoutes(app) {
       const viewFilter = req.query.viewFilter || null;
       const repoName   = viewFilter ? (viewFilter.match(/repo:([^\s]+)/i)?.[1] ?? null) : null;
       const labels     = viewFilter ? (viewFilter.match(/label:([^\s]+)/i)?.[1] ?? null) : null;
+      // Texto livre: tudo que não é um qualificador `chave:valor` vira busca por título.
+      const text = viewFilter
+        ? (viewFilter.replace(/-?[\w-]+:[^\s]+/g, " ").replace(/["']/g, " ").replace(/\s+/g, " ").trim() || null)
+        : null;
       const result = (columnId || columnName)
-        ? await listItemsByColumn(req.params.id, { columnId, columnName }, { first, after, repoName, labels })
-        : await listAllItems(req.params.id, { after, repoName, labels });
+        ? await listItemsByColumn(req.params.id, { columnId, columnName }, { first, after, repoName, labels, text })
+        : await listAllItems(req.params.id, { after, repoName, labels, text });
       res.json(result);
     } catch (err) {
       console.error("[items]", err);

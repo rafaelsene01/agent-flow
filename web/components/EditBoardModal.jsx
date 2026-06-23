@@ -29,13 +29,15 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   const [saving]                    = useState(false);
   const [dragOver, setDragOver]     = useState(null);
   const [originRepo, setOriginRepo] = useState(board.originRepo ?? "");
+  const [viewFilter, setViewFilter] = useState(board.viewFilter ?? "");
   const dragIdx = useRef(null);
 
-  // Repos derivados do repoName salvo no config (fonte confiável)
-  const repoOptions = (board.repoName ?? "")
-    .split(",")
-    .map((r) => r.trim())
-    .filter(Boolean);
+  const repoOptions = [...new Set(
+    [...(viewFilter ?? "").matchAll(/repo:([^\s]+)/gi)]
+      .flatMap((m) => m[1].split(","))
+      .map((r) => r.trim())
+      .filter(Boolean)
+  )];
 
   useEffect(() => {
     fetch(`/api/github/boards/${encodeURIComponent(board.id)}/columns`)
@@ -95,7 +97,7 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   );
 
   function save() {
-    onSaved({ ...board, columns: activeCols, originRepo: originRepo || null });
+    onSaved({ ...board, columns: activeCols, originRepo: originRepo || null, viewFilter: viewFilter.trim() });
   }
 
   return (
@@ -126,6 +128,25 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
 
         {/* Body */}
         <div className="flex flex-col gap-4 px-4 py-4 overflow-y-auto">
+
+          {/* Filtro da View */}
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="edit-view-filter"
+              className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+            >
+              Filtro da View
+            </label>
+            <textarea
+              id="edit-view-filter"
+              value={viewFilter}
+              onChange={(e) => setViewFilter(e.target.value)}
+              rows={2}
+              spellCheck={false}
+              placeholder="repo:owner/name is:open …"
+              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none resize-y focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+            />
+          </div>
 
           {/* Repositório de Origem */}
           <div className="flex flex-col gap-1.5">

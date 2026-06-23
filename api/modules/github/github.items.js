@@ -92,6 +92,18 @@ function labelsMatch(itemLabels, labelFilter) {
   return wanted.some((w) => itemLabels.some((l) => l.name.toLowerCase() === w));
 }
 
+// Busca por texto livre: cada palavra precisa aparecer no título (substring,
+// case-insensitive) ou bater exatamente com o número do card (ex: "42" ou "#42").
+function textMatches(item, text) {
+  if (!text) return true;
+  const title  = (item.title ?? "").toLowerCase();
+  const number = item.number != null ? String(item.number) : "";
+  return text.toLowerCase().split(/\s+/).filter(Boolean).every((w) => {
+    const term = w.replace(/^#/, "");
+    return title.includes(term) || (number !== "" && number === term);
+  });
+}
+
 function toClientItem({ id, type, itemType, title, number, body, assignees, labels }) {
   return { id, type, itemType, title, number, body, assignees, labels };
 }
@@ -100,17 +112,17 @@ function toClientItemWithColumn({ id, type, itemType, title, number, body, assig
   return { id, type, itemType, title, number, body, assignees, labels, columnName: _status, columnId: _statusOptionId };
 }
 
-export async function listItems(projectId, { first = 30, after = null, repoName = null, labels = null } = {}) {
+export async function listItems(projectId, { first = 30, after = null, repoName = null, labels = null, text = null } = {}) {
   const page = await fetchPage(projectId, { id: projectId, first, after });
   const items = page.items
-    .filter((i) => repoMatches(i._repoName, repoName) && labelsMatch(i.labels, labels))
+    .filter((i) => repoMatches(i._repoName, repoName) && labelsMatch(i.labels, labels) && textMatches(i, text))
     .map(toClientItem);
   return { ...page, items };
 }
 
 // Busca todas as páginas de uma vez (até 10 páginas / 1000 itens).
 // Se chamado com `after`, busca apenas a próxima página (modo scroll).
-export async function listAllItems(projectId, { after = null, repoName = null, labels = null } = {}) {
+export async function listAllItems(projectId, { after = null, repoName = null, labels = null, text = null } = {}) {
   const allItems = [];
   let cursor  = after;
   let hasMore = true;
@@ -121,7 +133,7 @@ export async function listAllItems(projectId, { after = null, repoName = null, l
     const page = await fetchPage(projectId, { id: projectId, first: 100, after: cursor });
     pages++;
     const filtered = page.items
-      .filter((i) => repoMatches(i._repoName, repoName) && labelsMatch(i.labels, labels))
+      .filter((i) => repoMatches(i._repoName, repoName) && labelsMatch(i.labels, labels) && textMatches(i, text))
       .map(toClientItemWithColumn);
     allItems.push(...filtered);
     hasMore = page.hasNextPage;
@@ -146,7 +158,7 @@ function parseCursor(after) {
   return { globalCursor: after, skip: 0 };
 }
 
-export async function listItemsByColumn(projectId, { columnId, columnName }, { first = 20, after = null, repoName = null, labels = null } = {}) {
+export async function listItemsByColumn(projectId, { columnId, columnName }, { first = 20, after = null, repoName = null, labels = null, text = null } = {}) {
   const { globalCursor, skip } = parseCursor(after);
 
   const collected = [];
@@ -173,7 +185,7 @@ export async function listItemsByColumn(projectId, { columnId, columnName }, { f
     lastPageWasFirst     = isFirstPage;
 
     for (const item of page.items) {
-      if (!repoMatches(item._repoName, repoName) || !labelsMatch(item.labels, labels)) continue;
+      if (!repoMatches(item._repoName, repoName) || !labelsMatch(item.labels, labels) || !textMatches(item, text)) continue;
       const matchById   = columnId   && item._statusOptionId === columnId;
       const matchByName = columnName && item._status?.toLowerCase() === columnName.toLowerCase();
       const match = matchById || (!columnId && matchByName) || (columnId && !item._statusOptionId && matchByName);

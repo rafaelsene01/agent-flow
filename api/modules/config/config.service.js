@@ -103,3 +103,30 @@ export function updateWorktreeStatus(id, updates) {
     worktrees: (current.worktrees ?? []).map((w) => w.id === id ? { ...w, ...updates } : w),
   }));
 }
+
+export function appendChatSession(id, entry) {
+  return enqueueWrite((current) => ({
+    ...current,
+    worktrees: (current.worktrees ?? []).map((w) =>
+      w.id === id
+        ? { ...w, chatSessions: [...(w.chatSessions ?? []), entry] }
+        : w,
+    ),
+  }));
+}
+
+export function updateChatSession(id, sessionId, patch) {
+  return enqueueWrite((current) => ({
+    ...current,
+    worktrees: (current.worktrees ?? []).map((w) =>
+      w.id === id
+        ? {
+            ...w,
+            chatSessions: (w.chatSessions ?? []).map((s) =>
+              s.id === sessionId ? { ...s, ...patch } : s,
+            ),
+          }
+        : w,
+    ),
+  }));
+}

@@ -4,7 +4,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { runClaude, resumeClaude, createRunLog, failureDetail, registerSseClient } from "../../modules/claude/claude.runner.js";
 import { acquireSlot, releaseSlot, registerProcess, unregisterProcess, cancelProcess } from "../../modules/claude/claude.concurrency.js";
-import { getWorktrees, updateWorktreeStatus, getHelpersDir, getLanguage } from "../../modules/config/config.service.js";
+import { getWorktrees, updateWorktreeStatus, getHelpersDir, getLanguage, appendChatSession, updateChatSession } from "../../modules/config/config.service.js";
 import { sendError } from "../../lib/errors.js";
 import { scanTlcFeatures } from "./tlc.js";
 
@@ -18,8 +18,21 @@ function makeSessionName(wt) {
   return `${worktreeName}-${branchName}`.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
 
-function makeChatSessionName(wt) {
-  return `${makeSessionName(wt)}-chat-${Date.now().toString(36)}`;
+function makeSessionId(wt, origin) {
+  return `${makeSessionName(wt)}-${origin}-${Date.now().toString(36)}`;
+}
+
+function truncateDesc(text) {
+  if (!text) return "";
+  const t = text.replace(/\s+/g, " ").trim();
+  return t.length <= 200 ? t : t.slice(0, 199) + "…";
+}
+
+function lastTaskOrSpecSession(wt) {
+  const sessions = (wt.chatSessions ?? [])
+    .filter((s) => s.started && (s.origin === "task" || s.origin === "spec"))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return sessions[0] ?? null;
 }
 
 async function ensureWorktreeExclude(wtPath) {
@@ -129,6 +142,15 @@ export default function runnerRoutes(app) {
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
     }
 
+    const runSessionId = makeSessionId(wt, "task");
+    appendChatSession(id, {
+      id: runSessionId,
+      origin: "task",
+      description: truncateDesc(body || title),
+      started: false,
+      createdAt: new Date().toISOString(),
+    });
+
     updateWorktreeStatus(id, {
       status:           "running",
       lastRunAt:        new Date().toISOString(),
@@ -164,7 +186,7 @@ export default function runnerRoutes(app) {
           cardContent,
           wt.path,
           logStream,
-          makeSessionName(wt),
+          runSessionId,
           (child) => registerProcess(id, child),
           { model: "sonnet", effort: "medium" },
         );
@@ -202,6 +224,7 @@ export default function runnerRoutes(app) {
           return;
         }
 
+        updateChatSession(id, runSessionId, { started: true });
         await new Promise((resolve) => logStream.end(resolve));
         updateWorktreeStatus(id, { status: "done" });
       } finally {
@@ -211,27 +234,14 @@ export default function runnerRoutes(app) {
     })();
   });
 
-  // Gera/rotaciona a sessão de chat: só grava na config. A sessão Claude é
-  // de fato criada no próximo envio de mensagem (runClaude com -n; depois resume).
-  app.post("/api/config/worktrees/:id/session", (req, res) => {
+  app.post("/api/config/worktrees/:id/message", async (req, res) => {
     const id = decodeURIComponent(req.params.id);
-    const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt) return sendError(res, 404, "Worktree não encontrado na configuração.");
-
-    const chatSession = makeChatSessionName(wt);
-    updateWorktreeStatus(id, { chatSession, chatSessionStarted: false });
-    res.json({ ok: true, chatSession });
-  });
-
-  app.post("/api/config/worktrees/:id/message", (req, res) => {
-    const id = decodeURIComponent(req.params.id);
-    const { message, model, effort } = req.body ?? {};
+    const { message, model, effort, sessionId } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
     if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
     if (!message?.trim())        return sendError(res, 400, "Mensagem obrigatória.");
-    if (!wt.chatSession)         return sendError(res, 400, "Gere uma sessão antes de enviar mensagens.");
 
     try {
       acquireSlot();
@@ -239,16 +249,41 @@ export default function runnerRoutes(app) {
       return sendError(res, err.status ?? 500, err.message);
     }
 
-    // Sessão reutilizável guardada na config.
-    const chatSession = wt.chatSession;
-    const chatSessionStarted = wt.chatSessionStarted ?? false;
+    let targetId, started;
+
+    try {
+      const sessions = wt.chatSessions ?? [];
+
+      if (!sessionId) {
+        targetId = makeSessionId(wt, "chat");
+        await appendChatSession(id, {
+          id: targetId,
+          origin: "chat",
+          description: truncateDesc(message),
+          started: false,
+          createdAt: new Date().toISOString(),
+        });
+        started = false;
+      } else {
+        const entry = sessions.find((s) => s.id === sessionId);
+        if (!entry) {
+          releaseSlot();
+          return sendError(res, 400, "Sessão não encontrada.");
+        }
+        targetId = entry.id;
+        started = entry.started;
+      }
+    } catch (err) {
+      releaseSlot();
+      return sendError(res, 500, err.message, err);
+    }
 
     updateWorktreeStatus(id, {
       messageStatus:    "running",
       messageLastRunAt: new Date().toISOString(),
       messageLastError: null,
     });
-    res.json({ ok: true });
+    res.json({ ok: true, sessionId: targetId });
 
     const logStream = createRunLog(wt, "agent-flow.log");
 
@@ -256,14 +291,11 @@ export default function runnerRoutes(app) {
       try {
         const prompt = langInstruction() + message.trim();
         const opts = { model: model || "sonnet", effort: effort || "medium" };
-        logStream.write(
-          `=== Mensagem do usuário (sessão ${chatSession}${chatSessionStarted ? ", resume" : ", nova"}) ===\n`,
-        );
+        logStream.write(`=== Mensagem do usuário (sessão ${targetId}${started ? ", resume" : ", nova"}) ===\n`);
 
-        // Primeira mensagem da sessão: cria com -n. Demais: --resume pelo nome.
-        const result = chatSessionStarted
-          ? await resumeClaude(prompt, wt.path, logStream, chatSession, (child) => registerProcess(id, child), opts)
-          : await runClaude(prompt, wt.path, logStream, chatSession, (child) => registerProcess(id, child), opts);
+        const result = started
+          ? await resumeClaude(prompt, wt.path, logStream, targetId, (child) => registerProcess(id, child), opts)
+          : await runClaude(prompt, wt.path, logStream, targetId, (child) => registerProcess(id, child), opts);
 
         if (result.code !== 0) {
           logStream.end();
@@ -272,7 +304,8 @@ export default function runnerRoutes(app) {
         }
 
         await new Promise((resolve) => logStream.end(resolve));
-        updateWorktreeStatus(id, { messageStatus: "done", chatSessionStarted: true });
+        updateWorktreeStatus(id, { messageStatus: "done" });
+        updateChatSession(id, targetId, { started: true });
       } finally {
         unregisterProcess(id);
         releaseSlot();
@@ -295,6 +328,15 @@ export default function runnerRoutes(app) {
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
     }
 
+    const tlcSessionId = makeSessionId(wt, "tlc");
+    appendChatSession(id, {
+      id: tlcSessionId,
+      origin: "tlc",
+      description: truncateDesc(body || title),
+      started: false,
+      createdAt: new Date().toISOString(),
+    });
+
     updateWorktreeStatus(id, {
       tlcStatus:    "running",
       tlcLastRunAt: new Date().toISOString(),
@@ -315,7 +357,7 @@ export default function runnerRoutes(app) {
         cardContent,
         wt.path,
         logStream,
-        null,
+        tlcSessionId,
         null,
         { model: "opus", effort: "high" },
       );
@@ -326,6 +368,7 @@ export default function runnerRoutes(app) {
         return;
       }
 
+      updateChatSession(id, tlcSessionId, { started: true });
       fs.rmSync(path.join(tlcHelpersDir, "CARD.md"), { force: true });
       migrateSpecsToHelpers(wt.path, tlcHelpersDir);
       logStream.end();
@@ -378,6 +421,15 @@ export default function runnerRoutes(app) {
 
     const specFilePath = path.join(featurePath, "spec.md").replace(/\\/g, "/");
 
+    const tlcExecSessionId = makeSessionId(wt, "spec");
+    appendChatSession(id, {
+      id: tlcExecSessionId,
+      origin: "spec",
+      description: truncateDesc(path.basename(featurePath)),
+      started: false,
+      createdAt: new Date().toISOString(),
+    });
+
     updateWorktreeStatus(id, {
       tlcExecStatus:    "running",
       tlcExecLastRunAt: new Date().toISOString(),
@@ -406,7 +458,7 @@ export default function runnerRoutes(app) {
           "(ex: COMMIT: feat: implement card sorting)",
           wt.path,
           logStream,
-          makeSessionName(wt),
+          tlcExecSessionId,
           (child) => registerProcess(id, child),
           { model: "sonnet", effort: "medium" },
         );
@@ -429,6 +481,7 @@ export default function runnerRoutes(app) {
           }
         }
 
+        updateChatSession(id, tlcExecSessionId, { started: true });
         await new Promise((resolve) => logStream.end(resolve));
         updateWorktreeStatus(id, { tlcExecStatus: "done" });
       } finally {
@@ -451,6 +504,15 @@ export default function runnerRoutes(app) {
     } catch (err) {
       return sendError(res, err.status ?? 500, err.message);
     }
+
+    const evalSessionId = makeSessionId(wt, "eval");
+    appendChatSession(id, {
+      id: evalSessionId,
+      origin: "eval",
+      description: truncateDesc(body || title),
+      started: false,
+      createdAt: new Date().toISOString(),
+    });
 
     updateWorktreeStatus(id, {
       specEvalStatus:    "running",
@@ -500,7 +562,7 @@ export default function runnerRoutes(app) {
           `Escreva o relatório com a nota final em \`${evalOutputDir}\`.`,
           wt.path,
           logStream,
-          null, // nova sessão: sem -n e sem --resume
+          evalSessionId,
           (child) => registerProcess(id, child),
           { model: "opus", effort: "high" },
         );
@@ -511,6 +573,7 @@ export default function runnerRoutes(app) {
           return;
         }
 
+        updateChatSession(id, evalSessionId, { started: true });
         await new Promise((resolve) => logStream.end(resolve));
         updateWorktreeStatus(id, { specEvalStatus: "done" });
       } finally {
@@ -649,17 +712,30 @@ export default function runnerRoutes(app) {
       ).catch(() => ({ stdout: "" }));
 
       if (statusOut.trim()) {
-        const sessionName = makeSessionName(wt);
+        const freshWt = getWorktrees().find((w) => w.id === id);
+        const lastSession = lastTaskOrSpecSession(freshWt ?? wt);
         const logStream = createRunLog(wt, "agent-flow.log");
+        let commitResult;
 
-        const commitResult = await resumeClaude(
-          langInstruction() +
-          "Com base em tudo que foi implementado nesta sessão, crie um commit semântico (conventional commits) " +
-          "com todas as mudanças staged. Use --no-verify. Não faça push.",
-          wt.path,
-          logStream,
-          sessionName,
-        );
+        if (lastSession) {
+          commitResult = await resumeClaude(
+            langInstruction() +
+            "Com base em tudo que foi implementado nesta sessão, crie um commit semântico (conventional commits) " +
+            "com todas as mudanças staged. Use --no-verify. Não faça push.",
+            wt.path,
+            logStream,
+            lastSession.id,
+          );
+        } else {
+          commitResult = await runClaude(
+            langInstruction() +
+            "Analise as mudanças staged (`git diff --staged`) e crie um commit semântico (conventional commits) " +
+            "com `--no-verify`. Não faça push.",
+            wt.path,
+            logStream,
+            null,
+          );
+        }
 
         await new Promise((resolve) => logStream.end(resolve));
 
@@ -793,10 +869,9 @@ export default function runnerRoutes(app) {
     res.json({ ok: true });
 
     (async () => {
-      const sessionName = makeSessionName(wt);
       const logStream = createRunLog(wt, "agent-flow.log");
 
-      const pullResult = await resumeClaude(
+      const pullResult = await runClaude(
         langInstruction() +
         `Faça pull das alterações remotas do branch '${wt.branch}' (origin/${wt.branch}) para o branch local. ` +
         `Use --no-verify onde necessário. Se houver conflitos de merge, resolva-os mantendo as alterações locais ` +
@@ -804,7 +879,7 @@ export default function runnerRoutes(app) {
         `Não faça commit nem push — deixe as alterações prontas para revisão.`,
         wt.path,
         logStream,
-        sessionName,
+        null,
       );
 
       await new Promise((resolve) => logStream.end(resolve));

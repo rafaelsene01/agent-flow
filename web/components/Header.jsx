@@ -27,15 +27,15 @@ export default function Header({ onSettings, onInitBoard, boards = [], activePat
                   type="button"
                   onClick={() => onSelectBoard(b)}
                   className={cn(
-                    "group relative flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-t-md whitespace-nowrap transition-colors outline-none",
+                    "group relative flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-t-md whitespace-nowrap shrink-0 transition-colors outline-none",
                     "focus-visible:ring-2 focus-visible:ring-ring/50",
                     isActive
                       ? "border-b-2 border-primary text-foreground bg-background"
                       : "border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >
-                  <span className="truncate max-w-[120px]">
-                    {b.repoName ? b.repoName.split("/").pop() : b.name}
+                  <span className="whitespace-nowrap">
+                    {b.viewName ? `${b.name} - ${b.viewName}` : b.name}
                   </span>
                   <span
                     className={cn(

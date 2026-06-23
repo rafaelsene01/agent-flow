@@ -34,6 +34,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
   const [activeCols, setActiveCols]       = useState([]);
   const [columnsLoading, setColumnsLoading] = useState(false);
   const [dragOver, setDragOver]           = useState(null);
+  const [viewFilter, setViewFilter]       = useState("");
   const [saving, setSaving]               = useState(false);
   const [copied, setCopied]               = useState(false);
   const dragIdx = useRef(null);
@@ -86,6 +87,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
 
   function selectView(board, view) {
     setSelectedView(view);
+    setViewFilter(view.filter ?? "");
     setAllCols([]);
     setActiveCols([]);
     // Atualiza opções de repo ao selecionar uma view (o filtro pode trazer novos repos)
@@ -156,19 +158,18 @@ export default function InitBoardModal({ onClose, onSaved }) {
       const config    = await configRes.json();
       const existing  = config.boards ?? [];
 
-      const name      = boardName || selected.title;
-      const repoName  = selectedView?.repo ?? "";
+      const name     = boardName || selected.title;
+      const vf       = viewFilter.trim();
       const newBoard = {
         id:         selected.id,
         viewId:     selectedView?.id ?? null,
         viewNumber: selectedView?.number ?? null,
         viewName:   selectedView?.name ?? null,
         name,
-        slug:       boardSlug({ name, repoName }),
+        slug:       boardSlug({ name, viewFilter: vf }),
         boardPath:  "",
-        repoName,
         originRepo: originRepo || null,
-        viewFilter: selectedView?.filter ?? "",
+        viewFilter: vf,
         repoPath:   "",
         columns:    activeCols.map((c) => ({ id: c.id, name: c.name, color: c.color ?? null })),
       };
@@ -325,6 +326,29 @@ export default function InitBoardModal({ onClose, onSaved }) {
                   </div>
                 )}
               </div>
+
+              {/* ── Filtro da View ── */}
+              {selectedView && (
+                <div className="flex flex-col gap-1.5">
+                  <Label
+                    htmlFor="view-filter-input"
+                    className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                  >
+                    Filtro da View
+                  </Label>
+                  <Input
+                    id="view-filter-input"
+                    type="text"
+                    value={viewFilter}
+                    onChange={(e) => setViewFilter(e.target.value)}
+                    placeholder="ex: repo:owner/repo"
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Filtro capturado do GitHub — edite se necessário antes de salvar.
+                  </p>
+                </div>
+              )}
 
               {/* ── Repositório de Origem ── */}
               {selectedView && (() => {
