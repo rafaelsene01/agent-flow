@@ -1,3 +1,11 @@
+# [1.15.0](https://github.com/rafaelsene01/agent-flow/compare/v1.14.2...v1.15.0) (2026-06-23)
+
+
+### Features
+
+* enhance chat session and filtering capabilities in worktree management ([f31dc22](https://github.com/rafaelsene01/agent-flow/commit/f31dc22ec21fc53bc98ec4c56409f148f25a3cf6))
+* implement caching for GitHub project items and enhance server performance ([65b405a](https://github.com/rafaelsene01/agent-flow/commit/65b405ad41bb14dc04a335ce93b1d49510e794a4))
+
 ## [1.14.2](https://github.com/rafaelsene01/agent-flow/compare/v1.14.1...v1.14.2) (2026-06-22)
 
 
