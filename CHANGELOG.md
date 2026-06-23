@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/rafaelsene01/agent-flow/compare/v1.15.0...v1.16.0) (2026-06-23)
+
+
+### Features
+
+* implement silent auto-refresh for GitHub project items ([3ca360b](https://github.com/rafaelsene01/agent-flow/commit/3ca360bdbe882006b13fa857bf9e8f1711708a3d))
+
 # [1.15.0](https://github.com/rafaelsene01/agent-flow/compare/v1.14.2...v1.15.0) (2026-06-23)
 
 
