@@ -4,6 +4,7 @@ import express from "express";
 import statusRoutes from "./routes/status.js";
 import configRoutes from "./routes/config.js";
 import githubRoutes from "./routes/github.js";
+import usageRoutes from "./routes/usage.js";
 import { warmup } from "./modules/status/status.cache.js";
 import { warmItemsCache } from "./modules/github/github.items.js";
 import { WEB_DIST_DIR } from "./paths.js";
@@ -43,6 +44,7 @@ export async function startServer({ port, apiOnly = false }) {
   statusRoutes(app);
   configRoutes(app);
   githubRoutes(app);
+  usageRoutes(app);
 
   if (!apiOnly) {
     app.use(express.static(WEB_DIST_DIR));

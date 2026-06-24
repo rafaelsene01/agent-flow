@@ -5,6 +5,7 @@ import { boardSlug } from "@/lib/boardSlug.js";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import UsageBadge from "@/components/UsageBadge.jsx";
 
 export default function Header({ onSettings, onInitBoard, boards = [], activePath = "", onSelectBoard, onRemoveBoard, theme = "dark", onToggleTheme }) {
   return (
@@ -60,6 +61,8 @@ export default function Header({ onSettings, onInitBoard, boards = [], activePat
 
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0">
+          <UsageBadge />
+
           {/* Add board */}
           <Tooltip>
             <TooltipTrigger asChild>
