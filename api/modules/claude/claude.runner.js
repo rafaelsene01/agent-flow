@@ -267,6 +267,7 @@ export function runClaude(
     logStream.write(
       `\n>>> claude ${args.filter((a) => !a.includes("skip")).join(" ")} (pid ${child.pid})\n`,
     );
+    logStream.write(`\n┌─[PROMPT]\n${prompt.trim()}\n└${SEP}\n`);
     onSpawn?.(child);
 
     const parser = makeLineParser(logStream);
@@ -346,6 +347,7 @@ export function resumeClaude(
     logStream.write(
       `\n>>> claude ${args.filter((a) => !a.includes("skip")).join(" ")} (pid ${child.pid})\n`,
     );
+    logStream.write(`\n┌─[PROMPT]\n${prompt.trim()}\n└${SEP}\n`);
     onSpawn?.(child);
 
     const parser = makeLineParser(logStream);

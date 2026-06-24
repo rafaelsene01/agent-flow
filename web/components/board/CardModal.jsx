@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -28,6 +28,8 @@ import TlcFileModal from "@/components/board/TlcFileModal.jsx";
 import FileContentModal from "@/components/board/FileContentModal.jsx";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.jsx";
 import { Button } from "@/components/ui/button.jsx";
+import { Input } from "@/components/ui/input.jsx";
+import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
 import { Separator } from "@/components/ui/separator.jsx";
 import {
@@ -230,18 +232,37 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.pullStatus === "running" ||
     worktreeConfig?.messageStatus === "running";
 
-  // Conecta SSE ao abrir o card e reconecta quando um novo run inicia
+  // Ao abrir o card sem run ativo: carrega log da última sessão do disco
+  useEffect(() => {
+    if (!worktreeId || !isConfigured || anyRunning) return;
+    const sessions = (worktreeConfig?.chatSessions ?? [])
+      .filter((s) => s.started && s.logFile)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const last = sessions[0];
+    if (!last) return;
+    fetch(
+      `/api/config/worktrees/${encodeURIComponent(worktreeId)}/helpers-file?file=${encodeURIComponent(last.logFile)}`,
+    )
+      .then((r) => r.json())
+      .then((d) => { if (d.content) setLogText(d.content); })
+      .catch(() => {});
+  }, [worktreeId, isConfigured]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Conecta SSE apenas quando há run ativo (na abertura ou quando um novo run inicia)
   useEffect(() => {
     if (!worktreeId || !isConfigured) return;
 
     const wasRunning = prevAnyRunningRef.current;
     prevAnyRunningRef.current = anyRunning;
 
-    // Conecta na primeira abertura (wasRunning === null) ou quando run inicia
     const newRunStarted = anyRunning && !wasRunning;
+
+    // Na primeira abertura sem run ativo: não conecta SSE (log vem do disco acima)
+    if (wasRunning === null && !anyRunning) return;
+    // Depois da primeira abertura: só reconecta quando um novo run inicia
     if (wasRunning !== null && !newRunStarted) return;
 
-    if (anyRunning) setLogText("");
+    setLogText("");
 
     // Em dev conecta direto no backend (5522) para evitar o buffering do proxy
     // do next dev, que segura o stream SSE. Em produção é mesma origem.
@@ -384,7 +405,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunSpecEval({ model, effort } = {}) {
+  async function handleRunSpecEval({ model, effort, validation, runTests } = {}) {
     setSpecEvalSending(true);
     try {
       const res = await fetch(
@@ -398,6 +419,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             body: item.body,
             model,
             effort,
+            validation,
+            runTests,
           }),
         },
       );
@@ -458,6 +481,47 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
+  const displayLogText = useMemo(() => {
+    if (!logText) return "";
+    // Matches simple event-type lines like [system/thinking_tokens] or [tool/result]
+    const COLLAPSIBLE = /^\[[\w/]+\]$/;
+    const lines = logText.split("\n");
+    const out = [];
+    let lastCollapsible = null;   // the line text
+    let lastCollapsibleIdx = -1;  // its index in out[]
+    let count = 0;
+
+    for (const line of lines) {
+      if (!line.trim()) {
+        // Preserve at most one blank line; absorb extras
+        if (out.length > 0 && out[out.length - 1] !== "") out.push("");
+        continue;
+      }
+
+      if (COLLAPSIBLE.test(line) && line === lastCollapsible) {
+        // Same collapsible line: update the existing entry in-place
+        count++;
+        out[lastCollapsibleIdx] = `${line}  ×${count}`;
+        // Remove the trailing blank that was added after the previous occurrence
+        if (out[out.length - 1] === "") out.pop();
+      } else {
+        out.push(line);
+        if (COLLAPSIBLE.test(line)) {
+          lastCollapsible = line;
+          lastCollapsibleIdx = out.length - 1;
+          count = 1;
+        } else {
+          // Non-collapsible content resets the collapsible tracking
+          lastCollapsible = null;
+          lastCollapsibleIdx = -1;
+          count = 0;
+        }
+      }
+    }
+
+    return out.join("\n");
+  }, [logText]);
+
   return (
     <Dialog
       open
@@ -475,7 +539,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       >
           {runConfirmModal && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
-              <div className="bg-background border rounded-lg shadow-xl w-full max-w-sm overflow-hidden mx-4">
+              <div className="bg-background border rounded-lg shadow-xl w-full max-w-md overflow-hidden mx-4">
                 <div className="flex items-center border-b px-5 py-4">
                   <span className="text-sm font-semibold flex-1">
                     {RUN_DEFAULTS[runConfirmModal.action]?.label}
@@ -516,6 +580,67 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {runConfirmModal.action === "eval" && (
+                    <>
+                      <div className="border-t pt-3 flex flex-col gap-3">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                          Comandos de Validação
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { key: "install", label: "Instalação", placeholder: "npm install" },
+                            { key: "build",   label: "Build",      placeholder: "npm run build" },
+                            { key: "lint",    label: "Lint",       placeholder: "npm run lint" },
+                            { key: "test",    label: "Testes",     placeholder: "npm test" },
+                          ].map(({ key, label, placeholder }) => (
+                            <div key={key} className="flex flex-col gap-1">
+                              <Label className="text-[10px] text-muted-foreground">{label}</Label>
+                              <Input
+                                type="text"
+                                value={runConfirmModal.validation?.[key] ?? ""}
+                                onChange={(e) =>
+                                  setRunConfirmModal((s) => ({
+                                    ...s,
+                                    validation: { ...s.validation, [key]: e.target.value },
+                                  }))
+                                }
+                                placeholder={placeholder}
+                                className="h-7 font-mono text-[11px] px-2"
+                              />
+                            </div>
+                          ))}
+                          <div className="col-span-2 flex flex-col gap-1">
+                            <Label className="text-[10px] text-muted-foreground">Outro</Label>
+                            <Input
+                              type="text"
+                              value={runConfirmModal.validation?.extra ?? ""}
+                              onChange={(e) =>
+                                setRunConfirmModal((s) => ({
+                                  ...s,
+                                  validation: { ...s.validation, extra: e.target.value },
+                                }))
+                              }
+                              placeholder="comando personalizado"
+                              className="h-7 font-mono text-[11px] px-2"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={runConfirmModal.runTests ?? true}
+                          onChange={(e) =>
+                            setRunConfirmModal((s) => ({ ...s, runTests: e.target.checked }))
+                          }
+                          className="size-3.5 accent-primary"
+                        />
+                        <span className="text-xs text-muted-foreground">Rodar e avaliar testes</span>
+                      </label>
+                    </>
+                  )}
                 </div>
                 <div className="flex justify-end gap-2 border-t px-5 py-3">
                   <Button variant="ghost" size="sm" onClick={() => setRunConfirmModal(null)}>
@@ -524,12 +649,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   <Button
                     size="sm"
                     onClick={() => {
-                      const { action, model, effort } = runConfirmModal;
+                      const { action, model, effort, validation, runTests } = runConfirmModal;
                       setRunConfirmModal(null);
                       if (action === "task") handleRunSpec({ model, effort });
                       else if (action === "tlc") handleRunTlc({ model, effort });
                       else if (action === "spec") handleRunTlcExec({ model, effort });
-                      else if (action === "eval") handleRunSpecEval({ model, effort });
+                      else if (action === "eval") handleRunSpecEval({ model, effort, validation, runTests });
                     }}
                   >
                     Executar
@@ -622,7 +747,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   className="min-h-0 flex-1 overflow-y-auto bg-zinc-950 px-4 py-3"
                 >
                   <pre className="font-mono text-[11px] leading-relaxed text-green-400/90 whitespace-pre-wrap break-all">
-                    {logText}
+                    {displayLogText}
                   </pre>
                 </div>
               ) : (
@@ -1074,7 +1199,18 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                       ? "Execute a Tarefa ou a Spec antes de avaliar"
                                       : undefined
                                 }
-                                onClick={() => setRunConfirmModal({ action: "eval", ...RUN_DEFAULTS.eval })}
+                                onClick={() => setRunConfirmModal({
+                                  action: "eval",
+                                  ...RUN_DEFAULTS.eval,
+                                  validation: {
+                                    install: board?.validation?.install ?? "",
+                                    build:   board?.validation?.build   ?? "",
+                                    lint:    board?.validation?.lint    ?? "",
+                                    test:    board?.validation?.test    ?? "",
+                                    extra:   board?.validation?.extra   ?? "",
+                                  },
+                                  runTests: true,
+                                })}
                                 className={cn(
                                   "w-full justify-start gap-2 text-xs",
                                   isEvalDone &&

@@ -2,14 +2,39 @@ import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { runClaude, resumeClaude, createRunLog, failureDetail, registerSseClient } from "../../modules/claude/claude.runner.js";
-import { acquireSlot, releaseSlot, registerProcess, unregisterProcess, cancelProcess } from "../../modules/claude/claude.concurrency.js";
-import { getWorktrees, updateWorktreeStatus, getHelpersDir, getLanguage, appendChatSession, updateChatSession } from "../../modules/config/config.service.js";
+import {
+  runClaude,
+  resumeClaude,
+  createRunLog,
+  failureDetail,
+  registerSseClient,
+} from "../../modules/claude/claude.runner.js";
+import {
+  acquireSlot,
+  releaseSlot,
+  registerProcess,
+  unregisterProcess,
+  cancelProcess,
+} from "../../modules/claude/claude.concurrency.js";
+import {
+  getWorktrees,
+  updateWorktreeStatus,
+  getHelpersDir,
+  getLanguage,
+  appendChatSession,
+  updateChatSession,
+} from "../../modules/config/config.service.js";
 import { sendError } from "../../lib/errors.js";
 import { scanTlcFeatures } from "./tlc.js";
 
-const execFileP  = promisify(execFile);
-const INTERNAL   = ["CARD.md", "agent-flow.log", "tlc.log", "tlc-exec.log", "spec-eval.log"];
+const execFileP = promisify(execFile);
+const INTERNAL = [
+  "CARD.md",
+  "agent-flow.log",
+  "tlc.log",
+  "tlc-exec.log",
+  "spec-eval.log",
+];
 const EXCLUDE_ENTRIES = [...INTERNAL, ".specs/"];
 
 function makeSessionName(wt) {
@@ -41,13 +66,19 @@ function lastTaskOrSpecSession(wt) {
 
 async function ensureWorktreeExclude(wtPath) {
   try {
-    const { stdout } = await execFileP("git", ["rev-parse", "--git-dir"], { cwd: wtPath, timeout: 5_000 });
+    const { stdout } = await execFileP("git", ["rev-parse", "--git-dir"], {
+      cwd: wtPath,
+      timeout: 5_000,
+    });
     const infoDir = path.join(stdout.trim(), "info");
     const excludeFile = path.join(infoDir, "exclude");
     fs.mkdirSync(infoDir, { recursive: true });
-    const existing = fs.existsSync(excludeFile) ? fs.readFileSync(excludeFile, "utf8") : "";
+    const existing = fs.existsSync(excludeFile)
+      ? fs.readFileSync(excludeFile, "utf8")
+      : "";
     const toAdd = EXCLUDE_ENTRIES.filter((e) => !existing.includes(e));
-    if (toAdd.length) fs.appendFileSync(excludeFile, "\n" + toAdd.join("\n") + "\n");
+    if (toAdd.length)
+      fs.appendFileSync(excludeFile, "\n" + toAdd.join("\n") + "\n");
   } catch (_) {}
 }
 
@@ -64,7 +95,10 @@ function migrateSpecsToHelpers(wtPath, helpersDir) {
   const src = path.join(wtPath, ".specs");
   if (!fs.existsSync(src)) return;
   try {
-    fs.cpSync(src, path.join(helpersDir, ".specs"), { recursive: true, force: true });
+    fs.cpSync(src, path.join(helpersDir, ".specs"), {
+      recursive: true,
+      force: true,
+    });
     fs.rmSync(src, { recursive: true, force: true });
   } catch (_) {}
 }
@@ -72,13 +106,16 @@ function migrateSpecsToHelpers(wtPath, helpersDir) {
 async function computeBaseRef(wtPath) {
   try {
     const { stdout: originHead } = await execFileP(
-      "git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+      "git",
+      ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
       { cwd: wtPath, timeout: 5_000 },
     );
     const base = originHead.trim();
     if (!base) return null;
     const { stdout: mb } = await execFileP(
-      "git", ["merge-base", "HEAD", base], { cwd: wtPath, timeout: 5_000 },
+      "git",
+      ["merge-base", "HEAD", base],
+      { cwd: wtPath, timeout: 5_000 },
     );
     return mb.trim() || null;
   } catch {
@@ -113,12 +150,18 @@ export default function runnerRoutes(app) {
       const { title, number, body } = req.body ?? {};
 
       const wt = getWorktrees().find((w) => w.id === id);
-      if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
-      if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+      if (!wt)
+        return sendError(res, 404, "Worktree não encontrado na configuração.");
+      if (!fs.existsSync(wt.path))
+        return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
       const helpersDir = getHelpersDir(wt);
-      const filePath   = path.join(helpersDir, "CARD.md");
-      fs.writeFileSync(filePath, buildCardLines({ title, number, body, branch: wt.branch }).join("\n"), "utf-8");
+      const filePath = path.join(helpersDir, "CARD.md");
+      fs.writeFileSync(
+        filePath,
+        buildCardLines({ title, number, body, branch: wt.branch }).join("\n"),
+        "utf-8",
+      );
       res.json({ ok: true, filePath });
     } catch (err) {
       sendError(res, 500, err.message, err);
@@ -130,8 +173,10 @@ export default function runnerRoutes(app) {
     const { title, number, body, model, effort } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!wt)
+      return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
     try {
       acquireSlot();
@@ -140,7 +185,11 @@ export default function runnerRoutes(app) {
     }
 
     try {
-      fs.writeFileSync(path.join(getHelpersDir(wt), "CARD.md"), buildCardLines({ title, number, body, branch: wt.branch }).join("\n"), "utf-8");
+      fs.writeFileSync(
+        path.join(getHelpersDir(wt), "CARD.md"),
+        buildCardLines({ title, number, body, branch: wt.branch }).join("\n"),
+        "utf-8",
+      );
     } catch (err) {
       releaseSlot();
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
@@ -158,10 +207,10 @@ export default function runnerRoutes(app) {
     });
 
     updateWorktreeStatus(id, {
-      status:           "running",
-      lastRunAt:        new Date().toISOString(),
-      lastError:        null,
-      cleanupDone:      false,
+      status: "running",
+      lastRunAt: new Date().toISOString(),
+      lastError: null,
+      cleanupDone: false,
       commitPushStatus: null,
       pendingCommitMsg: null,
     });
@@ -172,24 +221,27 @@ export default function runnerRoutes(app) {
     (async () => {
       try {
         const { stdout: headBefore } = await execFileP(
-          "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
+          "git",
+          ["rev-parse", "HEAD"],
+          { cwd: wt.path, timeout: 5_000 },
         ).catch(() => ({ stdout: "" }));
         const initialHead = headBefore.trim();
 
         logStream.write("=== Step 1: implementing task ===\n");
-        const cardContent = fs.readFileSync(path.join(getHelpersDir(wt), "CARD.md"), "utf-8");
+        const cardContent = fs.readFileSync(
+          path.join(getHelpersDir(wt), "CARD.md"),
+          "utf-8",
+        );
 
         const impl = await runClaude(
           langInstruction() +
-          "You are an autonomous coding agent. Implement the task below immediately.\n" +
-          "Rules:\n" +
-          "- Use Write and Edit tools to create/modify files. Do NOT describe — just do it.\n" +
-          "- Do NOT ask questions or wait for confirmation.\n" +
-          "- Do NOT run any git commands.\n" +
-          "- When fully done, output as your LAST line exactly: COMMIT: <conventional commit message>\n" +
-          "  (e.g. COMMIT: feat: add user auth endpoint)\n\n" +
-          "TASK:\n" +
-          cardContent,
+            "You are an autonomous coding agent. Implement the task below immediately.\n" +
+            "Rules:\n" +
+            "- Use Write and Edit tools to create/modify files. Do NOT describe — just do it.\n" +
+            "- Do NOT ask questions or wait for confirmation.\n" +
+            "- Do NOT run any git commands.\n" +
+            "TASK:\n" +
+            cardContent,
           wt.path,
           logStream,
           runSessionId,
@@ -199,34 +251,58 @@ export default function runnerRoutes(app) {
 
         if (impl.code !== 0) {
           logStream.end();
-          updateWorktreeStatus(id, { status: "error", lastError: `Implementation failed: ${failureDetail(impl, logStream.persistPath)}` });
+          updateWorktreeStatus(id, {
+            status: "error",
+            lastError: `Implementation failed: ${failureDetail(impl, logStream.persistPath)}`,
+          });
           return;
         }
 
         if (initialHead) {
           const { stdout: countOut } = await execFileP(
-            "git", ["rev-list", "--count", `${initialHead}..HEAD`], { cwd: wt.path, timeout: 5_000 },
+            "git",
+            ["rev-list", "--count", `${initialHead}..HEAD`],
+            { cwd: wt.path, timeout: 5_000 },
           ).catch(() => ({ stdout: "0" }));
           const claudeCommits = parseInt(countOut.trim(), 10) || 0;
           if (claudeCommits > 0) {
-            logStream.write(`\n=== Step 2: squashing ${claudeCommits} commit(s) from Claude ===\n`);
-            await execFileP("git", ["reset", "--soft", `HEAD~${claudeCommits}`], { cwd: wt.path, timeout: 15_000 })
-              .catch((e) => logStream.write(`Warning: reset failed: ${e.message}\n`));
+            logStream.write(
+              `\n=== Step 2: squashing ${claudeCommits} commit(s) from Claude ===\n`,
+            );
+            await execFileP(
+              "git",
+              ["reset", "--soft", `HEAD~${claudeCommits}`],
+              { cwd: wt.path, timeout: 15_000 },
+            ).catch((e) =>
+              logStream.write(`Warning: reset failed: ${e.message}\n`),
+            );
           }
         }
 
         const { stdout: changesOut } = await execFileP(
-          "git", ["status", "--porcelain"], { cwd: wt.path, timeout: 10_000 },
+          "git",
+          ["status", "--porcelain"],
+          { cwd: wt.path, timeout: 10_000 },
         ).catch(() => ({ stdout: "" }));
-        const realChanges = changesOut.trim().split("\n").filter((l) => {
-          if (!l.trim()) return false;
-          const file = l.slice(3).trim();
-          return !INTERNAL.includes(file) && !file.endsWith(".log") && !file.startsWith(".specs/");
-        });
+        const realChanges = changesOut
+          .trim()
+          .split("\n")
+          .filter((l) => {
+            if (!l.trim()) return false;
+            const file = l.slice(3).trim();
+            return (
+              !INTERNAL.includes(file) &&
+              !file.endsWith(".log") &&
+              !file.startsWith(".specs/")
+            );
+          });
 
         if (realChanges.length === 0) {
           logStream.end();
-          updateWorktreeStatus(id, { status: "error", lastError: `Implementation failed: no files were changed by Claude\n(log completo: ${logStream.persistPath})` });
+          updateWorktreeStatus(id, {
+            status: "error",
+            lastError: `Implementation failed: no files were changed by Claude\n(log completo: ${logStream.persistPath})`,
+          });
           return;
         }
 
@@ -245,9 +321,11 @@ export default function runnerRoutes(app) {
     const { message, model, effort, sessionId } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
-    if (!message?.trim())        return sendError(res, 400, "Mensagem obrigatória.");
+    if (!wt)
+      return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!message?.trim()) return sendError(res, 400, "Mensagem obrigatória.");
 
     try {
       acquireSlot();
@@ -288,7 +366,7 @@ export default function runnerRoutes(app) {
     }
 
     updateWorktreeStatus(id, {
-      messageStatus:    "running",
+      messageStatus: "running",
       messageLastRunAt: new Date().toISOString(),
       messageLastError: null,
     });
@@ -296,24 +374,47 @@ export default function runnerRoutes(app) {
 
     const helpersLogPath = path.join(getHelpersDir(wt), sessionLogFile);
     const isResume = !!sessionId;
-    const existingContent = (isResume && fs.existsSync(helpersLogPath))
-      ? fs.readFileSync(helpersLogPath, "utf-8")
-      : "";
-    const logStream = createRunLog(wt, sessionLogFile, { append: isResume, initialContent: existingContent });
+    const existingContent =
+      isResume && fs.existsSync(helpersLogPath)
+        ? fs.readFileSync(helpersLogPath, "utf-8")
+        : "";
+    const logStream = createRunLog(wt, sessionLogFile, {
+      append: isResume,
+      initialContent: existingContent,
+    });
 
     (async () => {
       try {
         const prompt = langInstruction() + message.trim();
         const opts = { model: model || "sonnet", effort: effort || "medium" };
-        logStream.write(`=== Mensagem do usuário (sessão ${targetId}${started ? ", resume" : ", nova"}) ===\n`);
+        logStream.write(
+          `=== Mensagem do usuário (sessão ${targetId}${started ? ", resume" : ", nova"}) ===\n`,
+        );
 
         const result = started
-          ? await resumeClaude(prompt, wt.path, logStream, targetId, (child) => registerProcess(id, child), opts)
-          : await runClaude(prompt, wt.path, logStream, targetId, (child) => registerProcess(id, child), opts);
+          ? await resumeClaude(
+              prompt,
+              wt.path,
+              logStream,
+              targetId,
+              (child) => registerProcess(id, child),
+              opts,
+            )
+          : await runClaude(
+              prompt,
+              wt.path,
+              logStream,
+              targetId,
+              (child) => registerProcess(id, child),
+              opts,
+            );
 
         if (result.code !== 0) {
           logStream.end();
-          updateWorktreeStatus(id, { messageStatus: "error", messageLastError: `Mensagem falhou: ${failureDetail(result, logStream.persistPath)}` });
+          updateWorktreeStatus(id, {
+            messageStatus: "error",
+            messageLastError: `Mensagem falhou: ${failureDetail(result, logStream.persistPath)}`,
+          });
           return;
         }
 
@@ -332,12 +433,18 @@ export default function runnerRoutes(app) {
     const { title, number, body, model, effort } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!wt)
+      return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
     const tlcHelpersDir = getHelpersDir(wt);
     try {
-      fs.writeFileSync(path.join(tlcHelpersDir, "CARD.md"), buildCardLines({ title, number, body, branch: wt.branch }).join("\n"), "utf-8");
+      fs.writeFileSync(
+        path.join(tlcHelpersDir, "CARD.md"),
+        buildCardLines({ title, number, body, branch: wt.branch }).join("\n"),
+        "utf-8",
+      );
     } catch (err) {
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
     }
@@ -354,7 +461,7 @@ export default function runnerRoutes(app) {
     });
 
     updateWorktreeStatus(id, {
-      tlcStatus:    "running",
+      tlcStatus: "running",
       tlcLastRunAt: new Date().toISOString(),
       tlcLastError: null,
     });
@@ -364,13 +471,16 @@ export default function runnerRoutes(app) {
 
     (async () => {
       logStream.write("=== TLC: Criando spec, design e tasks ===\n");
-      const cardContent = fs.readFileSync(path.join(tlcHelpersDir, "CARD.md"), "utf-8");
+      const cardContent = fs.readFileSync(
+        path.join(tlcHelpersDir, "CARD.md"),
+        "utf-8",
+      );
 
       const result = await runClaude(
         langInstruction() +
-        "/tlc-spec-driven\n\n" +
-        "Leia o conteúdo abaixo e execute as fases Specify, Design e Tasks completas.\n\n" +
-        cardContent,
+          "/tlc-spec-driven\n\n" +
+          "Leia o conteúdo abaixo e execute as fases Specify, Design e Tasks completas.\n\n" +
+          cardContent,
         wt.path,
         logStream,
         tlcSessionId,
@@ -380,7 +490,10 @@ export default function runnerRoutes(app) {
 
       if (result.code !== 0) {
         logStream.end();
-        updateWorktreeStatus(id, { tlcStatus: "error", tlcLastError: `TLC failed: ${failureDetail(result, logStream.persistPath)}` });
+        updateWorktreeStatus(id, {
+          tlcStatus: "error",
+          tlcLastError: `TLC failed: ${failureDetail(result, logStream.persistPath)}`,
+        });
         return;
       }
 
@@ -394,15 +507,21 @@ export default function runnerRoutes(app) {
       const tlcFiles = { spec: false, design: false, tasks: false };
 
       if (fs.existsSync(featuresDir)) {
-        const dirs = fs.readdirSync(featuresDir, { withFileTypes: true })
+        const dirs = fs
+          .readdirSync(featuresDir, { withFileTypes: true })
           .filter((d) => d.isDirectory())
-          .map((d) => ({ name: d.name, mtime: fs.statSync(path.join(featuresDir, d.name)).mtimeMs }))
+          .map((d) => ({
+            name: d.name,
+            mtime: fs.statSync(path.join(featuresDir, d.name)).mtimeMs,
+          }))
           .sort((a, b) => b.mtime - a.mtime);
 
         if (dirs.length > 0) {
           tlcFeaturePath = path.join(featuresDir, dirs[0].name);
           for (const type of ["spec", "design", "tasks"]) {
-            tlcFiles[type] = fs.existsSync(path.join(tlcFeaturePath, `${type}.md`));
+            tlcFiles[type] = fs.existsSync(
+              path.join(tlcFeaturePath, `${type}.md`),
+            );
           }
         }
       }
@@ -416,8 +535,10 @@ export default function runnerRoutes(app) {
     const { model, effort } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!wt)
+      return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
     try {
       acquireSlot();
@@ -430,10 +551,17 @@ export default function runnerRoutes(app) {
       const scanned = scanTlcFeatures(getHelpersDir(wt));
       if (!scanned) {
         releaseSlot();
-        return sendError(res, 400, "Nenhum feature TLC encontrado na worktree.");
+        return sendError(
+          res,
+          400,
+          "Nenhum feature TLC encontrado na worktree.",
+        );
       }
       featurePath = scanned.tlcFeaturePath;
-      updateWorktreeStatus(id, { tlcFeaturePath: featurePath, tlcFiles: scanned.tlcFiles });
+      updateWorktreeStatus(id, {
+        tlcFeaturePath: featurePath,
+        tlcFiles: scanned.tlcFiles,
+      });
     }
 
     const specFilePath = path.join(featurePath, "spec.md").replace(/\\/g, "/");
@@ -450,10 +578,10 @@ export default function runnerRoutes(app) {
     });
 
     updateWorktreeStatus(id, {
-      tlcExecStatus:    "running",
+      tlcExecStatus: "running",
       tlcExecLastRunAt: new Date().toISOString(),
       tlcExecLastError: null,
-      cleanupDone:      false,
+      cleanupDone: false,
       commitPushStatus: null,
       pendingCommitMsg: null,
     });
@@ -464,7 +592,9 @@ export default function runnerRoutes(app) {
     (async () => {
       try {
         const { stdout: headBefore } = await execFileP(
-          "git", ["rev-parse", "HEAD"], { cwd: wt.path, timeout: 5_000 },
+          "git",
+          ["rev-parse", "HEAD"],
+          { cwd: wt.path, timeout: 5_000 },
         ).catch(() => ({ stdout: "" }));
         const initialHead = headBefore.trim();
 
@@ -472,9 +602,9 @@ export default function runnerRoutes(app) {
 
         const impl = await runClaude(
           langInstruction() +
-          `Execute a spec em ${specFilePath} usando o máximo de subagentes possível. Não faça commits nem push.\n` +
-          "Quando totalmente concluído, sua ÚLTIMA linha deve ser exatamente: COMMIT: <mensagem conventional commit>\n" +
-          "(ex: COMMIT: feat: implement card sorting)",
+            `Execute a spec em ${specFilePath} usando o máximo de subagentes possível. Não faça commits nem push.\n` +
+            "Quando totalmente concluído, sua ÚLTIMA linha deve ser exatamente: COMMIT: <mensagem conventional commit>\n" +
+            "(ex: COMMIT: feat: implement card sorting)",
           wt.path,
           logStream,
           tlcExecSessionId,
@@ -484,19 +614,31 @@ export default function runnerRoutes(app) {
 
         if (impl.code !== 0) {
           logStream.end();
-          updateWorktreeStatus(id, { tlcExecStatus: "error", tlcExecLastError: `Execução falhou: ${failureDetail(impl, logStream.persistPath)}` });
+          updateWorktreeStatus(id, {
+            tlcExecStatus: "error",
+            tlcExecLastError: `Execução falhou: ${failureDetail(impl, logStream.persistPath)}`,
+          });
           return;
         }
 
         if (initialHead) {
           const { stdout: countOut } = await execFileP(
-            "git", ["rev-list", "--count", `${initialHead}..HEAD`], { cwd: wt.path, timeout: 5_000 },
+            "git",
+            ["rev-list", "--count", `${initialHead}..HEAD`],
+            { cwd: wt.path, timeout: 5_000 },
           ).catch(() => ({ stdout: "0" }));
           const claudeCommits = parseInt(countOut.trim(), 10) || 0;
           if (claudeCommits > 0) {
-            logStream.write(`\n=== Step 2: squashing ${claudeCommits} commit(s) intermediários ===\n`);
-            await execFileP("git", ["reset", "--soft", `HEAD~${claudeCommits}`], { cwd: wt.path, timeout: 15_000 })
-              .catch((e) => logStream.write(`Warning: reset failed: ${e.message}\n`));
+            logStream.write(
+              `\n=== Step 2: squashing ${claudeCommits} commit(s) intermediários ===\n`,
+            );
+            await execFileP(
+              "git",
+              ["reset", "--soft", `HEAD~${claudeCommits}`],
+              { cwd: wt.path, timeout: 15_000 },
+            ).catch((e) =>
+              logStream.write(`Warning: reset failed: ${e.message}\n`),
+            );
           }
         }
 
@@ -512,11 +654,14 @@ export default function runnerRoutes(app) {
 
   app.post("/api/config/worktrees/:id/run-spec-eval", (req, res) => {
     const id = decodeURIComponent(req.params.id);
-    const { title, number, body, model, effort } = req.body ?? {};
+    const { title, number, body, model, effort, validation, runTests } =
+      req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!wt)
+      return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
     try {
       acquireSlot();
@@ -536,7 +681,7 @@ export default function runnerRoutes(app) {
     });
 
     updateWorktreeStatus(id, {
-      specEvalStatus:    "running",
+      specEvalStatus: "running",
       specEvalLastRunAt: new Date().toISOString(),
       specEvalLastError: null,
     });
@@ -547,7 +692,7 @@ export default function runnerRoutes(app) {
     (async () => {
       try {
         const evalHelpersDir = getHelpersDir(wt);
-        const spec    = findSpecContent(evalHelpersDir);
+        const spec = findSpecContent(evalHelpersDir);
         const baseRef = await computeBaseRef(wt.path);
 
         const specSection = spec
@@ -555,7 +700,9 @@ export default function runnerRoutes(app) {
             `Leia esse arquivo e use-o como ground truth da avaliação.`
           : "Não há spec.md gerado nesta worktree. Use a descrição do card abaixo como a especificação (PRD) — " +
             "ground truth da avaliação:\n\n" +
-            buildCardLines({ title, number, body, branch: wt.branch }).join("\n");
+            buildCardLines({ title, number, body, branch: wt.branch }).join(
+              "\n",
+            );
 
         const baseSection = baseRef
           ? `O ponto base da implementação é o commit \`${baseRef}\`. ` +
@@ -567,20 +714,52 @@ export default function runnerRoutes(app) {
             "commits do branch (incluindo os já enviados ao remote) E as alterações locais não commitadas/staged " +
             "(`git diff`, `git status`).";
 
-        const evalOutputDir = path.join(evalHelpersDir, ".specs", "evaluations").replace(/\\/g, "/");
-        fs.mkdirSync(path.join(evalHelpersDir, ".specs", "evaluations"), { recursive: true });
+        const evalOutputDir = path
+          .join(evalHelpersDir, ".specs", "evaluations")
+          .replace(/\\/g, "/");
+        fs.mkdirSync(path.join(evalHelpersDir, ".specs", "evaluations"), {
+          recursive: true,
+        });
 
-        logStream.write("=== Spec-Eval: avaliando implementação contra a spec ===\n");
+        const validationCmds = [
+          validation?.install && `- Instalação: \`${validation.install}\``,
+          validation?.build && `- Build: \`${validation.build}\``,
+          validation?.lint && `- Lint: \`${validation.lint}\``,
+          runTests !== false &&
+            validation?.test &&
+            `- Testes: \`${validation.test}\``,
+          validation?.extra && `- Extra: \`${validation.extra}\``,
+        ].filter(Boolean);
+
+        const validationSection =
+          validationCmds.length > 0
+            ? "Comandos de validação disponíveis para verificar a implementação (use-os quando necessário):\n" +
+              validationCmds.join("\n")
+            : "";
+
+        const testsInstruction =
+          runTests === false
+            ? "\n\nIMPORTANTE: NÃO execute nem avalie testes. Ignore completamente qualquer menção a testes — " +
+              "não os rode, não os considere na avaliação e não os mencione no relatório."
+            : "";
+
+        logStream.write(
+          "=== Spec-Eval: avaliando implementação contra a spec ===\n",
+        );
 
         const result = await runClaude(
           langInstruction() +
-          "/spec-driven-eval\n\n" +
-          "Siga a guideline spec-driven-eval e avalie (grade) a implementação no branch atual desta worktree, " +
-          "produzindo a nota final comparável.\n\n" +
-          specSection + "\n\n" +
-          baseSection + "\n\n" +
-          "Não modifique o código sob avaliação e não faça commits nem push. " +
-          `Escreva o relatório com a nota final em \`${evalOutputDir}\`.`,
+            "/spec-driven-eval\n\n" +
+            "Siga a guideline spec-driven-eval e avalie (grade) a implementação no branch atual desta worktree, " +
+            "produzindo a nota final comparável.\n\n" +
+            specSection +
+            "\n\n" +
+            baseSection +
+            "\n\n" +
+            (validationSection ? validationSection + "\n\n" : "") +
+            "Não modifique o código sob avaliação e não faça commits nem push. " +
+            `Escreva o relatório com a nota final em \`${evalOutputDir}\`.` +
+            testsInstruction,
           wt.path,
           logStream,
           evalSessionId,
@@ -590,7 +769,10 @@ export default function runnerRoutes(app) {
 
         if (result.code !== 0) {
           logStream.end();
-          updateWorktreeStatus(id, { specEvalStatus: "error", specEvalLastError: `Spec-eval falhou: ${failureDetail(result, logStream.persistPath)}` });
+          updateWorktreeStatus(id, {
+            specEvalStatus: "error",
+            specEvalLastError: `Spec-eval falhou: ${failureDetail(result, logStream.persistPath)}`,
+          });
           return;
         }
 
@@ -607,16 +789,24 @@ export default function runnerRoutes(app) {
   app.post("/api/config/worktrees/:id/cleanup", (req, res) => {
     const id = decodeURIComponent(req.params.id);
     const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!wt)
+      return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
     const cleanHelpersDir = getHelpersDir(wt);
-    try { fs.rmSync(path.join(cleanHelpersDir, "CARD.md"), { force: true }); } catch (_) {}
+    try {
+      fs.rmSync(path.join(cleanHelpersDir, "CARD.md"), { force: true });
+    } catch (_) {}
     // Backward compat: clean up from worktree too (old worktrees may still have files there)
     for (const f of INTERNAL) {
-      try { fs.rmSync(path.join(wt.path, f), { force: true }); } catch (_) {}
+      try {
+        fs.rmSync(path.join(wt.path, f), { force: true });
+      } catch (_) {}
     }
-    try { fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true }); } catch (_) {}
+    try {
+      fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true });
+    } catch (_) {}
 
     updateWorktreeStatus(id, { cleanupDone: true, commitPushStatus: null });
     res.json({ ok: true });
@@ -626,18 +816,27 @@ export default function runnerRoutes(app) {
     const id = decodeURIComponent(req.params.id);
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt) return sendError(res, 404, "Worktree não encontrado.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
     try {
       await ensureWorktreeExclude(wt.path);
-      const { stdout } = await execFileP("git", ["status", "--porcelain", "-uall"], { cwd: wt.path, timeout: 10_000 });
-      const files = stdout.trim().split("\n")
+      const { stdout } = await execFileP(
+        "git",
+        ["status", "--porcelain", "-uall"],
+        { cwd: wt.path, timeout: 10_000 },
+      );
+      const files = stdout
+        .trim()
+        .split("\n")
         .filter(Boolean)
         .map((line) => {
           const filePath = line.slice(3);
           const fullPath = path.resolve(wt.path, filePath);
-          const isDir = filePath.endsWith("/") || (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory());
+          const isDir =
+            filePath.endsWith("/") ||
+            (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory());
           return { status: line.slice(0, 2).trim(), path: filePath, isDir };
-        })
+        });
       res.json({ files });
     } catch (err) {
       sendError(res, 500, err.message, err);
@@ -667,7 +866,8 @@ export default function runnerRoutes(app) {
     const id = decodeURIComponent(req.params.id);
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt) return sendError(res, 404, "Worktree não encontrado.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
     const filePath = req.query.file;
     if (!filePath) return sendError(res, 400, "file obrigatório");
     const wtResolved = path.resolve(wt.path);
@@ -676,7 +876,8 @@ export default function runnerRoutes(app) {
       return sendError(res, 403, "Path não permitido");
     try {
       const { stdout: statusOut } = await execFileP(
-        "git", ["status", "--porcelain", "-z", "--", filePath],
+        "git",
+        ["status", "--porcelain", "-z", "--", filePath],
         { cwd: wt.path, timeout: 10_000 },
       );
       const statusLine = statusOut.split("\0")[0] ?? "";
@@ -686,18 +887,22 @@ export default function runnerRoutes(app) {
       const isNewStaged = x === "A"; // staged new file, not in HEAD
 
       if (isUntracked) {
-        if (fs.existsSync(fullPath)) fs.rmSync(fullPath, { recursive: true, force: true });
+        if (fs.existsSync(fullPath))
+          fs.rmSync(fullPath, { recursive: true, force: true });
       } else if (isNewStaged) {
         // Unstage then delete
-        await execFileP("git", ["rm", "--cached", "--force", "--", filePath], { cwd: wt.path, timeout: 10_000 })
-          .catch(() => {});
-        if (fs.existsSync(fullPath)) fs.rmSync(fullPath, { recursive: true, force: true });
+        await execFileP("git", ["rm", "--cached", "--force", "--", filePath], {
+          cwd: wt.path,
+          timeout: 10_000,
+        }).catch(() => {});
+        if (fs.existsSync(fullPath))
+          fs.rmSync(fullPath, { recursive: true, force: true });
       } else {
         // Modified, deleted, renamed — restore to HEAD (staged + worktree)
-        await execFileP(
-          "git", ["checkout", "HEAD", "--", filePath],
-          { cwd: wt.path, timeout: 10_000 },
-        );
+        await execFileP("git", ["checkout", "HEAD", "--", filePath], {
+          cwd: wt.path,
+          timeout: 10_000,
+        });
       }
       res.json({ ok: true });
     } catch (err) {
@@ -709,11 +914,13 @@ export default function runnerRoutes(app) {
     const id = decodeURIComponent(req.params.id);
 
     const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!wt)
+      return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
     updateWorktreeStatus(id, {
-      commitPushStatus:    "running",
+      commitPushStatus: "running",
       commitPushLastRunAt: new Date().toISOString(),
       commitPushLastError: null,
     });
@@ -722,14 +929,22 @@ export default function runnerRoutes(app) {
     (async () => {
       await ensureWorktreeExclude(wt.path);
       try {
-        await execFileP("git", ["add", "-A"], { cwd: wt.path, timeout: 30_000 });
+        await execFileP("git", ["add", "-A"], {
+          cwd: wt.path,
+          timeout: 30_000,
+        });
       } catch (err) {
-        updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `git add falhou: ${err.message}` });
+        updateWorktreeStatus(id, {
+          commitPushStatus: "error",
+          commitPushLastError: `git add falhou: ${err.message}`,
+        });
         return;
       }
 
       const { stdout: statusOut } = await execFileP(
-        "git", ["status", "--porcelain"], { cwd: wt.path, timeout: 10_000 },
+        "git",
+        ["status", "--porcelain"],
+        { cwd: wt.path, timeout: 10_000 },
       ).catch(() => ({ stdout: "" }));
 
       if (statusOut.trim()) {
@@ -741,8 +956,8 @@ export default function runnerRoutes(app) {
         if (lastSession) {
           commitResult = await resumeClaude(
             langInstruction() +
-            "Com base em tudo que foi implementado nesta sessão, crie um commit semântico (conventional commits) " +
-            "com todas as mudanças staged. Use --no-verify. Não faça push.",
+              "Com base em tudo que foi implementado nesta sessão, crie um commit semântico (conventional commits) " +
+              "com todas as mudanças staged. Use --no-verify. Não faça push.",
             wt.path,
             logStream,
             lastSession.id,
@@ -750,8 +965,8 @@ export default function runnerRoutes(app) {
         } else {
           commitResult = await runClaude(
             langInstruction() +
-            "Analise as mudanças staged (`git diff --staged`) e crie um commit semântico (conventional commits) " +
-            "com `--no-verify`. Não faça push.",
+              "Analise as mudanças staged (`git diff --staged`) e crie um commit semântico (conventional commits) " +
+              "com `--no-verify`. Não faça push.",
             wt.path,
             logStream,
             null,
@@ -761,15 +976,25 @@ export default function runnerRoutes(app) {
         await new Promise((resolve) => logStream.end(resolve));
 
         if (commitResult.code !== 0) {
-          updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `Commit falhou: ${failureDetail(commitResult, logStream.persistPath)}` });
+          updateWorktreeStatus(id, {
+            commitPushStatus: "error",
+            commitPushLastError: `Commit falhou: ${failureDetail(commitResult, logStream.persistPath)}`,
+          });
           return;
         }
       }
 
       try {
-        await execFileP("git", ["push", "--no-verify", "origin", `HEAD:${wt.branch}`], { cwd: wt.path, timeout: 60_000 });
+        await execFileP(
+          "git",
+          ["push", "--no-verify", "origin", `HEAD:${wt.branch}`],
+          { cwd: wt.path, timeout: 60_000 },
+        );
       } catch (err) {
-        updateWorktreeStatus(id, { commitPushStatus: "error", commitPushLastError: `Push falhou: ${err.message}` });
+        updateWorktreeStatus(id, {
+          commitPushStatus: "error",
+          commitPushLastError: `Push falhou: ${err.message}`,
+        });
         return;
       }
 
@@ -780,11 +1005,14 @@ export default function runnerRoutes(app) {
   app.delete("/api/config/worktrees/:id/run", (req, res) => {
     const id = decodeURIComponent(req.params.id);
     const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt) return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!wt)
+      return sendError(res, 404, "Worktree não encontrado na configuração.");
 
     const result = cancelProcess(id);
-    if (result === "not-found")   return sendError(res, 404, "Nenhum run ativo para esta worktree.");
-    if (result === "already-done") return sendError(res, 409, "Run já finalizado.");
+    if (result === "not-found")
+      return sendError(res, 404, "Nenhum run ativo para esta worktree.");
+    if (result === "already-done")
+      return sendError(res, 409, "Run já finalizado.");
 
     updateWorktreeStatus(id, { status: "cancelled" });
     res.json({ ok: true });
@@ -802,7 +1030,8 @@ export default function runnerRoutes(app) {
 
     try {
       for (const entry of fs.readdirSync(helpersDir, { withFileTypes: true })) {
-        if (entry.isFile() && entry.name.endsWith(".log")) files.push(entry.name);
+        if (entry.isFile() && entry.name.endsWith(".log"))
+          files.push(entry.name);
       }
     } catch (_) {}
 
@@ -812,7 +1041,8 @@ export default function runnerRoutes(app) {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
           const rel = relBase ? `${relBase}/${entry.name}` : entry.name;
           if (entry.isDirectory()) collectMd(path.join(dir, entry.name), rel);
-          else if (entry.isFile() && entry.name.endsWith(".md")) files.push(rel);
+          else if (entry.isFile() && entry.name.endsWith(".md"))
+            files.push(rel);
         }
       } catch (_) {}
     }
@@ -830,8 +1060,8 @@ export default function runnerRoutes(app) {
     if (!filePath) return sendError(res, 400, "file obrigatório");
 
     const helpersDir = getHelpersDir(wt);
-    const resolved   = path.resolve(helpersDir);
-    const fullPath   = path.resolve(helpersDir, filePath);
+    const resolved = path.resolve(helpersDir);
+    const fullPath = path.resolve(helpersDir, filePath);
 
     if (!fullPath.startsWith(resolved + path.sep) && fullPath !== resolved)
       return sendError(res, 403, "Path não permitido");
@@ -866,12 +1096,17 @@ export default function runnerRoutes(app) {
   app.get("/api/config/worktrees/:id/behind-count", async (req, res) => {
     const id = decodeURIComponent(req.params.id);
     const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt)                     return sendError(res, 404, "Worktree não encontrado.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
     try {
-      await execFileP("git", ["fetch", "origin", wt.branch], { cwd: wt.path, timeout: 30_000 });
+      await execFileP("git", ["fetch", "origin", wt.branch], {
+        cwd: wt.path,
+        timeout: 30_000,
+      });
       const { stdout } = await execFileP(
-        "git", ["rev-list", "--count", "HEAD..FETCH_HEAD"],
+        "git",
+        ["rev-list", "--count", "HEAD..FETCH_HEAD"],
         { cwd: wt.path, timeout: 10_000 },
       );
       res.json({ behind: parseInt(stdout.trim(), 10) || 0 });
@@ -883,8 +1118,9 @@ export default function runnerRoutes(app) {
   app.post("/api/config/worktrees/:id/pull", (req, res) => {
     const id = decodeURIComponent(req.params.id);
     const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt)                     return sendError(res, 404, "Worktree não encontrado.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
     updateWorktreeStatus(id, { pullStatus: "running", pullLastError: null });
     res.json({ ok: true });
@@ -894,10 +1130,10 @@ export default function runnerRoutes(app) {
 
       const pullResult = await runClaude(
         langInstruction() +
-        `Faça pull das alterações remotas do branch '${wt.branch}' (origin/${wt.branch}) para o branch local. ` +
-        `Use --no-verify onde necessário. Se houver conflitos de merge, resolva-os mantendo as alterações locais ` +
-        `quando fizer sentido e integrando as remotas. ` +
-        `Não faça commit nem push — deixe as alterações prontas para revisão.`,
+          `Faça pull das alterações remotas do branch '${wt.branch}' (origin/${wt.branch}) para o branch local. ` +
+          `Use --no-verify onde necessário. Se houver conflitos de merge, resolva-os mantendo as alterações locais ` +
+          `quando fizer sentido e integrando as remotas. ` +
+          `Não faça commit nem push — deixe as alterações prontas para revisão.`,
         wt.path,
         logStream,
         null,
@@ -906,7 +1142,10 @@ export default function runnerRoutes(app) {
       await new Promise((resolve) => logStream.end(resolve));
 
       if (pullResult.code !== 0) {
-        updateWorktreeStatus(id, { pullStatus: "error", pullLastError: failureDetail(pullResult, logStream.persistPath) });
+        updateWorktreeStatus(id, {
+          pullStatus: "error",
+          pullLastError: failureDetail(pullResult, logStream.persistPath),
+        });
         return;
       }
 

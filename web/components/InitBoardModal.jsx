@@ -37,6 +37,11 @@ export default function InitBoardModal({ onClose, onSaved }) {
   const [viewFilter, setViewFilter]       = useState("");
   const [saving, setSaving]               = useState(false);
   const [copied, setCopied]               = useState(false);
+  const [cmdInstall, setCmdInstall]       = useState("");
+  const [cmdBuild, setCmdBuild]           = useState("");
+  const [cmdLint, setCmdLint]             = useState("");
+  const [cmdTest, setCmdTest]             = useState("");
+  const [cmdExtra, setCmdExtra]           = useState("");
   const dragIdx = useRef(null);
 
   useEffect(() => {
@@ -172,6 +177,13 @@ export default function InitBoardModal({ onClose, onSaved }) {
         viewFilter: vf,
         repoPath:   "",
         columns:    activeCols.map((c) => ({ id: c.id, name: c.name, color: c.color ?? null })),
+        validation: {
+          install: cmdInstall.trim() || null,
+          build:   cmdBuild.trim()   || null,
+          lint:    cmdLint.trim()    || null,
+          test:    cmdTest.trim()    || null,
+          extra:   cmdExtra.trim()   || null,
+        },
       };
 
       await fetch("/api/config", {
@@ -461,6 +473,84 @@ export default function InitBoardModal({ onClose, onSaved }) {
                   </div>
                 </div>
               )}
+              {/* ── Comandos de validação ── */}
+              <div className="flex flex-col gap-3 border-t pt-3.5 mt-1">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Comandos de Validação
+                </span>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="cmd-install" className="text-xs text-muted-foreground">
+                      Instalação
+                    </Label>
+                    <Input
+                      id="cmd-install"
+                      type="text"
+                      value={cmdInstall}
+                      onChange={(e) => setCmdInstall(e.target.value)}
+                      placeholder="npm install"
+                      className="font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="cmd-build" className="text-xs text-muted-foreground">
+                      Build
+                    </Label>
+                    <Input
+                      id="cmd-build"
+                      type="text"
+                      value={cmdBuild}
+                      onChange={(e) => setCmdBuild(e.target.value)}
+                      placeholder="npm run build"
+                      className="font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="cmd-lint" className="text-xs text-muted-foreground">
+                      Lint
+                    </Label>
+                    <Input
+                      id="cmd-lint"
+                      type="text"
+                      value={cmdLint}
+                      onChange={(e) => setCmdLint(e.target.value)}
+                      placeholder="npm run lint"
+                      className="font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="cmd-test" className="text-xs text-muted-foreground">
+                      Testes
+                    </Label>
+                    <Input
+                      id="cmd-test"
+                      type="text"
+                      value={cmdTest}
+                      onChange={(e) => setCmdTest(e.target.value)}
+                      placeholder="npm test"
+                      className="font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="col-span-2 flex flex-col gap-1.5">
+                    <Label htmlFor="cmd-extra" className="text-xs text-muted-foreground">
+                      Outro
+                    </Label>
+                    <Input
+                      id="cmd-extra"
+                      type="text"
+                      value={cmdExtra}
+                      onChange={(e) => setCmdExtra(e.target.value)}
+                      placeholder="comando personalizado"
+                      className="font-mono text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
             </>
           )}
         </div>
