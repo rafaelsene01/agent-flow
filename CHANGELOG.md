@@ -1,3 +1,11 @@
+# [1.20.0](https://github.com/rafaelsene01/agent-flow/compare/v1.19.0...v1.20.0) (2026-06-24)
+
+
+### Features
+
+* enhance InitBoardModal and CardModal with validation command inputs ([d0f5678](https://github.com/rafaelsene01/agent-flow/commit/d0f5678ad191c2c81196a2ee58b75fd2000ce818))
+* enhance logging and run configuration in runner and CardModal components ([0dfe157](https://github.com/rafaelsene01/agent-flow/commit/0dfe1574c0f4f8125108ed1f849ce51ab24e346b))
+
 # [1.19.0](https://github.com/rafaelsene01/agent-flow/compare/v1.18.0...v1.19.0) (2026-06-23)
 
 
