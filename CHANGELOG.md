@@ -1,3 +1,10 @@
+# [1.21.0](https://github.com/rafaelsene01/agent-flow/compare/v1.20.0...v1.21.0) (2026-06-24)
+
+
+### Features
+
+* add usage routes and badge to enhance user experience ([df3b25f](https://github.com/rafaelsene01/agent-flow/commit/df3b25fd65018ed54b03f9192c606a015bb84549))
+
 # [1.20.0](https://github.com/rafaelsene01/agent-flow/compare/v1.19.0...v1.20.0) (2026-06-24)
 
 
