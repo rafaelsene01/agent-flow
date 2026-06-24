@@ -54,6 +54,13 @@ const ORIGIN_LABEL = {
   chat: "chat",
 };
 
+const RUN_DEFAULTS = {
+  task: { model: "sonnet", effort: "medium", label: "Executar Tarefa" },
+  tlc:  { model: "opus",   effort: "high",   label: "Executar TLC" },
+  spec: { model: "sonnet", effort: "medium", label: "Executar Spec" },
+  eval: { model: "opus",   effort: "high",   label: "Executar Spec-Eval" },
+};
+
 
 function Assignee({ login, avatarUrl, size = "size-6" }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -128,6 +135,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [helpersFiles, setHelpersFiles] = useState(null); // null=not loaded, array=loaded
   const [helpersFileModal, setHelpersFileModal] = useState(null); // null | file path string
   const [errorModal, setErrorModal] = useState(null); // null | string
+  const [runConfirmModal, setRunConfirmModal] = useState(null); // null | { action, model, effort }
   const [logText, setLogText] = useState("");
   const [mainTab, setMainTab] = useState("desc");
   const [messageText, setMessageText] = useState("");
@@ -312,7 +320,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunTlc() {
+  async function handleRunTlc({ model, effort } = {}) {
     setTlcSending(true);
     try {
       const res = await fetch(
@@ -324,6 +332,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             title: item.title,
             number: item.number,
             body: item.body,
+            model,
+            effort,
           }),
         },
       );
@@ -352,12 +362,16 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunTlcExec() {
+  async function handleRunTlcExec({ model, effort } = {}) {
     setTlcExecSending(true);
     try {
       const res = await fetch(
         `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run-tlc-exec`,
-        { method: "POST", headers: { "Content-Type": "application/json" } },
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model, effort }),
+        },
       );
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -370,7 +384,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunSpecEval() {
+  async function handleRunSpecEval({ model, effort } = {}) {
     setSpecEvalSending(true);
     try {
       const res = await fetch(
@@ -382,6 +396,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             title: item.title,
             number: item.number,
             body: item.body,
+            model,
+            effort,
           }),
         },
       );
@@ -414,7 +430,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunSpec() {
+  async function handleRunSpec({ model, effort } = {}) {
     setSpecSending(true);
     try {
       const res = await fetch(
@@ -426,6 +442,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             title: item.title,
             number: item.number,
             body: item.body,
+            model,
+            effort,
           }),
         },
       );
@@ -455,6 +473,71 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
         onEscapeKeyDown={(e) => e.preventDefault()}
         className="w-full sm:max-w-[calc(100%-2rem)] h-[80vh] gap-0 overflow-hidden p-0"
       >
+          {runConfirmModal && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
+              <div className="bg-background border rounded-lg shadow-xl w-full max-w-sm overflow-hidden mx-4">
+                <div className="flex items-center border-b px-5 py-4">
+                  <span className="text-sm font-semibold flex-1">
+                    {RUN_DEFAULTS[runConfirmModal.action]?.label}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-4 px-5 py-4">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Modelo</span>
+                    <Select
+                      value={runConfirmModal.model}
+                      onValueChange={(v) => setRunConfirmModal((s) => ({ ...s, model: v }))}
+                    >
+                      <SelectTrigger size="sm" className="text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="haiku">Haiku</SelectItem>
+                        <SelectItem value="sonnet">Sonnet</SelectItem>
+                        <SelectItem value="opus">Opus</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Effort</span>
+                    <Select
+                      value={runConfirmModal.effort}
+                      onValueChange={(v) => setRunConfirmModal((s) => ({ ...s, effort: v }))}
+                    >
+                      <SelectTrigger size="sm" className="text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">low</SelectItem>
+                        <SelectItem value="medium">medium</SelectItem>
+                        <SelectItem value="high">high</SelectItem>
+                        <SelectItem value="xhigh">xhigh</SelectItem>
+                        <SelectItem value="max">max</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 border-t px-5 py-3">
+                  <Button variant="ghost" size="sm" onClick={() => setRunConfirmModal(null)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const { action, model, effort } = runConfirmModal;
+                      setRunConfirmModal(null);
+                      if (action === "task") handleRunSpec({ model, effort });
+                      else if (action === "tlc") handleRunTlc({ model, effort });
+                      else if (action === "spec") handleRunTlcExec({ model, effort });
+                      else if (action === "eval") handleRunSpecEval({ model, effort });
+                    }}
+                  >
+                    Executar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex h-full min-h-0">
             {/* ── main ── */}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -747,7 +830,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 size="sm"
                                 type="button"
                                 disabled={isRunning || isTlcRunning}
-                                onClick={handleRunSpec}
+                                onClick={() => setRunConfirmModal({ action: "task", ...RUN_DEFAULTS.task })}
                                 className={cn(
                                   "w-full justify-start gap-2 text-xs",
                                   isDone &&
@@ -813,7 +896,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                     ? "Skill tlc-spec-driven não instalada — configure nas Configurações"
                                     : undefined
                                 }
-                                onClick={handleRunTlc}
+                                onClick={() => setRunConfirmModal({ action: "tlc", ...RUN_DEFAULTS.tlc })}
                                 className={cn(
                                   "w-full justify-start gap-2 text-xs",
                                   isTlcDone &&
@@ -903,7 +986,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                           ? "Execute o TLC antes de executar a Spec"
                                           : undefined
                                       }
-                                      onClick={handleRunTlcExec}
+                                      onClick={() => setRunConfirmModal({ action: "spec", ...RUN_DEFAULTS.spec })}
                                       className={cn(
                                         "w-full justify-start gap-2 text-xs",
                                         isExecDone &&
@@ -991,7 +1074,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                       ? "Execute a Tarefa ou a Spec antes de avaliar"
                                       : undefined
                                 }
-                                onClick={handleRunSpecEval}
+                                onClick={() => setRunConfirmModal({ action: "eval", ...RUN_DEFAULTS.eval })}
                                 className={cn(
                                   "w-full justify-start gap-2 text-xs",
                                   isEvalDone &&

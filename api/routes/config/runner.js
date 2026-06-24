@@ -22,6 +22,10 @@ function makeSessionId(wt, origin) {
   return `${makeSessionName(wt)}-${origin}-${Date.now().toString(36)}`;
 }
 
+function makeLogFile(origin) {
+  return `${origin}-${Date.now().toString(36)}.log`;
+}
+
 function truncateDesc(text) {
   if (!text) return "";
   const t = text.replace(/\s+/g, " ").trim();
@@ -123,7 +127,7 @@ export default function runnerRoutes(app) {
 
   app.post("/api/config/worktrees/:id/run", (req, res) => {
     const id = decodeURIComponent(req.params.id);
-    const { title, number, body } = req.body ?? {};
+    const { title, number, body, model, effort } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
@@ -142,9 +146,11 @@ export default function runnerRoutes(app) {
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
     }
 
+    const logFile = makeLogFile("task");
     const runSessionId = makeSessionId(wt, "task");
     appendChatSession(id, {
       id: runSessionId,
+      logFile,
       origin: "task",
       description: truncateDesc(body || title),
       started: false,
@@ -161,7 +167,7 @@ export default function runnerRoutes(app) {
     });
     res.json({ ok: true });
 
-    const logStream = createRunLog(wt, "agent-flow.log");
+    const logStream = createRunLog(wt, logFile);
 
     (async () => {
       try {
@@ -188,7 +194,7 @@ export default function runnerRoutes(app) {
           logStream,
           runSessionId,
           (child) => registerProcess(id, child),
-          { model: "sonnet", effort: "medium" },
+          { model: model || "sonnet", effort: effort || "medium" },
         );
 
         if (impl.code !== 0) {
@@ -215,7 +221,7 @@ export default function runnerRoutes(app) {
         const realChanges = changesOut.trim().split("\n").filter((l) => {
           if (!l.trim()) return false;
           const file = l.slice(3).trim();
-          return !INTERNAL.includes(file) && !file.startsWith(".specs/");
+          return !INTERNAL.includes(file) && !file.endsWith(".log") && !file.startsWith(".specs/");
         });
 
         if (realChanges.length === 0) {
@@ -249,15 +255,17 @@ export default function runnerRoutes(app) {
       return sendError(res, err.status ?? 500, err.message);
     }
 
-    let targetId, started;
+    let targetId, started, sessionLogFile;
 
     try {
       const sessions = wt.chatSessions ?? [];
 
       if (!sessionId) {
+        sessionLogFile = makeLogFile("chat");
         targetId = makeSessionId(wt, "chat");
         await appendChatSession(id, {
           id: targetId,
+          logFile: sessionLogFile,
           origin: "chat",
           description: truncateDesc(message),
           started: false,
@@ -272,6 +280,7 @@ export default function runnerRoutes(app) {
         }
         targetId = entry.id;
         started = entry.started;
+        sessionLogFile = entry.logFile ?? makeLogFile("chat");
       }
     } catch (err) {
       releaseSlot();
@@ -285,7 +294,12 @@ export default function runnerRoutes(app) {
     });
     res.json({ ok: true, sessionId: targetId });
 
-    const logStream = createRunLog(wt, "agent-flow.log");
+    const helpersLogPath = path.join(getHelpersDir(wt), sessionLogFile);
+    const isResume = !!sessionId;
+    const existingContent = (isResume && fs.existsSync(helpersLogPath))
+      ? fs.readFileSync(helpersLogPath, "utf-8")
+      : "";
+    const logStream = createRunLog(wt, sessionLogFile, { append: isResume, initialContent: existingContent });
 
     (async () => {
       try {
@@ -315,7 +329,7 @@ export default function runnerRoutes(app) {
 
   app.post("/api/config/worktrees/:id/run-tlc", (req, res) => {
     const id = decodeURIComponent(req.params.id);
-    const { title, number, body } = req.body ?? {};
+    const { title, number, body, model, effort } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
@@ -328,9 +342,11 @@ export default function runnerRoutes(app) {
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
     }
 
+    const logFile = makeLogFile("tlc");
     const tlcSessionId = makeSessionId(wt, "tlc");
     appendChatSession(id, {
       id: tlcSessionId,
+      logFile,
       origin: "tlc",
       description: truncateDesc(body || title),
       started: false,
@@ -344,7 +360,7 @@ export default function runnerRoutes(app) {
     });
     res.json({ ok: true });
 
-    const logStream = createRunLog(wt, "tlc.log");
+    const logStream = createRunLog(wt, logFile);
 
     (async () => {
       logStream.write("=== TLC: Criando spec, design e tasks ===\n");
@@ -359,7 +375,7 @@ export default function runnerRoutes(app) {
         logStream,
         tlcSessionId,
         null,
-        { model: "opus", effort: "high" },
+        { model: model || "opus", effort: effort || "high" },
       );
 
       if (result.code !== 0) {
@@ -397,6 +413,7 @@ export default function runnerRoutes(app) {
 
   app.post("/api/config/worktrees/:id/run-tlc-exec", (req, res) => {
     const id = decodeURIComponent(req.params.id);
+    const { model, effort } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
@@ -421,9 +438,11 @@ export default function runnerRoutes(app) {
 
     const specFilePath = path.join(featurePath, "spec.md").replace(/\\/g, "/");
 
+    const logFile = makeLogFile("spec");
     const tlcExecSessionId = makeSessionId(wt, "spec");
     appendChatSession(id, {
       id: tlcExecSessionId,
+      logFile,
       origin: "spec",
       description: truncateDesc(path.basename(featurePath)),
       started: false,
@@ -440,7 +459,7 @@ export default function runnerRoutes(app) {
     });
     res.json({ ok: true });
 
-    const logStream = createRunLog(wt, "tlc-exec.log");
+    const logStream = createRunLog(wt, logFile);
 
     (async () => {
       try {
@@ -460,7 +479,7 @@ export default function runnerRoutes(app) {
           logStream,
           tlcExecSessionId,
           (child) => registerProcess(id, child),
-          { model: "sonnet", effort: "medium" },
+          { model: model || "sonnet", effort: effort || "medium" },
         );
 
         if (impl.code !== 0) {
@@ -493,7 +512,7 @@ export default function runnerRoutes(app) {
 
   app.post("/api/config/worktrees/:id/run-spec-eval", (req, res) => {
     const id = decodeURIComponent(req.params.id);
-    const { title, number, body } = req.body ?? {};
+    const { title, number, body, model, effort } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt)                     return sendError(res, 404, "Worktree não encontrado na configuração.");
@@ -505,9 +524,11 @@ export default function runnerRoutes(app) {
       return sendError(res, err.status ?? 500, err.message);
     }
 
+    const logFile = makeLogFile("eval");
     const evalSessionId = makeSessionId(wt, "eval");
     appendChatSession(id, {
       id: evalSessionId,
+      logFile,
       origin: "eval",
       description: truncateDesc(body || title),
       started: false,
@@ -521,7 +542,7 @@ export default function runnerRoutes(app) {
     });
     res.json({ ok: true });
 
-    const logStream = createRunLog(wt, "spec-eval.log");
+    const logStream = createRunLog(wt, logFile);
 
     (async () => {
       try {
@@ -564,7 +585,7 @@ export default function runnerRoutes(app) {
           logStream,
           evalSessionId,
           (child) => registerProcess(id, child),
-          { model: "opus", effort: "high" },
+          { model: model || "opus", effort: effort || "high" },
         );
 
         if (result.code !== 0) {

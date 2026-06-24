@@ -85,15 +85,16 @@ export function broadcastDone(id) {
 
 // ── Log streams ────────────────────────────────────────────────────────────────
 
-export function createRunLog(wt, name) {
+export function createRunLog(wt, name, { append = false, initialContent = "" } = {}) {
   activeRuns.add(wt.id);
-  logBuffers.set(wt.id, "");
+  logBuffers.set(wt.id, initialContent);
   fs.mkdirSync(LOGS_DIR, { recursive: true });
   const helpersDir  = getHelpersDir(wt);
   const persistPath = path.join(LOGS_DIR, `${path.basename(wt.path)}-${name}`);
+  const flags = append ? "a" : "w";
   const streams = [
-    fs.createWriteStream(path.join(helpersDir, name), { flags: "w", encoding: "utf-8" }),
-    fs.createWriteStream(persistPath, { flags: "w", encoding: "utf-8" }),
+    fs.createWriteStream(path.join(helpersDir, name), { flags, encoding: "utf-8" }),
+    fs.createWriteStream(persistPath, { flags, encoding: "utf-8" }),
   ];
   const id = wt.id;
   return {
