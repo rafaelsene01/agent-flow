@@ -11,6 +11,7 @@ import {
   FileText,
   FolderOpen,
   GitBranch,
+  GitMerge,
   GitPullRequest,
   ListChecks,
   Loader2,
@@ -54,6 +55,7 @@ const ORIGIN_LABEL = {
   eval: "eval",
   tlc: "tlc",
   chat: "chat",
+  "create-pr": "PR",
 };
 
 const RUN_DEFAULTS = {
@@ -62,6 +64,7 @@ const RUN_DEFAULTS = {
   spec: { model: "sonnet", effort: "medium", label: "Executar Spec" },
   eval: { model: "sonnet", effort: "high", label: "Executar Spec-Eval" },
   commitPush: { model: "haiku", effort: "low", label: "Commit & Push" },
+  createPR: { model: "haiku", effort: "medium", label: "Criar Pull Request" },
 };
 
 
@@ -145,6 +148,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [messageModel, setMessageModel] = useState("sonnet");
   const [messageEffort, setMessageEffort] = useState("medium");
   const [messageSending, setMessageSending] = useState(false);
+  const [resetWorktreeSending, setResetWorktreeSending] = useState(false);
+  const [createPrSending, setCreatePrSending] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState("__new__");
   const logRef = useRef(null);
   const prevAnyRunningRef = useRef(null);
@@ -231,7 +236,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.specEvalStatus === "running" ||
     worktreeConfig?.commitPushStatus === "running" ||
     worktreeConfig?.pullStatus === "running" ||
-    worktreeConfig?.messageStatus === "running";
+    worktreeConfig?.messageStatus === "running" ||
+    worktreeConfig?.prStatus === "running";
 
   // Ao abrir o card sem run ativo: carrega log da última sessão do disco
   useEffect(() => {
@@ -309,6 +315,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.commitPushStatus,
     worktreeConfig?.pullStatus,
     worktreeConfig?.messageStatus,
+    worktreeConfig?.prStatus,
   ]);
 
   async function handleSendMessage() {
@@ -373,6 +380,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
   async function handleResetWorktree() {
     if (!worktreeId) return;
+    setResetWorktreeSending(true);
     try {
       await fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}`, {
         method: "DELETE",
@@ -382,6 +390,36 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       onWorktreeChange?.();
     } catch (err) {
       console.error("[reset-worktree]", err);
+    } finally {
+      setResetWorktreeSending(false);
+    }
+  }
+
+  async function handleCreatePR({ model, effort, sessionId } = {}) {
+    setCreatePrSending(true);
+    try {
+      const res = await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/create-pr`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: item.title,
+            number: item.number,
+            model,
+            effort,
+            sessionId: sessionId === "__new__" ? undefined : sessionId,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      loadWorktreeConfig();
+      onWorktreeChange?.();
+    } catch (err) {
+      console.error("[create-pr]", err);
+    } finally {
+      setCreatePrSending(false);
     }
   }
 
@@ -689,6 +727,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     else if (action === "spec") handleRunTlcExec({ model, effort, sessionId: session });
                     else if (action === "eval") handleRunSpecEval({ model, effort, validation, runTests, sessionId: session });
                     else if (action === "commitPush") handleCommitPush({ model, effort, sessionId: session });
+                    else if (action === "createPR") handleCreatePR({ model, effort, sessionId: session });
                   }}
                 >
                   Executar
@@ -924,8 +963,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       type="button"
                       title="Resetar: remove a worktree do disco e limpa a configuração do card"
                       onClick={handleResetWorktree}
+                      disabled={resetWorktreeSending}
                     >
-                      <RotateCcw className="size-3.5" />
+                      {resetWorktreeSending
+                        ? <Loader2 className="size-3.5 animate-spin" />
+                        : <RotateCcw className="size-3.5" />}
                     </Button>
                   )}
                 </div>
@@ -1369,6 +1411,56 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         <CopyCmd cmd='git commit -m "message"' />
                         <CopyCmd cmd={`git push --force-with-lease origin ${worktreeConfig.branch}`} />
                       </div>
+                      {worktreeConfig.originBranch && (() => {
+                        const prStatus = worktreeConfig?.prStatus;
+                        const isPrRunning = prStatus === "running" || createPrSending;
+                        const isPrDone = prStatus === "done";
+                        const isPrError = prStatus === "error";
+                        const hasFiles = changedFiles?.length > 0;
+                        return (
+                          <div className="mt-1 flex flex-col gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              type="button"
+                              disabled={isPrRunning || hasFiles || changedFiles === null}
+                              onClick={() => setRunConfirmModal({ action: "createPR", ...RUN_DEFAULTS.createPR, session: "__new__" })}
+                              title={isPrError ? worktreeConfig?.prLastError : undefined}
+                              className={cn(
+                                "w-full justify-start gap-2 text-xs",
+                                isPrDone
+                                  ? "border-state-completed/50 text-state-completed opacity-75"
+                                  : isPrError
+                                    ? "border-destructive/50 text-destructive opacity-75"
+                                    : !isPrRunning && "border-primary/60 text-primary",
+                              )}
+                            >
+                              {isPrRunning
+                                ? <Loader2 className="size-3.5 animate-spin" />
+                                : <GitMerge className="size-3.5" />}
+                              <span>
+                                {isPrRunning
+                                  ? "Criando PR…"
+                                  : isPrError
+                                    ? "↺ Tentar PR"
+                                    : isPrDone
+                                      ? "✓ PR Criado"
+                                      : `Criar PR → ${worktreeConfig.originBranch}`}
+                              </span>
+                            </Button>
+                            {isPrDone && worktreeConfig?.prUrl && (
+                              <a
+                                href={worktreeConfig.prUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="truncate px-1 text-[11px] text-primary hover:underline"
+                              >
+                                {worktreeConfig.prUrl}
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TabsContent>
 
                     {/* ── Aba 3: Arquivos alterados ── */}

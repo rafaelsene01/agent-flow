@@ -70,6 +70,14 @@ export async function listBranches(owner, repo, query = "") {
   return { branches, hasMore: Boolean(refs?.pageInfo?.hasNextPage) };
 }
 
+export async function createPullRequest(owner, repo, { head, base, title, body }) {
+  const token = requireToken();
+  return ghFetch(`/repos/${owner}/${repo}/pulls`, token, {
+    method: "POST",
+    body: JSON.stringify({ title, body, head, base }),
+  });
+}
+
 export async function createBranch(owner, repo, newBranch, originBranch) {
   const token = requireToken();
   const origin = await ghFetch(

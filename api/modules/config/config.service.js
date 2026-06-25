@@ -63,7 +63,7 @@ export function getWorktrees() {
   return getConfig().worktrees ?? [];
 }
 
-export function registerWorktree({ owner, repo, branch, cardNumber, repoDir, worktreeDir }) {
+export function registerWorktree({ owner, repo, branch, originBranch, cardNumber, repoDir, worktreeDir }) {
   const id         = `${owner}/${repo}#${cardNumber}`;
   const helpersDir = worktreeDir + "-helpers";
   fs.mkdirSync(helpersDir, { recursive: true });
@@ -72,6 +72,7 @@ export function registerWorktree({ owner, repo, branch, cardNumber, repoDir, wor
     cardNumber,
     repo: `${owner}/${repo}`,
     branch,
+    originBranch: originBranch ?? null,
     path:      worktreeDir,
     helpersDir,
     repoDir,

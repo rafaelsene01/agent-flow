@@ -139,7 +139,7 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
     if (toAdd.length) fs.appendFileSync(excludeFile, "\n" + toAdd.join("\n") + "\n");
   } catch (_) {}
 
-  const { helpersDir } = registerWorktree({ owner, repo, branch: newBranch, cardNumber, repoDir, worktreeDir });
+  const { helpersDir } = registerWorktree({ owner, repo, branch: newBranch, originBranch, cardNumber, repoDir, worktreeDir });
 
   return { repoDir, worktreeDir, helpersDir, cloned };
 }
