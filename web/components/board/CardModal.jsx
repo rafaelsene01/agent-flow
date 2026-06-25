@@ -341,7 +341,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunTlc({ model, effort } = {}) {
+  async function handleRunTlc({ model, effort, sessionId } = {}) {
     setTlcSending(true);
     try {
       const res = await fetch(
@@ -355,6 +355,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             body: item.body,
             model,
             effort,
+            sessionId: sessionId === "__new__" ? undefined : sessionId,
           }),
         },
       );
@@ -383,7 +384,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunTlcExec({ model, effort } = {}) {
+  async function handleRunTlcExec({ model, effort, sessionId } = {}) {
     setTlcExecSending(true);
     try {
       const res = await fetch(
@@ -391,7 +392,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model, effort }),
+          body: JSON.stringify({ model, effort, sessionId: sessionId === "__new__" ? undefined : sessionId }),
         },
       );
       const data = await res.json();
@@ -405,7 +406,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunSpecEval({ model, effort, validation, runTests } = {}) {
+  async function handleRunSpecEval({ model, effort, validation, runTests, sessionId } = {}) {
     setSpecEvalSending(true);
     try {
       const res = await fetch(
@@ -421,6 +422,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             effort,
             validation,
             runTests,
+            sessionId: sessionId === "__new__" ? undefined : sessionId,
           }),
         },
       );
@@ -453,7 +455,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunSpec({ model, effort } = {}) {
+  async function handleRunSpec({ model, effort, sessionId } = {}) {
     setSpecSending(true);
     try {
       const res = await fetch(
@@ -467,6 +469,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             body: item.body,
             model,
             effort,
+            sessionId: sessionId === "__new__" ? undefined : sessionId,
           }),
         },
       );
@@ -546,6 +549,27 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   </span>
                 </div>
                 <div className="flex flex-col gap-4 px-5 py-4">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Sessão</span>
+                    <Select
+                      value={runConfirmModal.session}
+                      onValueChange={(v) => setRunConfirmModal((s) => ({ ...s, session: v }))}
+                    >
+                      <SelectTrigger size="sm" className="text-xs w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__new__">Nova Sessão</SelectItem>
+                        {[...(worktreeConfig?.chatSessions ?? [])]
+                          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                          .map((s) => (
+                            <SelectItem key={s.id} value={s.id} title={s.description}>
+                              [{ORIGIN_LABEL[s.origin] ?? s.origin}] {s.description}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Modelo</span>
                     <Select
@@ -649,12 +673,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   <Button
                     size="sm"
                     onClick={() => {
-                      const { action, model, effort, validation, runTests } = runConfirmModal;
+                      const { action, model, effort, validation, runTests, session } = runConfirmModal;
                       setRunConfirmModal(null);
-                      if (action === "task") handleRunSpec({ model, effort });
-                      else if (action === "tlc") handleRunTlc({ model, effort });
-                      else if (action === "spec") handleRunTlcExec({ model, effort });
-                      else if (action === "eval") handleRunSpecEval({ model, effort, validation, runTests });
+                      if (action === "task") handleRunSpec({ model, effort, sessionId: session });
+                      else if (action === "tlc") handleRunTlc({ model, effort, sessionId: session });
+                      else if (action === "spec") handleRunTlcExec({ model, effort, sessionId: session });
+                      else if (action === "eval") handleRunSpecEval({ model, effort, validation, runTests, sessionId: session });
                     }}
                   >
                     Executar
@@ -955,7 +979,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 size="sm"
                                 type="button"
                                 disabled={isRunning || isTlcRunning}
-                                onClick={() => setRunConfirmModal({ action: "task", ...RUN_DEFAULTS.task })}
+                                onClick={() => setRunConfirmModal({ action: "task", ...RUN_DEFAULTS.task, session: "__new__" })}
                                 className={cn(
                                   "w-full justify-start gap-2 text-xs",
                                   isDone &&
@@ -1021,7 +1045,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                     ? "Skill tlc-spec-driven não instalada — configure nas Configurações"
                                     : undefined
                                 }
-                                onClick={() => setRunConfirmModal({ action: "tlc", ...RUN_DEFAULTS.tlc })}
+                                onClick={() => setRunConfirmModal({ action: "tlc", ...RUN_DEFAULTS.tlc, session: "__new__" })}
                                 className={cn(
                                   "w-full justify-start gap-2 text-xs",
                                   isTlcDone &&
@@ -1111,7 +1135,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                           ? "Execute o TLC antes de executar a Spec"
                                           : undefined
                                       }
-                                      onClick={() => setRunConfirmModal({ action: "spec", ...RUN_DEFAULTS.spec })}
+                                      onClick={() => setRunConfirmModal({ action: "spec", ...RUN_DEFAULTS.spec, session: "__new__" })}
                                       className={cn(
                                         "w-full justify-start gap-2 text-xs",
                                         isExecDone &&
@@ -1202,6 +1226,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 onClick={() => setRunConfirmModal({
                                   action: "eval",
                                   ...RUN_DEFAULTS.eval,
+                                  session: "__new__",
                                   validation: {
                                     install: board?.validation?.install ?? "",
                                     build:   board?.validation?.build   ?? "",

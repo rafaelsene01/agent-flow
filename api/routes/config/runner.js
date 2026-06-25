@@ -170,7 +170,7 @@ export default function runnerRoutes(app) {
 
   app.post("/api/config/worktrees/:id/run", (req, res) => {
     const id = decodeURIComponent(req.params.id);
-    const { title, number, body, model, effort } = req.body ?? {};
+    const { title, number, body, model, effort, sessionId } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt)
@@ -195,16 +195,28 @@ export default function runnerRoutes(app) {
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
     }
 
-    const logFile = makeLogFile("task");
-    const runSessionId = makeSessionId(wt, "task");
-    appendChatSession(id, {
-      id: runSessionId,
-      logFile,
-      origin: "task",
-      description: truncateDesc(body || title),
-      started: false,
-      createdAt: new Date().toISOString(),
-    });
+    let runSessionId, logFile, sessionStarted;
+    if (sessionId) {
+      const entry = (wt.chatSessions ?? []).find((s) => s.id === sessionId);
+      if (entry) {
+        runSessionId = entry.id;
+        logFile = entry.logFile ?? makeLogFile("task");
+        sessionStarted = entry.started;
+      }
+    }
+    if (!runSessionId) {
+      logFile = makeLogFile("task");
+      runSessionId = makeSessionId(wt, "task");
+      appendChatSession(id, {
+        id: runSessionId,
+        logFile,
+        origin: "task",
+        description: truncateDesc(body || title),
+        started: false,
+        createdAt: new Date().toISOString(),
+      });
+      sessionStarted = false;
+    }
 
     updateWorktreeStatus(id, {
       status: "running",
@@ -216,7 +228,7 @@ export default function runnerRoutes(app) {
     });
     res.json({ ok: true });
 
-    const logStream = createRunLog(wt, logFile);
+    const logStream = createRunLog(wt, logFile, { append: !!sessionId });
 
     (async () => {
       try {
@@ -233,21 +245,19 @@ export default function runnerRoutes(app) {
           "utf-8",
         );
 
-        const impl = await runClaude(
+        const prompt =
           langInstruction() +
-            "You are an autonomous coding agent. Implement the task below immediately.\n" +
-            "Rules:\n" +
-            "- Use Write and Edit tools to create/modify files. Do NOT describe — just do it.\n" +
-            "- Do NOT ask questions or wait for confirmation.\n" +
-            "- Do NOT run any git commands.\n" +
-            "TASK:\n" +
-            cardContent,
-          wt.path,
-          logStream,
-          runSessionId,
-          (child) => registerProcess(id, child),
-          { model: model || "sonnet", effort: effort || "medium" },
-        );
+          "You are an autonomous coding agent. Implement the task below immediately.\n" +
+          "Rules:\n" +
+          "- Use Write and Edit tools to create/modify files. Do NOT describe — just do it.\n" +
+          "- Do NOT ask questions or wait for confirmation.\n" +
+          "- Do NOT run any git commands.\n" +
+          "TASK:\n" +
+          cardContent;
+
+        const impl = await (sessionStarted
+          ? resumeClaude(prompt, wt.path, logStream, runSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" })
+          : runClaude(prompt, wt.path, logStream, runSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" }));
 
         if (impl.code !== 0) {
           logStream.end();
@@ -430,7 +440,7 @@ export default function runnerRoutes(app) {
 
   app.post("/api/config/worktrees/:id/run-tlc", (req, res) => {
     const id = decodeURIComponent(req.params.id);
-    const { title, number, body, model, effort } = req.body ?? {};
+    const { title, number, body, model, effort, sessionId } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt)
@@ -449,16 +459,28 @@ export default function runnerRoutes(app) {
       return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
     }
 
-    const logFile = makeLogFile("tlc");
-    const tlcSessionId = makeSessionId(wt, "tlc");
-    appendChatSession(id, {
-      id: tlcSessionId,
-      logFile,
-      origin: "tlc",
-      description: truncateDesc(body || title),
-      started: false,
-      createdAt: new Date().toISOString(),
-    });
+    let tlcSessionId, logFile, sessionStarted;
+    if (sessionId) {
+      const entry = (wt.chatSessions ?? []).find((s) => s.id === sessionId);
+      if (entry) {
+        tlcSessionId = entry.id;
+        logFile = entry.logFile ?? makeLogFile("tlc");
+        sessionStarted = entry.started;
+      }
+    }
+    if (!tlcSessionId) {
+      logFile = makeLogFile("tlc");
+      tlcSessionId = makeSessionId(wt, "tlc");
+      appendChatSession(id, {
+        id: tlcSessionId,
+        logFile,
+        origin: "tlc",
+        description: truncateDesc(body || title),
+        started: false,
+        createdAt: new Date().toISOString(),
+      });
+      sessionStarted = false;
+    }
 
     updateWorktreeStatus(id, {
       tlcStatus: "running",
@@ -467,7 +489,7 @@ export default function runnerRoutes(app) {
     });
     res.json({ ok: true });
 
-    const logStream = createRunLog(wt, logFile);
+    const logStream = createRunLog(wt, logFile, { append: !!sessionId });
 
     (async () => {
       logStream.write("=== TLC: Criando spec, design e tasks ===\n");
@@ -476,17 +498,15 @@ export default function runnerRoutes(app) {
         "utf-8",
       );
 
-      const result = await runClaude(
+      const prompt =
         langInstruction() +
-          "/tlc-spec-driven\n\n" +
-          "Leia o conteúdo abaixo e execute as fases Specify, Design e Tasks completas.\n\n" +
-          cardContent,
-        wt.path,
-        logStream,
-        tlcSessionId,
-        null,
-        { model: model || "opus", effort: effort || "high" },
-      );
+        "/tlc-spec-driven\n\n" +
+        "Leia o conteúdo abaixo e execute as fases Specify, Design e Tasks completas.\n\n" +
+        cardContent;
+
+      const result = await (sessionStarted
+        ? resumeClaude(prompt, wt.path, logStream, tlcSessionId, null, { model: model || "opus", effort: effort || "high" })
+        : runClaude(prompt, wt.path, logStream, tlcSessionId, null, { model: model || "opus", effort: effort || "high" }));
 
       if (result.code !== 0) {
         logStream.end();
@@ -532,7 +552,7 @@ export default function runnerRoutes(app) {
 
   app.post("/api/config/worktrees/:id/run-tlc-exec", (req, res) => {
     const id = decodeURIComponent(req.params.id);
-    const { model, effort } = req.body ?? {};
+    const { model, effort, sessionId } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt)
@@ -566,16 +586,28 @@ export default function runnerRoutes(app) {
 
     const specFilePath = path.join(featurePath, "spec.md").replace(/\\/g, "/");
 
-    const logFile = makeLogFile("spec");
-    const tlcExecSessionId = makeSessionId(wt, "spec");
-    appendChatSession(id, {
-      id: tlcExecSessionId,
-      logFile,
-      origin: "spec",
-      description: truncateDesc(path.basename(featurePath)),
-      started: false,
-      createdAt: new Date().toISOString(),
-    });
+    let tlcExecSessionId, logFile, sessionStarted;
+    if (sessionId) {
+      const entry = (wt.chatSessions ?? []).find((s) => s.id === sessionId);
+      if (entry) {
+        tlcExecSessionId = entry.id;
+        logFile = entry.logFile ?? makeLogFile("spec");
+        sessionStarted = entry.started;
+      }
+    }
+    if (!tlcExecSessionId) {
+      logFile = makeLogFile("spec");
+      tlcExecSessionId = makeSessionId(wt, "spec");
+      appendChatSession(id, {
+        id: tlcExecSessionId,
+        logFile,
+        origin: "spec",
+        description: truncateDesc(path.basename(featurePath)),
+        started: false,
+        createdAt: new Date().toISOString(),
+      });
+      sessionStarted = false;
+    }
 
     updateWorktreeStatus(id, {
       tlcExecStatus: "running",
@@ -587,7 +619,7 @@ export default function runnerRoutes(app) {
     });
     res.json({ ok: true });
 
-    const logStream = createRunLog(wt, logFile);
+    const logStream = createRunLog(wt, logFile, { append: !!sessionId });
 
     (async () => {
       try {
@@ -600,17 +632,15 @@ export default function runnerRoutes(app) {
 
         logStream.write("=== Step 1: executando spec ===\n");
 
-        const impl = await runClaude(
+        const execPrompt =
           langInstruction() +
-            `Execute a spec em ${specFilePath} usando o máximo de subagentes possível. Não faça commits nem push.\n` +
-            "Quando totalmente concluído, sua ÚLTIMA linha deve ser exatamente: COMMIT: <mensagem conventional commit>\n" +
-            "(ex: COMMIT: feat: implement card sorting)",
-          wt.path,
-          logStream,
-          tlcExecSessionId,
-          (child) => registerProcess(id, child),
-          { model: model || "sonnet", effort: effort || "medium" },
-        );
+          `Execute a spec em ${specFilePath} usando o máximo de subagentes possível. Não faça commits nem push.\n` +
+          "Quando totalmente concluído, sua ÚLTIMA linha deve ser exatamente: COMMIT: <mensagem conventional commit>\n" +
+          "(ex: COMMIT: feat: implement card sorting)";
+
+        const impl = await (sessionStarted
+          ? resumeClaude(execPrompt, wt.path, logStream, tlcExecSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" })
+          : runClaude(execPrompt, wt.path, logStream, tlcExecSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" }));
 
         if (impl.code !== 0) {
           logStream.end();
@@ -654,7 +684,7 @@ export default function runnerRoutes(app) {
 
   app.post("/api/config/worktrees/:id/run-spec-eval", (req, res) => {
     const id = decodeURIComponent(req.params.id);
-    const { title, number, body, model, effort, validation, runTests } =
+    const { title, number, body, model, effort, validation, runTests, sessionId } =
       req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
@@ -669,16 +699,28 @@ export default function runnerRoutes(app) {
       return sendError(res, err.status ?? 500, err.message);
     }
 
-    const logFile = makeLogFile("eval");
-    const evalSessionId = makeSessionId(wt, "eval");
-    appendChatSession(id, {
-      id: evalSessionId,
-      logFile,
-      origin: "eval",
-      description: truncateDesc(body || title),
-      started: false,
-      createdAt: new Date().toISOString(),
-    });
+    let evalSessionId, logFile, sessionStarted;
+    if (sessionId) {
+      const entry = (wt.chatSessions ?? []).find((s) => s.id === sessionId);
+      if (entry) {
+        evalSessionId = entry.id;
+        logFile = entry.logFile ?? makeLogFile("eval");
+        sessionStarted = entry.started;
+      }
+    }
+    if (!evalSessionId) {
+      logFile = makeLogFile("eval");
+      evalSessionId = makeSessionId(wt, "eval");
+      appendChatSession(id, {
+        id: evalSessionId,
+        logFile,
+        origin: "eval",
+        description: truncateDesc(body || title),
+        started: false,
+        createdAt: new Date().toISOString(),
+      });
+      sessionStarted = false;
+    }
 
     updateWorktreeStatus(id, {
       specEvalStatus: "running",
@@ -687,7 +729,7 @@ export default function runnerRoutes(app) {
     });
     res.json({ ok: true });
 
-    const logStream = createRunLog(wt, logFile);
+    const logStream = createRunLog(wt, logFile, { append: !!sessionId });
 
     (async () => {
       try {
@@ -747,25 +789,23 @@ export default function runnerRoutes(app) {
           "=== Spec-Eval: avaliando implementação contra a spec ===\n",
         );
 
-        const result = await runClaude(
+        const evalPrompt =
           langInstruction() +
-            "/spec-driven-eval\n\n" +
-            "Siga a guideline spec-driven-eval e avalie (grade) a implementação no branch atual desta worktree, " +
-            "produzindo a nota final comparável.\n\n" +
-            specSection +
-            "\n\n" +
-            baseSection +
-            "\n\n" +
-            (validationSection ? validationSection + "\n\n" : "") +
-            "Não modifique o código sob avaliação e não faça commits nem push. " +
-            `Escreva o relatório com a nota final em \`${evalOutputDir}\`.` +
-            testsInstruction,
-          wt.path,
-          logStream,
-          evalSessionId,
-          (child) => registerProcess(id, child),
-          { model: model || "opus", effort: effort || "high" },
-        );
+          "/spec-driven-eval\n\n" +
+          "Siga a guideline spec-driven-eval e avalie (grade) a implementação no branch atual desta worktree, " +
+          "produzindo a nota final comparável.\n\n" +
+          specSection +
+          "\n\n" +
+          baseSection +
+          "\n\n" +
+          (validationSection ? validationSection + "\n\n" : "") +
+          "Não modifique o código sob avaliação e não faça commits nem push. " +
+          `Escreva o relatório com a nota final em \`${evalOutputDir}\`.` +
+          testsInstruction;
+
+        const result = await (sessionStarted
+          ? resumeClaude(evalPrompt, wt.path, logStream, evalSessionId, (child) => registerProcess(id, child), { model: model || "opus", effort: effort || "high" })
+          : runClaude(evalPrompt, wt.path, logStream, evalSessionId, (child) => registerProcess(id, child), { model: model || "opus", effort: effort || "high" }));
 
         if (result.code !== 0) {
           logStream.end();
