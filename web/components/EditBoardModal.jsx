@@ -10,6 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // Normaliza string legada para { id: null, name } ou mantém { id, name }.
 function normalizeCol(c) {
@@ -30,14 +32,20 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   const [dragOver, setDragOver]     = useState(null);
   const [originRepo, setOriginRepo] = useState(board.originRepo ?? "");
   const [viewFilter, setViewFilter] = useState(board.viewFilter ?? "");
+  const [cmdInstall, setCmdInstall] = useState(board.validation?.install ?? "");
+  const [cmdBuild,   setCmdBuild]   = useState(board.validation?.build   ?? "");
+  const [cmdLint,    setCmdLint]    = useState(board.validation?.lint     ?? "");
+  const [cmdTest,    setCmdTest]    = useState(board.validation?.test     ?? "");
+  const [cmdExtra,   setCmdExtra]   = useState(board.validation?.extra    ?? "");
   const dragIdx = useRef(null);
 
-  const repoOptions = [...new Set(
-    [...(viewFilter ?? "").matchAll(/repo:([^\s]+)/gi)]
+  const repoOptions = [...new Set([
+    ...[...(viewFilter ?? "").matchAll(/repo:([^\s]+)/gi)]
       .flatMap((m) => m[1].split(","))
       .map((r) => r.trim())
-      .filter(Boolean)
-  )];
+      .filter(Boolean),
+    ...(originRepo ? [originRepo] : []),
+  ])];
 
   useEffect(() => {
     fetch(`/api/github/boards/${encodeURIComponent(board.id)}/columns`)
@@ -97,7 +105,19 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   );
 
   function save() {
-    onSaved({ ...board, columns: activeCols, originRepo: originRepo || null, viewFilter: viewFilter.trim() });
+    onSaved({
+      ...board,
+      columns:    activeCols,
+      originRepo: originRepo || null,
+      viewFilter: viewFilter.trim(),
+      validation: {
+        install: cmdInstall.trim() || null,
+        build:   cmdBuild.trim()   || null,
+        lint:    cmdLint.trim()    || null,
+        test:    cmdTest.trim()    || null,
+        extra:   cmdExtra.trim()   || null,
+      },
+    });
   }
 
   return (
@@ -241,6 +261,80 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
               </div>
             </div>
           )}
+
+          {/* Comandos de Validação */}
+          <div className="flex flex-col gap-3 border-t pt-3.5">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Comandos de Validação
+            </span>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-cmd-install" className="text-xs text-muted-foreground">
+                  Instalação
+                </Label>
+                <Input
+                  id="edit-cmd-install"
+                  type="text"
+                  value={cmdInstall}
+                  onChange={(e) => setCmdInstall(e.target.value)}
+                  placeholder="npm install"
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-cmd-build" className="text-xs text-muted-foreground">
+                  Build
+                </Label>
+                <Input
+                  id="edit-cmd-build"
+                  type="text"
+                  value={cmdBuild}
+                  onChange={(e) => setCmdBuild(e.target.value)}
+                  placeholder="npm run build"
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-cmd-lint" className="text-xs text-muted-foreground">
+                  Lint
+                </Label>
+                <Input
+                  id="edit-cmd-lint"
+                  type="text"
+                  value={cmdLint}
+                  onChange={(e) => setCmdLint(e.target.value)}
+                  placeholder="npm run lint"
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-cmd-test" className="text-xs text-muted-foreground">
+                  Testes
+                </Label>
+                <Input
+                  id="edit-cmd-test"
+                  type="text"
+                  value={cmdTest}
+                  onChange={(e) => setCmdTest(e.target.value)}
+                  placeholder="npm test"
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div className="col-span-2 flex flex-col gap-1.5">
+                <Label htmlFor="edit-cmd-extra" className="text-xs text-muted-foreground">
+                  Outro
+                </Label>
+                <Input
+                  id="edit-cmd-extra"
+                  type="text"
+                  value={cmdExtra}
+                  onChange={(e) => setCmdExtra(e.target.value)}
+                  placeholder="comando personalizado"
+                  className="font-mono text-xs"
+                />
+              </div>
+            </div>
+          </div>
 
         </div>
 
