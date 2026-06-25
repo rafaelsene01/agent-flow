@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/rafaelsene01/agent-flow/compare/v1.22.0...v1.22.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* improve error handling and cache management in GitHub and usage modules ([ba5cd4f](https://github.com/rafaelsene01/agent-flow/commit/ba5cd4f967f86034286a9ee1214fffd4e2b9054a))
+
 # [1.22.0](https://github.com/rafaelsene01/agent-flow/compare/v1.21.0...v1.22.0) (2026-06-25)
 
 
