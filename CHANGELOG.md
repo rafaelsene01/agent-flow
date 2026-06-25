@@ -1,3 +1,13 @@
+# [1.22.0](https://github.com/rafaelsene01/agent-flow/compare/v1.21.0...v1.22.0) (2026-06-25)
+
+
+### Features
+
+* add create pull request functionality and enhance worktree management ([f7210d2](https://github.com/rafaelsene01/agent-flow/commit/f7210d22246b0e2a4c6f0e87dd38bfb47c556913))
+* enhance commit-push process with improved logging and session management ([1c0aa9a](https://github.com/rafaelsene01/agent-flow/commit/1c0aa9ab6a0a870f1c0d6c77ec1724e2919567c4))
+* enhance session management in runner and CardModal components ([43b87cb](https://github.com/rafaelsene01/agent-flow/commit/43b87cb5d68aa91f5466dc0db89f8ca18fd20073))
+* improve commit-push functionality and session management in CardModal ([72439b1](https://github.com/rafaelsene01/agent-flow/commit/72439b1945ef53ebe5df49e13ae0968c3fcb9d0d))
+
 # [1.21.0](https://github.com/rafaelsene01/agent-flow/compare/v1.20.0...v1.21.0) (2026-06-24)
 
 
