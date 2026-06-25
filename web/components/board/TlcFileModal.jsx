@@ -68,10 +68,11 @@ export default function TlcFileModal({ worktreeId, type, onClose }) {
   const Icon = TLC_LUCIDE[type] ?? FileText;
 
   return (
-    <Dialog open modal={false} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent
         className="w-full sm:max-w-[calc(100%-2rem)] h-[92vh] p-0 gap-0 flex flex-col overflow-hidden"
         showCloseButton={false}
+        onInteractOutside={(e) => e.preventDefault()}
       >
         {/* ── header row: title + toolbar ── */}
         <div className="flex items-center gap-2 px-5 py-3 border-b shrink-0">
@@ -146,7 +147,7 @@ export default function TlcFileModal({ worktreeId, type, onClose }) {
           ) : (
             <Textarea
               className={cn(
-                "flex-1 min-h-0 resize-none rounded-none border-0 font-mono text-[13px] leading-relaxed focus-visible:ring-0 focus-visible:border-0",
+                "flex-1 min-h-0 resize-none rounded-none border-0 font-mono text-[13px] leading-relaxed focus-visible:ring-0 focus-visible:border-0 overflow-y-auto [field-sizing:fixed]",
               )}
               value={content}
               onChange={(e) => setContent(e.target.value)}

@@ -152,10 +152,11 @@ export default function CreateBranchModal({ board, item, onClose }) {
   const canCreate = owner && repo && originBranch && newBranch && !validationError && !creating;
 
   return (
-    <Dialog open modal={false} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         className="max-w-[480px] p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden"
         showCloseButton={false}
+        onInteractOutside={(e) => e.preventDefault()}
       >
         {/* ── Header ── */}
         <DialogHeader className="flex-row items-center justify-between gap-2 border-b px-5 py-3.5 shrink-0">

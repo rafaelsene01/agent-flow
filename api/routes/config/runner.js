@@ -895,7 +895,7 @@ export default function runnerRoutes(app) {
         .split("\n")
         .filter(Boolean)
         .map((line) => {
-          const filePath = line.slice(3);
+          const filePath = line.slice(3).trim();
           const fullPath = path.resolve(wt.path, filePath);
           const isDir =
             filePath.endsWith("/") ||

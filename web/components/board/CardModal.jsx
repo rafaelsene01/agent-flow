@@ -1481,12 +1481,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               key={file.path}
                               className="group flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted/60"
                             >
-                              <span className="w-4 shrink-0 font-mono text-[10px] text-muted-foreground">
+                              <span className="w-5 shrink-0 overflow-hidden font-mono text-[10px] text-muted-foreground">
                                 {file.status}
                               </span>
                               {file.isDir ? (
                                 <span
-                                  className="flex min-w-0 flex-1 items-center gap-1 truncate font-mono text-[11px] text-muted-foreground"
+                                  className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden truncate font-mono text-[11px] text-muted-foreground"
                                   title={file.path}
                                 >
                                   <FolderOpen className="size-3 shrink-0" />
@@ -1496,7 +1496,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 <button
                                   type="button"
                                   className={cn(
-                                    "min-w-0 flex-1 truncate text-left font-mono text-[11px] hover:underline",
+                                    "min-w-0 flex-1 overflow-hidden truncate text-left font-mono text-[11px] hover:underline",
                                     file.status === "D" && "line-through opacity-60",
                                   )}
                                   title={file.path}
