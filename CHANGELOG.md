@@ -1,3 +1,10 @@
+## [1.22.2](https://github.com/rafaelsene01/agent-flow/compare/v1.22.1...v1.22.2) (2026-06-25)
+
+
+### Bug Fixes
+
+* improve UI interactions and layout in modal components ([5475638](https://github.com/rafaelsene01/agent-flow/commit/54756382837d60458bd3cd47b44fe9d0b8974ffe))
+
 ## [1.22.1](https://github.com/rafaelsene01/agent-flow/compare/v1.22.0...v1.22.1) (2026-06-25)
 
 

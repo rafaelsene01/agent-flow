@@ -1,6 +1,6 @@
 {
   "name": "agent-flow",
-  "version": "1.22.1",
+  "version": "1.22.2",
   "description": "Agent Flow · Web Kanban board for Linear — open source, runs locally",
   "main": "dist/agent-flow.js",
   "workspaces": [
