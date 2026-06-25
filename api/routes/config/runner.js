@@ -960,6 +960,17 @@ export default function runnerRoutes(app) {
     if (!fs.existsSync(wt.path))
       return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
 
+    const logFile = makeLogFile("commit-push");
+    const commitSessionId = makeSessionId(wt, "commit-push");
+    appendChatSession(id, {
+      id: commitSessionId,
+      logFile,
+      origin: "chat",
+      description: "Commit & Push",
+      started: false,
+      createdAt: new Date().toISOString(),
+    });
+
     updateWorktreeStatus(id, {
       commitPushStatus: "running",
       commitPushLastRunAt: new Date().toISOString(),
@@ -967,14 +978,19 @@ export default function runnerRoutes(app) {
     });
     res.json({ ok: true });
 
+    const logStream = createRunLog(wt, logFile, { append: !!sessionId });
+
     (async () => {
       await ensureWorktreeExclude(wt.path);
+
+      logStream.write("=== Step 1: staging all changes ===\n");
       try {
         await execFileP("git", ["add", "-A"], {
           cwd: wt.path,
           timeout: 30_000,
         });
       } catch (err) {
+        await new Promise((resolve) => logStream.end(resolve));
         updateWorktreeStatus(id, {
           commitPushStatus: "error",
           commitPushLastError: `git add falhou: ${err.message}`,
@@ -1006,7 +1022,7 @@ export default function runnerRoutes(app) {
           sessionStarted = lastSession?.started ?? false;
         }
 
-        const logStream = createRunLog(wt, "agent-flow.log");
+        logStream.write("=== Step 2: creating semantic commit ===\n");
         let commitResult;
 
         if (targetSessionId && sessionStarted) {
@@ -1027,30 +1043,35 @@ export default function runnerRoutes(app) {
               "com `--no-verify`. Não faça push.",
             wt.path,
             logStream,
-            targetSessionId,
+            targetSessionId ?? commitSessionId,
             null,
             opts,
           );
         }
 
-        await new Promise((resolve) => logStream.end(resolve));
-
         if (commitResult.code !== 0) {
+          await new Promise((resolve) => logStream.end(resolve));
           updateWorktreeStatus(id, {
             commitPushStatus: "error",
             commitPushLastError: `Commit falhou: ${failureDetail(commitResult, logStream.persistPath)}`,
           });
           return;
         }
+      } else {
+        logStream.write("=== Nenhuma alteração staged para commitar ===\n");
       }
 
+      logStream.write("=== Step 3: pushing to remote ===\n");
       try {
-        await execFileP(
+        const { stdout: pushOut, stderr: pushErr } = await execFileP(
           "git",
           ["push", "--no-verify", "origin", `HEAD:${wt.branch}`],
           { cwd: wt.path, timeout: 60_000 },
         );
+        if (pushOut) logStream.write(pushOut);
+        if (pushErr) logStream.write(pushErr);
       } catch (err) {
+        await new Promise((resolve) => logStream.end(resolve));
         updateWorktreeStatus(id, {
           commitPushStatus: "error",
           commitPushLastError: `Push falhou: ${err.message}`,
@@ -1058,6 +1079,8 @@ export default function runnerRoutes(app) {
         return;
       }
 
+      updateChatSession(id, commitSessionId, { started: true });
+      await new Promise((resolve) => logStream.end(resolve));
       updateWorktreeStatus(id, { commitPushStatus: "done" });
     })();
   });
