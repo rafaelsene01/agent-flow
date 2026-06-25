@@ -891,7 +891,6 @@ export default function runnerRoutes(app) {
         { cwd: wt.path, timeout: 10_000 },
       );
       const files = stdout
-        .trim()
         .split("\n")
         .filter(Boolean)
         .map((line) => {
