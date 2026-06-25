@@ -952,6 +952,7 @@ export default function runnerRoutes(app) {
 
   app.post("/api/config/worktrees/:id/commit-push", (req, res) => {
     const id = decodeURIComponent(req.params.id);
+    const { model, effort, sessionId } = req.body ?? {};
 
     const wt = getWorktrees().find((w) => w.id === id);
     if (!wt)
@@ -989,18 +990,35 @@ export default function runnerRoutes(app) {
 
       if (statusOut.trim()) {
         const freshWt = getWorktrees().find((w) => w.id === id);
-        const lastSession = lastTaskOrSpecSession(freshWt ?? wt);
+        const opts = { model: model || "sonnet", effort: effort || "medium" };
+
+        let targetSessionId, sessionStarted;
+        if (sessionId) {
+          const entry = (freshWt?.chatSessions ?? []).find((s) => s.id === sessionId);
+          if (entry) {
+            targetSessionId = entry.id;
+            sessionStarted = entry.started;
+          }
+        }
+        if (!targetSessionId) {
+          const lastSession = lastTaskOrSpecSession(freshWt ?? wt);
+          targetSessionId = lastSession?.id ?? null;
+          sessionStarted = lastSession?.started ?? false;
+        }
+
         const logStream = createRunLog(wt, "agent-flow.log");
         let commitResult;
 
-        if (lastSession) {
+        if (targetSessionId && sessionStarted) {
           commitResult = await resumeClaude(
             langInstruction() +
               "Com base em tudo que foi implementado nesta sessão, crie um commit semântico (conventional commits) " +
               "com todas as mudanças staged. Use --no-verify. Não faça push.",
             wt.path,
             logStream,
-            lastSession.id,
+            targetSessionId,
+            null,
+            opts,
           );
         } else {
           commitResult = await runClaude(
@@ -1009,7 +1027,9 @@ export default function runnerRoutes(app) {
               "com `--no-verify`. Não faça push.",
             wt.path,
             logStream,
+            targetSessionId,
             null,
+            opts,
           );
         }
 
