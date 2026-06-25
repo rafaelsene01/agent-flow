@@ -185,9 +185,11 @@ async function getAllProjectItems(projectId) {
 }
 
 // Pré-aquece o cache de um projeto (chamado no boot do servidor para cada board).
+// Sempre força uma busca fresca no GitHub, independente da idade do cache em disco,
+// para que um restart do servidor sempre recarregue os cards.
 export function warmItemsCache(projectId) {
   if (!projectId) return;
-  getAllProjectItems(projectId).catch((err) => console.error("[items] erro no warm:", err.message));
+  refreshInBackground(projectId).catch((err) => console.error("[items] erro no warm:", err.message));
 }
 
 // Invalida o cache em memória (ex: após mover um card). Sem argumento, limpa tudo.

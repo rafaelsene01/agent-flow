@@ -40,13 +40,22 @@ async function fetchUsage() {
     signal: AbortSignal.timeout(15_000),
   });
 
+  if (!res.ok) {
+    let body = "";
+    try { body = await res.text(); } catch {}
+    throw new Error(`API retornou ${res.status}: ${body.slice(0, 200)}`);
+  }
+
   const h = res.headers;
-  const sessionPct  = Math.round(parseFloat(h.get("anthropic-ratelimit-unified-5h-utilization") ?? "0") * 100);
+  const sessionPct   = Math.round(parseFloat(h.get("anthropic-ratelimit-unified-5h-utilization") ?? "0") * 100);
   const sessionReset = parseInt(h.get("anthropic-ratelimit-unified-5h-reset") ?? "0", 10);
-  const weeklyPct   = Math.round(parseFloat(h.get("anthropic-ratelimit-unified-7d-utilization") ?? "0") * 100);
+  const weeklyPct    = Math.round(parseFloat(h.get("anthropic-ratelimit-unified-7d-utilization") ?? "0") * 100);
   const weeklyReset  = parseInt(h.get("anthropic-ratelimit-unified-7d-reset") ?? "0", 10);
 
-  if (!sessionReset && !weeklyReset) throw new Error("Headers de rate limit não presentes na resposta");
+  if (!sessionReset && !weeklyReset) {
+    console.warn("[usage] headers unified ausentes — headers presentes:", [...h.keys()].filter(k => k.startsWith("anthropic")).join(", ") || "(nenhum)");
+    return null;
+  }
 
   return {
     session: { pct: sessionPct, reset: formatReset(sessionReset, false) },
@@ -57,7 +66,7 @@ async function fetchUsage() {
 function refresh() {
   if (pendingRefresh) return pendingRefresh;
   pendingRefresh = fetchUsage()
-    .then((data) => { cachedData = data; })
+    .then((data) => { if (data) cachedData = data; })
     .catch((err) => { console.error("[usage] refresh falhou:", err.message); })
     .finally(() => { pendingRefresh = null; });
   return pendingRefresh;
