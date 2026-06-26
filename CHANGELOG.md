@@ -1,3 +1,11 @@
+# [1.23.0](https://github.com/rafaelsene01/agent-flow/compare/v1.22.2...v1.23.0) (2026-06-26)
+
+
+### Features
+
+* add overlay management functionality to worktree and UI components ([0dbcb0e](https://github.com/rafaelsene01/agent-flow/commit/0dbcb0eaabd039a71847a046e214bcfeeb173ca0))
+* add validation command inputs to EditBoardModal ([e41494a](https://github.com/rafaelsene01/agent-flow/commit/e41494a8afd5ec61e635ec2cd1b967c58581ba8b))
+
 ## [1.22.2](https://github.com/rafaelsene01/agent-flow/compare/v1.22.1...v1.22.2) (2026-06-25)
 
 
