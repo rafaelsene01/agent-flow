@@ -24,7 +24,7 @@ export default function Header({ onSettings, onInitBoard, boards = [], activePat
               const isActive = boardSlug(b) === activePath.slice(1);
               return (
                 <button
-                  key={b.viewId ?? b.id}
+                  key={`${b.id}-${b.viewId ?? "no-view"}`}
                   type="button"
                   onClick={() => onSelectBoard(b)}
                   className={cn(
