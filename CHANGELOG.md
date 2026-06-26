@@ -1,3 +1,10 @@
+## [1.23.1](https://github.com/rafaelsene01/agent-flow/compare/v1.23.0...v1.23.1) (2026-06-26)
+
+
+### Bug Fixes
+
+* enhance board selection key generation and add overlay file management in InitBoardModal ([a93285f](https://github.com/rafaelsene01/agent-flow/commit/a93285f212fe53bae90caec0e7a1c9d052b342f9))
+
 # [1.23.0](https://github.com/rafaelsene01/agent-flow/compare/v1.22.2...v1.23.0) (2026-06-26)
 
 
