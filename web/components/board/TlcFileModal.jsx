@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
-import { FileText, Palette, ListChecks, Pencil, Eye } from "lucide-react";
+import { FileText, Palette, ListChecks, Pencil, Eye, X, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -27,9 +27,12 @@ const TLC_LUCIDE = {
 
 export default function TlcFileModal({ worktreeId, type, onClose }) {
   const [content, setContent] = useState(null); // null = loading
+  const [initial, setInitial] = useState(null); // baseline salvo p/ dirty check
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(false);
+
+  const dirty = content !== null && content !== initial;
 
   useEffect(() => {
     fetch(
@@ -39,6 +42,7 @@ export default function TlcFileModal({ worktreeId, type, onClose }) {
       .then((d) => {
         if (d.error) throw new Error(d.error);
         setContent(d.content);
+        setInitial(d.content);
       })
       .catch((err) => setError(err.message));
   }, [worktreeId, type]);
@@ -79,6 +83,13 @@ export default function TlcFileModal({ worktreeId, type, onClose }) {
           <DialogTitle className="flex items-center gap-2 text-sm font-semibold flex-1 min-w-0">
             <Icon className="size-4 shrink-0 text-muted-foreground" />
             {TLC_LABEL[type]}
+            {dirty && (
+              <span
+                className="size-1.5 shrink-0 rounded-full bg-amber-500"
+                title="Alterações não salvas"
+                aria-label="Alterações não salvas"
+              />
+            )}
           </DialogTitle>
 
           {/* toolbar: tabs + save + close */}
@@ -102,7 +113,7 @@ export default function TlcFileModal({ worktreeId, type, onClose }) {
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={saving || content === null}
+              disabled={saving || content === null || !dirty}
             >
               {saving ? "Salvando…" : "Salvar"}
             </Button>
@@ -113,7 +124,7 @@ export default function TlcFileModal({ worktreeId, type, onClose }) {
               onClick={onClose}
               aria-label="Fechar"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              <X className="size-3.5" />
             </Button>
           </div>
         </div>
@@ -126,9 +137,9 @@ export default function TlcFileModal({ worktreeId, type, onClose }) {
         )}
 
         {content === null && !error && (
-          <p className="text-xs text-muted-foreground px-5 py-3 shrink-0">
-            Carregando…
-          </p>
+          <div className="flex flex-1 items-center justify-center p-8">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          </div>
         )}
 
         {/* ── editor / preview ── */}

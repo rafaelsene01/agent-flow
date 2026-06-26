@@ -926,6 +926,26 @@ export default function runnerRoutes(app) {
     }
   });
 
+  app.put("/api/config/worktrees/:id/file-content", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
+    const filePath = req.query.file;
+    if (!filePath) return sendError(res, 400, "file obrigatório");
+    const { content } = req.body ?? {};
+    if (typeof content !== "string") return sendError(res, 400, "Conteúdo inválido");
+    const wtResolved = path.resolve(wt.path);
+    const fullPath = path.resolve(wt.path, filePath);
+    if (!fullPath.startsWith(wtResolved + path.sep) && fullPath !== wtResolved)
+      return sendError(res, 403, "Path não permitido");
+    try {
+      fs.writeFileSync(fullPath, content, "utf8");
+      res.json({ ok: true });
+    } catch (err) {
+      sendError(res, 500, err.message, err);
+    }
+  });
+
   app.delete("/api/config/worktrees/:id/file", async (req, res) => {
     const id = decodeURIComponent(req.params.id);
     const wt = getWorktrees().find((w) => w.id === id);
@@ -1303,6 +1323,27 @@ export default function runnerRoutes(app) {
 
     try {
       res.json({ content: fs.readFileSync(fullPath, "utf8") });
+    } catch (err) {
+      sendError(res, 500, err.message, err);
+    }
+  });
+
+  app.put("/api/config/worktrees/:id/helpers-file", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
+    const filePath = req.query.file;
+    if (!filePath) return sendError(res, 400, "file obrigatório");
+    const { content } = req.body ?? {};
+    if (typeof content !== "string") return sendError(res, 400, "Conteúdo inválido");
+    const helpersDir = getHelpersDir(wt);
+    const resolved = path.resolve(helpersDir);
+    const fullPath = path.resolve(helpersDir, filePath);
+    if (!fullPath.startsWith(resolved + path.sep) && fullPath !== resolved)
+      return sendError(res, 403, "Path não permitido");
+    try {
+      fs.writeFileSync(fullPath, content, "utf8");
+      res.json({ ok: true });
     } catch (err) {
       sendError(res, 500, err.message, err);
     }

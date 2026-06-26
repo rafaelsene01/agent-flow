@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select.jsx";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.jsx";
 import { cn } from "@/lib/utils";
+import { statusColor, statusLabel, fileIcon } from "@/lib/fileVisuals";
 
 const TYPE_LABEL = {
   Issue: "Issue",
@@ -1476,13 +1477,21 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                             Nenhum arquivo modificado.
                           </span>
                         ) : (
-                          changedFiles.map((file) => (
+                          changedFiles.map((file) => {
+                            const FileIcon = fileIcon(file.path);
+                            return (
                             <div
                               key={file.path}
                               className="group flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted/60"
                             >
-                              <span className="w-5 shrink-0 overflow-hidden font-mono text-[10px] text-muted-foreground">
-                                {file.status}
+                              <span
+                                className={cn(
+                                  "w-4 shrink-0 overflow-hidden text-center font-mono text-[10px] font-semibold",
+                                  statusColor(file.status),
+                                )}
+                                title={statusLabel(file.status)}
+                              >
+                                {file.status?.trim()[0] ?? "?"}
                               </span>
                               {file.isDir ? (
                                 <span
@@ -1496,13 +1505,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 <button
                                   type="button"
                                   className={cn(
-                                    "min-w-0 flex-1 overflow-hidden truncate text-left font-mono text-[11px] hover:underline",
-                                    file.status === "D" && "line-through opacity-60",
+                                    "flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-left font-mono text-[11px] hover:underline",
+                                    file.status?.trim()[0] === "D" && "line-through opacity-60",
                                   )}
                                   title={file.path}
                                   onClick={() => setFileContentModal(file.path)}
                                 >
-                                  {file.path}
+                                  <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                  <span className="truncate">{file.path}</span>
                                 </button>
                               )}
                               <button
@@ -1514,7 +1524,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 <X className="size-3" />
                               </button>
                             </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
                     </TabsContent>
@@ -1532,17 +1543,21 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                             Nenhum arquivo na pasta de helpers.
                           </span>
                         ) : (
-                          helpersFiles.map((file) => (
+                          helpersFiles.map((file) => {
+                            const FileIcon = fileIcon(file);
+                            return (
                             <button
                               key={file}
                               type="button"
-                              className="min-w-0 w-full truncate text-left font-mono text-[11px] px-1 py-0.5 rounded hover:bg-muted/60 hover:underline"
+                              className="flex min-w-0 w-full items-center gap-1 text-left font-mono text-[11px] px-1 py-0.5 rounded hover:bg-muted/60 hover:underline"
                               title={file}
                               onClick={() => setHelpersFileModal(file)}
                             >
-                              {file}
+                              <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                              <span className="truncate">{file}</span>
                             </button>
-                          ))
+                            );
+                          })
                         )}
                       </div>
                     </TabsContent>
