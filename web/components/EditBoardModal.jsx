@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { GripVertical, X, Plus } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { GripVertical, X, Plus, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -38,6 +38,22 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   const [cmdTest,    setCmdTest]    = useState(board.validation?.test     ?? "");
   const [cmdExtra,   setCmdExtra]   = useState(board.validation?.extra    ?? "");
   const dragIdx = useRef(null);
+
+  const [overlayFiles, setOverlayFiles]   = useState([]);
+  const [editingFile, setEditingFile]     = useState(null); // { name, content, isNew }
+  const [overlayLoading, setOverlayLoading] = useState(false);
+
+  const fetchOverlayFiles = useCallback((repo) => {
+    if (!repo) return;
+    fetch(`/api/config/overlay?repo=${encodeURIComponent(repo)}`)
+      .then((r) => r.json())
+      .then((data) => { if (!data.error) setOverlayFiles(data.files ?? []); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (board.originRepo) fetchOverlayFiles(board.originRepo);
+  }, [board.originRepo, fetchOverlayFiles]);
 
   const repoOptions = [...new Set([
     ...[...(viewFilter ?? "").matchAll(/repo:([^\s]+)/gi)]
@@ -259,6 +275,131 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Arquivos de Overlay */}
+          {board.originRepo && (
+            <div className="flex flex-col gap-3 border-t pt-3.5">
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Arquivos de Overlay
+              </span>
+
+              {overlayFiles.length > 0 && !editingFile && (
+                <div className="border rounded-lg bg-muted/40 p-1 flex flex-col gap-1">
+                  {overlayFiles.map((f) => (
+                    <div
+                      key={f.name}
+                      className="flex items-center gap-2 rounded-md bg-background border px-2.5 py-2 text-sm"
+                    >
+                      <span className="flex-1 truncate font-mono text-xs">{f.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        type="button"
+                        title="Editar"
+                        onClick={async () => {
+                          const r = await fetch(`/api/config/overlay/file?repo=${encodeURIComponent(board.originRepo)}&file=${encodeURIComponent(f.name)}`);
+                          const data = await r.json();
+                          if (data.error) { window.alert(data.error); return; }
+                          setEditingFile({ name: f.name, content: data.content, isNew: false });
+                        }}
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        type="button"
+                        title="Deletar"
+                        className="hover:text-destructive hover:bg-destructive/10"
+                        onClick={async () => {
+                          if (!window.confirm(`Deletar "${f.name}"?`)) return;
+                          const r = await fetch(`/api/config/overlay?repo=${encodeURIComponent(board.originRepo)}&file=${encodeURIComponent(f.name)}`, { method: "DELETE" });
+                          const data = await r.json();
+                          if (data.error) { window.alert(data.error); return; }
+                          fetchOverlayFiles(board.originRepo);
+                        }}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!editingFile && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  className="self-start"
+                  onClick={() => setEditingFile({ name: "", content: "", isNew: true })}
+                >
+                  <Plus className="size-3.5 mr-1" />
+                  Novo arquivo
+                </Button>
+              )}
+
+              {editingFile && (
+                <div className="flex flex-col gap-2 border rounded-lg p-3 bg-muted/20">
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs text-muted-foreground">Nome do arquivo</Label>
+                    <Input
+                      type="text"
+                      value={editingFile.name}
+                      disabled={!editingFile.isNew}
+                      onChange={(e) => setEditingFile((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder=".env"
+                      className="font-mono text-xs"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs text-muted-foreground">Conteúdo</Label>
+                    <textarea
+                      value={editingFile.content}
+                      onChange={(e) => setEditingFile((prev) => ({ ...prev, content: e.target.value }))}
+                      rows={6}
+                      spellCheck={false}
+                      className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-xs font-mono shadow-xs outline-none resize-y focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      type="button"
+                      disabled={overlayLoading || !editingFile.name}
+                      onClick={async () => {
+                        setOverlayLoading(true);
+                        try {
+                          const r = await fetch(`/api/config/overlay?repo=${encodeURIComponent(board.originRepo)}`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ name: editingFile.name, content: editingFile.content }),
+                          });
+                          const data = await r.json();
+                          if (data.error) { window.alert(data.error); return; }
+                          setEditingFile(null);
+                          fetchOverlayFiles(board.originRepo);
+                        } finally {
+                          setOverlayLoading(false);
+                        }
+                      }}
+                    >
+                      {overlayLoading ? "Salvando…" : "Salvar"}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      type="button"
+                      onClick={() => setEditingFile(null)}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

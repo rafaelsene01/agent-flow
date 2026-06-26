@@ -2,7 +2,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
-import { getConfig, registerWorktree } from "../config/config.service.js";
+import { getConfig, registerWorktree, getOverlayDir } from "../config/config.service.js";
 import { getToken } from "../github/github.client.js";
 
 const execFileP = promisify(execFile);
@@ -141,5 +141,35 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
 
   const { helpersDir } = registerWorktree({ owner, repo, branch: newBranch, originBranch, cardNumber, repoDir, worktreeDir });
 
+  applyOverlays(`${owner}/${repo}`, worktreeDir);
+
   return { repoDir, worktreeDir, helpersDir, cloned };
+}
+
+function applyOverlays(originRepo, worktreeDir) {
+  if (!originRepo) return;
+  let overlayDir;
+  try {
+    overlayDir = getOverlayDir(originRepo);
+  } catch {
+    return;
+  }
+  let entries;
+  try {
+    entries = fs.readdirSync(overlayDir, { recursive: true, withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const srcPath = path.join(entry.parentPath ?? entry.path, entry.name);
+    const relName = path.relative(overlayDir, srcPath);
+    const destPath = path.join(worktreeDir, relName);
+    try {
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.copyFileSync(srcPath, destPath);
+    } catch (err) {
+      console.error(`[applyOverlays] falha ao copiar ${relName}:`, err.message);
+    }
+  }
 }

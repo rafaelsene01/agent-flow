@@ -91,6 +91,15 @@ export function getHelpersDir(wt) {
   return dir;
 }
 
+export function getOverlayDir(originRepo) {
+  const parts = String(originRepo).split("/");
+  const dir = parts.length >= 2
+    ? path.join(APP_DIR, "overlays", parts[0], parts[1])
+    : path.join(APP_DIR, "overlays", originRepo);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 export function removeWorktree(id) {
   return enqueueWrite((current) => ({
     ...current,

@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { getConfig, setConfig, getWorktrees, removeWorktree, getHelpersDir } from "../../modules/config/config.service.js";
+import { getConfig, setConfig, getWorktrees, removeWorktree, getHelpersDir, getOverlayDir } from "../../modules/config/config.service.js";
 import { sendError } from "../../lib/errors.js";
 
 const execFileP = promisify(execFile);
@@ -61,6 +61,10 @@ export default function worktreesRoutes(app) {
       const helpersDir = wt.helpersDir ?? (wt.path + "-helpers");
       if (helpersDir) dirsToDelete.add(helpersDir);
     }
+
+    try {
+      dirsToDelete.add(getOverlayDir(originRepo));
+    } catch (_) {}
 
     setConfig({ worktrees: getWorktrees().filter((w) => w.repo !== originRepo) });
 
