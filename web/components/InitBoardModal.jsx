@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Copy, Check, GripVertical, X } from "lucide-react";
+import { useI18n } from "@/lib/i18nContext";
+import { Copy, Check, GripVertical, X, LayoutGrid } from "lucide-react";
 import { boardSlug } from "@/lib/boardSlug.js";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +21,7 @@ function colKey(c) {
 }
 
 export default function InitBoardModal({ onClose, onSaved }) {
+  const { t } = useI18n();
   const [boards, setBoards]               = useState([]);
   const [loading, setLoading]             = useState(true);
   const [fetchError, setFetchError]       = useState(null);
@@ -207,8 +209,8 @@ export default function InitBoardModal({ onClose, onSaved }) {
 
         <DialogHeader className="px-5 pt-5 pb-0 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base">
-            <span aria-hidden="true" className="text-lg leading-none">⊞</span>
-            Inicializar Board
+            <LayoutGrid className="size-4 shrink-0" aria-hidden="true" />
+            {t("board.init")}
           </DialogTitle>
         </DialogHeader>
 
@@ -559,14 +561,14 @@ export default function InitBoardModal({ onClose, onSaved }) {
         {/* Footer */}
         <DialogFooter className="px-5 py-4 border-t shrink-0 sm:flex-row sm:justify-end gap-2">
           <Button variant="secondary" type="button" onClick={onClose}>
-            Cancelar
+            {t("action.cancel")}
           </Button>
           <Button
             type="button"
             disabled={!selected || !boardName || !selectedView || saving || columnsLoading || activeCols.length === 0}
             onClick={save}
           >
-            {saving ? "Salvando…" : "Adicionar Board"}
+            {saving ? t("board.saving") : t("board.add")}
           </Button>
         </DialogFooter>
 

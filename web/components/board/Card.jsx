@@ -19,12 +19,26 @@ function Assignee({ login, avatarUrl }) {
           onError={() => setImgFailed(true)}
         />
       ) : (
-        <span className="text-[9px] font-semibold uppercase text-muted-foreground leading-none">
+        <span className="text-xs font-semibold uppercase text-muted-foreground leading-none">
           {login[0]}
         </span>
       )}
     </div>
   );
+}
+
+function getLabelStyle(color) {
+  const hex = color ?? "888888"
+  const r = parseInt(hex.slice(0, 2), 16)
+  const g = parseInt(hex.slice(2, 4), 16)
+  const b = parseInt(hex.slice(4, 6), 16)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  const textColor = luminance > 0.6 ? "#1a1a1a" : `#${hex}`
+  return {
+    background: `#${hex}22`,
+    color: textColor,
+    borderColor: `#${hex}55`,
+  }
 }
 
 export default function Card({ item, onOpen, worktrees = [], originRepo = null }) {
@@ -72,7 +86,7 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
             {item.type === "PullRequest" && (
               <Badge
                 variant="outline"
-                className="text-[10px] text-primary border-primary/40 px-1.5 py-0"
+                className="text-xs text-primary border-primary/40 px-1.5 py-0"
               >
                 PR
               </Badge>
@@ -96,11 +110,7 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
               <span
                 key={l.name}
                 className="text-[11px] px-2 py-px rounded-full border"
-                style={{
-                  background: `#${l.color}22`,
-                  color: `#${l.color}`,
-                  borderColor: `#${l.color}55`,
-                }}
+                style={getLabelStyle(l.color)}
               >
                 {l.name}
               </span>

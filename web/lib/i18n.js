@@ -1,0 +1,291 @@
+export const DEFAULT_LOCALE = "pt"
+
+export const dictionaries = {
+  pt: {
+    // Board / page
+    "board.init": "Inicializar Board",
+    "board.none": "Nenhum board inicializado",
+    "board.none.desc": "Adicione um repositório GitHub para começar.",
+    "board.filter.placeholder": "Filtrar cards (repo:… label:… texto ou número)",
+    "board.filter.label": "Filtro da view",
+    "board.filter.help.title": "Sintaxe do filtro",
+    "board.filter.help.repo": "repo:owner/nome — filtra por repositório",
+    "board.filter.help.label": "label:bug — filtra por label",
+    "board.filter.help.text": "texto ou número — busca livre no título/#",
+    "board.edit.columns": "Editar colunas",
+    "board.cleanup.title": "Apagar repositório e worktrees deste board",
+    "board.initializing": "Verificando integrações…",
+
+    // Confirm dialogs
+    "board.remove.confirm": "Excluir o board e todos os worktrees e repositório associados? Esta ação não pode ser desfeita.",
+    "board.cleanup.confirm": "Apagar o repositório e todos os worktrees do board?\nO board permanece na lista. Esta ação não pode ser desfeita.",
+
+    // Common actions
+    "action.send": "Enviar",
+    "action.cancel": "Cancelar",
+    "action.confirm": "Confirmar",
+    "action.delete": "Excluir",
+    "action.close": "Fechar",
+    "action.save": "Salvar",
+    "action.reset": "Resetar",
+    "action.pull": "Pull",
+
+    // Run defaults (CardModal)
+    "run.task": "Executar Tarefa",
+    "run.tlc": "Executar TLC",
+    "run.spec": "Executar Spec",
+    "run.eval": "Executar Spec-Eval",
+    "run.commitPush": "Commit & Push",
+    "run.createPR": "Criar Pull Request",
+
+    // Origin labels
+    "origin.task": "tarefa",
+    "origin.spec": "spec",
+    "origin.eval": "eval",
+    "origin.tlc": "tlc",
+    "origin.chat": "chat",
+    "origin.create-pr": "PR",
+
+    // CardModal labels
+    "card.branch": "Branch",
+    "card.branch.create": "Criar branch",
+    "card.branch.created": "Branch criada",
+    "card.message": "Mensagem",
+    "card.message.send": "Enviar mensagem",
+    "card.message.placeholder": "Digite uma mensagem para o agente…",
+    "card.run": "Executar",
+    "card.logs": "Logs",
+    "card.files": "Arquivos",
+    "card.helpers": "Helpers",
+    "card.git": "Git",
+    "card.description": "Descrição",
+    "card.session": "Sessão",
+    "card.session.new": "Nova sessão",
+    "card.model": "Modelo",
+    "card.effort": "Esforço",
+    "card.triggers": "Gatilhos",
+    "card.type": "Tipo",
+    "card.run.background": "Executando em background…",
+    "card.run.done.rerun": "✓ Concluído · clique para re-executar",
+
+    // Pipeline stages
+    "pipeline.branch": "Branch",
+    "pipeline.task": "Executar Tarefa",
+    "pipeline.tlc": "TLC",
+    "pipeline.spec": "Spec",
+    "pipeline.specEval": "Spec-Eval",
+    "pipeline.commitPush": "Commit & Push",
+    "pipeline.pr": "Pull Request",
+
+    // Status
+    "status.pending": "Pendente",
+    "status.running": "Executando",
+    "status.done": "Concluído",
+    "status.error": "Erro",
+
+    // Toast messages
+    "toast.success": "Sucesso",
+    "toast.error": "Erro",
+    "toast.send.success": "Mensagem enviada",
+    "toast.send.error": "Falha ao enviar mensagem",
+    "toast.run.success": "Execução iniciada",
+    "toast.run.error": "Falha ao iniciar execução",
+    "toast.tlc.success": "TLC iniciado",
+    "toast.tlc.error": "Erro ao iniciar TLC",
+    "toast.reset.success": "Worktree resetado",
+    "toast.reset.error": "Falha ao resetar worktree",
+    "toast.pr.success": "PR criado",
+    "toast.pr.error": "Falha ao criar PR",
+    "toast.pull.success": "Pull realizado",
+    "toast.pull.error": "Falha ao realizar pull",
+    "toast.exclude.success": "Arquivo excluído",
+    "toast.exclude.error": "Falha ao excluir arquivo",
+    "toast.cleanup.error": "Falha ao limpar board",
+    "toast.remove.error": "Falha ao remover board",
+
+    // Shortcut hint
+    "shortcut.send": "⌘↵ para enviar",
+
+    // Legend
+    "legend.title": "Estados do card",
+    "legend.silver": "Prata",
+    "legend.gold": "Ouro",
+    "legend.spinning": "Girando",
+    "legend.branch": "branch configurado",
+    "legend.done": "execução concluída",
+    "legend.running": "executando agora",
+
+    // Confirm dialog
+    "confirm.destructive": "Esta ação não pode ser desfeita.",
+    "confirm.remove.board": "Remover board",
+    "confirm.cleanup.board": "Limpar repositório",
+
+    // Settings
+    "settings.language": "Idioma",
+
+    // Git tab
+    "git.advanced": "Avançado",
+    "git.advanced.desc": "Ações destrutivas — use com cautela",
+    "git.commitPush.sending": "Enviando…",
+    "git.commitPush.retry": "↺ Tentar",
+    "git.commitPush.sent": "✓ Enviado",
+    "git.pr.creating": "Criando PR…",
+    "git.pr.retry": "↺ Tentar PR",
+    "git.pr.created": "✓ PR Criado",
+    "git.pr.create": "Criar PR",
+
+    // Header
+    "header.theme.to-light": "Mudar para tema claro",
+    "header.theme.to-dark": "Mudar para tema escuro",
+    "header.remove.board": "Remover board",
+    "header.settings": "Configurações",
+
+    // InitBoardModal
+    "board.add": "Adicionar Board",
+    "board.saving": "Salvando…",
+  },
+
+  en: {
+    // Board / page
+    "board.init": "Initialize Board",
+    "board.none": "No board initialized",
+    "board.none.desc": "Add a GitHub repository to get started.",
+    "board.filter.placeholder": "Filter cards (repo:… label:… text or number)",
+    "board.filter.label": "View filter",
+    "board.filter.help.title": "Filter syntax",
+    "board.filter.help.repo": "repo:owner/name — filter by repository",
+    "board.filter.help.label": "label:bug — filter by label",
+    "board.filter.help.text": "text or number — free search in title/#",
+    "board.edit.columns": "Edit columns",
+    "board.cleanup.title": "Delete repository and worktrees for this board",
+    "board.initializing": "Checking integrations…",
+
+    // Confirm dialogs
+    "board.remove.confirm": "Delete the board and all associated worktrees and repository? This action cannot be undone.",
+    "board.cleanup.confirm": "Delete the repository and all worktrees for the board?\nThe board remains in the list. This action cannot be undone.",
+
+    // Common actions
+    "action.send": "Send",
+    "action.cancel": "Cancel",
+    "action.confirm": "Confirm",
+    "action.delete": "Delete",
+    "action.close": "Close",
+    "action.save": "Save",
+    "action.reset": "Reset",
+    "action.pull": "Pull",
+
+    // Run defaults (CardModal)
+    "run.task": "Run Task",
+    "run.tlc": "Run TLC",
+    "run.spec": "Run Spec",
+    "run.eval": "Run Spec-Eval",
+    "run.commitPush": "Commit & Push",
+    "run.createPR": "Create Pull Request",
+
+    // Origin labels
+    "origin.task": "task",
+    "origin.spec": "spec",
+    "origin.eval": "eval",
+    "origin.tlc": "tlc",
+    "origin.chat": "chat",
+    "origin.create-pr": "PR",
+
+    // CardModal labels
+    "card.branch": "Branch",
+    "card.branch.create": "Create branch",
+    "card.branch.created": "Branch created",
+    "card.message": "Message",
+    "card.message.send": "Send message",
+    "card.message.placeholder": "Type a message to the agent…",
+    "card.run": "Run",
+    "card.logs": "Logs",
+    "card.files": "Files",
+    "card.helpers": "Helpers",
+    "card.git": "Git",
+    "card.description": "Description",
+    "card.session": "Session",
+    "card.session.new": "New session",
+    "card.model": "Model",
+    "card.effort": "Effort",
+    "card.triggers": "Triggers",
+    "card.type": "Type",
+    "card.run.background": "Running in background…",
+    "card.run.done.rerun": "✓ Done · click to re-run",
+
+    // Pipeline stages
+    "pipeline.branch": "Branch",
+    "pipeline.task": "Run Task",
+    "pipeline.tlc": "TLC",
+    "pipeline.spec": "Spec",
+    "pipeline.specEval": "Spec-Eval",
+    "pipeline.commitPush": "Commit & Push",
+    "pipeline.pr": "Pull Request",
+
+    // Status
+    "status.pending": "Pending",
+    "status.running": "Running",
+    "status.done": "Done",
+    "status.error": "Error",
+
+    // Toast messages
+    "toast.success": "Success",
+    "toast.error": "Error",
+    "toast.send.success": "Message sent",
+    "toast.send.error": "Failed to send message",
+    "toast.run.success": "Run started",
+    "toast.run.error": "Failed to start run",
+    "toast.tlc.success": "TLC started",
+    "toast.tlc.error": "Failed to start TLC",
+    "toast.reset.success": "Worktree reset",
+    "toast.reset.error": "Failed to reset worktree",
+    "toast.pr.success": "PR created",
+    "toast.pr.error": "Failed to create PR",
+    "toast.pull.success": "Pull completed",
+    "toast.pull.error": "Failed to pull",
+    "toast.exclude.success": "File excluded",
+    "toast.exclude.error": "Failed to exclude file",
+    "toast.cleanup.error": "Failed to clean board",
+    "toast.remove.error": "Failed to remove board",
+
+    // Shortcut hint
+    "shortcut.send": "⌘↵ to send",
+
+    // Legend
+    "legend.title": "Card states",
+    "legend.silver": "Silver",
+    "legend.gold": "Gold",
+    "legend.spinning": "Spinning",
+    "legend.branch": "branch configured",
+    "legend.done": "run completed",
+    "legend.running": "running now",
+
+    // Confirm dialog
+    "confirm.destructive": "This action cannot be undone.",
+    "confirm.remove.board": "Remove board",
+    "confirm.cleanup.board": "Clean repository",
+
+    // Settings
+    "settings.language": "Language",
+
+    // Git tab
+    "git.advanced": "Advanced",
+    "git.advanced.desc": "Destructive actions — use with care",
+    "git.commitPush.sending": "Sending…",
+    "git.commitPush.retry": "↺ Retry",
+    "git.commitPush.sent": "✓ Sent",
+    "git.pr.creating": "Creating PR…",
+    "git.pr.retry": "↺ Retry PR",
+    "git.pr.created": "✓ PR Created",
+    "git.pr.create": "Create PR",
+
+    // Header
+    "header.theme.to-light": "Switch to light theme",
+    "header.theme.to-dark": "Switch to dark theme",
+    "header.remove.board": "Remove board",
+    "header.settings": "Settings",
+
+    // InitBoardModal
+    "board.add": "Add Board",
+    "board.saving": "Saving…",
+  },
+}

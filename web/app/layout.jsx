@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import Providers from "@/components/Providers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
@@ -20,7 +21,7 @@ export default function RootLayout({ children }) {
           }}
         />
       </head>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased"><Providers>{children}</Providers></body>
     </html>
   );
 }

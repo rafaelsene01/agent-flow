@@ -41,8 +41,14 @@ import {
   SelectValue,
 } from "@/components/ui/select.jsx";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.jsx";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip.jsx";
 import { cn } from "@/lib/utils";
 import { statusColor, statusLabel, fileIcon } from "@/lib/fileVisuals";
+import { useToast } from "@/lib/toast";
+import { useI18n } from "@/lib/i18nContext";
+import { Collapsible as CollapsiblePrimitive } from "radix-ui";
+import PipelineStatusIcon from "@/components/board/PipelineStatusIcon.jsx";
+import PipelineStepper from "@/components/board/PipelineStepper.jsx";
 
 const TYPE_LABEL = {
   Issue: "Issue",
@@ -60,12 +66,12 @@ const ORIGIN_LABEL = {
 };
 
 const RUN_DEFAULTS = {
-  task: { model: "sonnet", effort: "high", label: "Executar Tarefa" },
-  tlc: { model: "opus", effort: "high", label: "Executar TLC" },
-  spec: { model: "sonnet", effort: "medium", label: "Executar Spec" },
-  eval: { model: "sonnet", effort: "high", label: "Executar Spec-Eval" },
-  commitPush: { model: "haiku", effort: "low", label: "Commit & Push" },
-  createPR: { model: "haiku", effort: "medium", label: "Criar Pull Request" },
+  task: { model: "sonnet", effort: "high", label: "Executar Tarefa", labelKey: "run.task" },
+  tlc: { model: "opus", effort: "high", label: "Executar TLC", labelKey: "run.tlc" },
+  spec: { model: "sonnet", effort: "medium", label: "Executar Spec", labelKey: "run.spec" },
+  eval: { model: "sonnet", effort: "high", label: "Executar Spec-Eval", labelKey: "run.eval" },
+  commitPush: { model: "haiku", effort: "low", label: "Commit & Push", labelKey: "run.commitPush" },
+  createPR: { model: "haiku", effort: "medium", label: "Criar Pull Request", labelKey: "run.createPR" },
 };
 
 
@@ -84,7 +90,7 @@ function Assignee({ login, avatarUrl, size = "size-6" }) {
           onError={() => setImgFailed(true)}
         />
       ) : (
-        <span className="text-[10px] font-semibold uppercase text-muted-foreground leading-none">
+        <span className="text-xs font-semibold uppercase text-muted-foreground leading-none">
           {login[0]}
         </span>
       )}
@@ -100,7 +106,33 @@ function SidebarLabel({ children }) {
   );
 }
 
+function AdvancedGitSection({ branch }) {
+  const [open, setOpen] = useState(false);
+  const { t } = useI18n();
+  return (
+    <CollapsiblePrimitive.Root open={open} onOpenChange={setOpen}>
+      <CollapsiblePrimitive.Trigger asChild>
+        <button type="button" className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+          <span>{open ? "▾" : "▸"}</span>
+          <span>{t("git.advanced")}</span>
+        </button>
+      </CollapsiblePrimitive.Trigger>
+      <CollapsiblePrimitive.Content>
+        <div className="flex flex-col gap-1 mt-0.5 pl-2 border-l border-destructive/30">
+          <span className="text-xs text-destructive/70 uppercase tracking-wide">{t("git.advanced.desc")}</span>
+          <CopyCmd cmd={`git reset --hard origin/${branch}`} />
+          <CopyCmd cmd="git reset --soft HEAD~1" />
+          <CopyCmd cmd="git reset" />
+          <CopyCmd cmd={`git push --force-with-lease origin ${branch}`} />
+        </div>
+      </CollapsiblePrimitive.Content>
+    </CollapsiblePrimitive.Root>
+  );
+}
+
 export default function CardModal({ item, board, onClose, onWorktreeChange }) {
+  const { toast } = useToast();
+  const { t } = useI18n();
   const [showCreateBranch, setShowCreateBranch] = useState(false);
   const [tlcFileModal, setTlcFileModal] = useState(null); // null | "spec" | "design" | "tasks"
   const [worktreeConfig, setWorktreeConfig] = useState(null); // null=loading false=none object=found
@@ -187,8 +219,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
         { method: "DELETE" },
       );
       loadChangedFiles();
+      toast({ title: t("toast.exclude.success"), variant: "success" });
     } catch (err) {
       console.error("[exclude-file]", err);
+      toast({ title: t("toast.exclude.error"), description: err.message, variant: "error" });
     }
   }
 
@@ -219,8 +253,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       );
       loadWorktreeConfig();
       loadBehindCount();
+      toast({ title: t("toast.pull.success"), variant: "success" });
     } catch (err) {
       console.error("[pull]", err);
+      toast({ title: t("toast.pull.error"), description: err.message, variant: "error" });
     } finally {
       setPullSending(false);
     }
@@ -346,8 +382,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       if (data.sessionId) setSelectedSessionId(data.sessionId);
       loadWorktreeConfig();
       onWorktreeChange?.();
+      toast({ title: t("toast.send.success"), variant: "success" });
     } catch (err) {
       console.error("[send-message]", err);
+      toast({ title: t("toast.send.error"), description: err.message, variant: "error" });
     } finally {
       setMessageSending(false);
     }
@@ -375,8 +413,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       if (data.error) throw new Error(data.error);
       loadWorktreeConfig();
       onWorktreeChange?.();
+      toast({ title: t("toast.tlc.success"), variant: "success" });
     } catch (err) {
       console.error("[run-tlc]", err);
+      toast({ title: t("toast.tlc.error"), description: err.message, variant: "error" });
     } finally {
       setTlcSending(false);
     }
@@ -392,8 +432,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       setTlcFiles(null);
       loadWorktreeConfig();
       onWorktreeChange?.();
+      toast({ title: t("toast.reset.success"), variant: "success" });
     } catch (err) {
       console.error("[reset-worktree]", err);
+      toast({ title: t("toast.reset.error"), description: err.message, variant: "error" });
     } finally {
       setResetWorktreeSending(false);
     }
@@ -420,8 +462,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       if (data.error) throw new Error(data.error);
       loadWorktreeConfig();
       onWorktreeChange?.();
+      toast({ title: t("toast.pr.success"), variant: "success" });
     } catch (err) {
       console.error("[create-pr]", err);
+      toast({ title: t("toast.pr.error"), description: err.message, variant: "error" });
     } finally {
       setCreatePrSending(false);
     }
@@ -444,6 +488,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       onWorktreeChange?.();
     } catch (err) {
       console.error("[run-tlc-exec]", err);
+      setErrorModal(err.message);
     } finally {
       setTlcExecSending(false);
     }
@@ -475,6 +520,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       onWorktreeChange?.();
     } catch (err) {
       console.error("[run-spec-eval]", err);
+      setErrorModal(err.message);
     } finally {
       setSpecEvalSending(false);
     }
@@ -501,6 +547,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       onWorktreeChange?.();
     } catch (err) {
       console.error("[commit-push]", err);
+      setErrorModal(err.message);
     } finally {
       setCommitPushSending(false);
     }
@@ -530,6 +577,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       onWorktreeChange?.();
     } catch (err) {
       console.error("[run-spec]", err);
+      setErrorModal(err.message);
     } finally {
       setSpecSending(false);
     }
@@ -587,8 +635,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     >
       <DialogContent
         aria-describedby={undefined}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => { if (anyRunning) e.preventDefault(); }}
+        onEscapeKeyDown={(e) => { if (anyRunning) e.preventDefault(); }}
         className="w-full sm:max-w-[calc(100%-2rem)] h-[80vh] gap-0 overflow-hidden p-0"
       >
         {runConfirmModal && (
@@ -596,12 +644,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             <div className="bg-background border rounded-lg shadow-xl w-full max-w-md overflow-hidden mx-4">
               <div className="flex items-center border-b px-5 py-4">
                 <span className="text-sm font-semibold flex-1">
-                  {RUN_DEFAULTS[runConfirmModal.action]?.label}
+                  {RUN_DEFAULTS[runConfirmModal.action]?.labelKey
+                    ? t(RUN_DEFAULTS[runConfirmModal.action].labelKey)
+                    : RUN_DEFAULTS[runConfirmModal.action]?.label}
                 </span>
               </div>
               <div className="flex flex-col gap-4 px-5 py-4">
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Sessão</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.session")}</span>
                   <Select
                     value={runConfirmModal.session}
                     onValueChange={(v) => setRunConfirmModal((s) => ({ ...s, session: v }))}
@@ -610,7 +660,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__new__">Nova Sessão</SelectItem>
+                      <SelectItem value="__new__">{t("card.session.new")}</SelectItem>
                       {[...(worktreeConfig?.chatSessions ?? [])]
                         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
                         .map((s) => (
@@ -622,7 +672,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Modelo</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.model")}</span>
                   <Select
                     value={runConfirmModal.model}
                     onValueChange={(v) => setRunConfirmModal((s) => ({ ...s, model: v }))}
@@ -638,7 +688,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Effort</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.effort")}</span>
                   <Select
                     value={runConfirmModal.effort}
                     onValueChange={(v) => setRunConfirmModal((s) => ({ ...s, effort: v }))}
@@ -670,7 +720,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                           { key: "test", label: "Testes", placeholder: "npm test" },
                         ].map(({ key, label, placeholder }) => (
                           <div key={key} className="flex flex-col gap-1">
-                            <Label className="text-[10px] text-muted-foreground">{label}</Label>
+                            <Label className="text-xs text-muted-foreground">{label}</Label>
                             <Input
                               type="text"
                               value={runConfirmModal.validation?.[key] ?? ""}
@@ -686,7 +736,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                           </div>
                         ))}
                         <div className="col-span-2 flex flex-col gap-1">
-                          <Label className="text-[10px] text-muted-foreground">Outro</Label>
+                          <Label className="text-xs text-muted-foreground">Outro</Label>
                           <Input
                             type="text"
                             value={runConfirmModal.validation?.extra ?? ""}
@@ -791,26 +841,26 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   type="button"
                   onClick={() => setMainTab("desc")}
                   className={cn(
-                    "text-[11px] font-bold uppercase tracking-wider transition-colors",
+                    "text-[11px] font-bold uppercase tracking-wider transition-colors rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     mainTab === "desc"
                       ? "text-foreground"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  Descrição
+                  {t("card.description")}
                 </button>
                 {logText && (
                   <button
                     type="button"
                     onClick={() => setMainTab("logs")}
                     className={cn(
-                      "flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors",
+                      "flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       mainTab === "logs"
                         ? "text-foreground"
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    Logs
+                    {t("card.logs")}
                     {anyRunning && (
                       <span className="inline-block size-1.5 rounded-full bg-green-500 animate-pulse" />
                     )}
@@ -859,7 +909,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__new__">Nova Sessão</SelectItem>
+                      <SelectItem value="__new__">{t("card.session.new")}</SelectItem>
                       {[...(worktreeConfig?.chatSessions ?? [])]
                         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
                         .map((s) => (
@@ -879,7 +929,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       if (!anyRunning && !messageSending) handleSendMessage();
                     }
                   }}
-                  placeholder="Enviar uma mensagem ao agente nesta worktree…"
+                  placeholder={t("card.message.placeholder")}
                   className="min-h-16 resize-none text-sm"
                   disabled={anyRunning || messageSending}
                 />
@@ -916,6 +966,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground select-none">⌘↵</span>
                   <Button
                     size="sm"
                     type="button"
@@ -928,8 +980,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     ) : (
                       <Send className="size-3.5" />
                     )}
-                    <span>Enviar</span>
+                    <span>{t("action.send")}</span>
                   </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -937,13 +990,45 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
           {/* ── sidebar ── */}
           <aside className="flex w-[280px] shrink-0 flex-col gap-5 overflow-y-auto border-l bg-muted/30 p-5">
+            {isConfigured && (
+              <div className="flex flex-col gap-2">
+                <SidebarLabel>Pipeline</SidebarLabel>
+                <PipelineStepper stages={{
+                  branch: isConfigured ? "done" : "pending",
+                  task: worktreeConfig?.status === "done" ? "done"
+                    : worktreeConfig?.status === "running" || specSending ? "current"
+                    : worktreeConfig?.status === "error" ? "error"
+                    : "pending",
+                  tlc: worktreeConfig?.tlcStatus === "done" ? "done"
+                    : worktreeConfig?.tlcStatus === "running" || tlcSending ? "current"
+                    : worktreeConfig?.tlcStatus === "error" ? "error"
+                    : "pending",
+                  spec: worktreeConfig?.tlcExecStatus === "done" ? "done"
+                    : worktreeConfig?.tlcExecStatus === "running" || tlcExecSending ? "current"
+                    : worktreeConfig?.tlcExecStatus === "error" ? "error"
+                    : "pending",
+                  specEval: worktreeConfig?.specEvalStatus === "done" ? "done"
+                    : worktreeConfig?.specEvalStatus === "running" || specEvalSending ? "current"
+                    : worktreeConfig?.specEvalStatus === "error" ? "error"
+                    : "pending",
+                  commitPush: worktreeConfig?.commitPushStatus === "done" ? "done"
+                    : worktreeConfig?.commitPushStatus === "running" || commitPushSending ? "current"
+                    : worktreeConfig?.commitPushStatus === "error" ? "error"
+                    : "pending",
+                  pr: worktreeConfig?.prStatus === "done" ? "done"
+                    : worktreeConfig?.prStatus === "running" || createPrSending ? "current"
+                    : worktreeConfig?.prStatus === "error" ? "error"
+                    : "pending",
+                }} />
+              </div>
+            )}
             <div className="flex flex-col gap-2">
-              <SidebarLabel>Gatilhos</SidebarLabel>
+              <SidebarLabel>{t("card.triggers")}</SidebarLabel>
               <div className="flex flex-col gap-1.5">
                 {/* ── Configurar Branch (inalterado) ── */}
                 <div className="flex gap-1.5">
                   <Button
-                    variant="outline"
+                    variant={!isConfigured ? "default" : "outline"}
                     size="sm"
                     type="button"
                     disabled={isConfigured || isChecking}
@@ -956,9 +1041,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   >
                     <GitBranch className="size-3.5" />
                     <span>Configurar Branch</span>
-                    <span className="ml-auto text-xs">
-                      {isConfigured ? "✓" : "▷"}
-                    </span>
+                    <PipelineStatusIcon state={isConfigured ? "done" : "ready"} className="ml-auto" />
                   </Button>
                   {isConfigured && (
                     <Button
@@ -1004,20 +1087,34 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     }}
                     className="w-full mt-1"
                   >
-                    <TabsList className="w-full grid grid-cols-4 h-8">
-                      <TabsTrigger value="exec" title="Executar" className="px-0">
-                        <Play className="size-3.5" />
-                      </TabsTrigger>
-                      <TabsTrigger value="git" title="Git" className="px-0">
-                        <GitBranch className="size-3.5" />
-                      </TabsTrigger>
-                      <TabsTrigger value="files" title="Arquivos alterados" className="px-0">
-                        <FolderOpen className="size-3.5" />
-                      </TabsTrigger>
-                      <TabsTrigger value="helpers" title="Helpers" className="px-0">
-                        <Archive className="size-3.5" />
-                      </TabsTrigger>
-                    </TabsList>
+                    <TooltipProvider>
+                      <TabsList className="w-full grid grid-cols-4 h-8">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <TabsTrigger value="exec" className="px-0"><Play className="size-3.5" /></TabsTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">{t("card.run")}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <TabsTrigger value="git" className="px-0"><GitBranch className="size-3.5" /></TabsTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">{t("card.git")}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <TabsTrigger value="files" className="px-0"><FolderOpen className="size-3.5" /></TabsTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">{t("card.files")}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <TabsTrigger value="helpers" className="px-0"><Archive className="size-3.5" /></TabsTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">{t("card.helpers")}</TooltipContent>
+                        </Tooltip>
+                      </TabsList>
+                    </TooltipProvider>
 
                     {/* ── Aba 1: Executar ── */}
                     <TabsContent value="exec" className="flex flex-col gap-1.5 mt-2">
@@ -1031,7 +1128,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         return (
                           <>
                             <Button
-                              variant="outline"
+                              variant={isConfigured && worktreeConfig?.status !== "done" && worktreeConfig?.tlcExecStatus !== "done" && worktreeConfig?.specEvalStatus !== "done" ? "default" : "outline"}
                               size="sm"
                               type="button"
                               disabled={isRunning || isTlcRunning}
@@ -1045,26 +1142,18 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               )}
                             >
                               <Pencil className="size-3.5" />
-                              <span>Executar Tarefa</span>
-                              <span className="ml-auto text-xs">
-                                {isRunning
-                                  ? "…"
-                                  : isDone
-                                    ? "✓"
-                                    : isError
-                                      ? "↺"
-                                      : "▷"}
-                              </span>
+                              <span>{t("run.task")}</span>
+                              <PipelineStatusIcon state={isRunning ? "running" : isDone ? "done" : isError ? "error" : "ready"} className="ml-auto" />
                             </Button>
                             {isRunning && (
                               <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
                                 <Loader2 className="size-3 shrink-0 animate-spin" />
-                                Executando em background…
+                                {t("card.run.background")}
                               </span>
                             )}
                             {isDone && (
                               <span className="text-[11px] text-state-completed">
-                                ✓ Concluído · clique para re-executar
+                                {t("card.run.done.rerun")}
                               </span>
                             )}
                             {isError && worktreeConfig?.lastError && (
@@ -1111,16 +1200,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               )}
                             >
                               <Zap className="size-3.5" />
-                              <span>Executar TLC</span>
-                              <span className="ml-auto text-xs">
-                                {isTlcRunning
-                                  ? "…"
-                                  : isTlcDone
-                                    ? "✓"
-                                    : isTlcError
-                                      ? "↺"
-                                      : "▷"}
-                              </span>
+                              <span>{t("run.tlc")}</span>
+                              <PipelineStatusIcon state={isTlcRunning ? "running" : isTlcDone ? "done" : isTlcError ? "error" : "ready"} className="ml-auto" />
                             </Button>
                             {isTlcRunning && (
                               <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
@@ -1201,16 +1282,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                     )}
                                   >
                                     <Play className="size-3.5" />
-                                    <span>Executar Spec</span>
-                                    <span className="ml-auto text-xs">
-                                      {isExecRunning
-                                        ? "…"
-                                        : isExecDone
-                                          ? "✓"
-                                          : isExecError
-                                            ? "↺"
-                                            : "▷"}
-                                    </span>
+                                    <span>{t("run.spec")}</span>
+                                    <PipelineStatusIcon state={isExecRunning ? "running" : isExecDone ? "done" : isExecError ? "error" : "ready"} className="ml-auto" />
                                   </Button>
                                   {isExecRunning && (
                                     <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
@@ -1220,7 +1293,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                   )}
                                   {isExecDone && (
                                     <span className="text-[11px] text-state-completed">
-                                      ✓ Concluído · clique para re-executar
+                                      {t("card.run.done.rerun")}
                                     </span>
                                   )}
                                   {isExecError &&
@@ -1301,16 +1374,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               )}
                             >
                               <ListChecks className="size-3.5" />
-                              <span>Executar Spec-Eval</span>
-                              <span className="ml-auto text-xs">
-                                {isEvalRunning
-                                  ? "…"
-                                  : isEvalDone
-                                    ? "✓"
-                                    : isEvalError
-                                      ? "↺"
-                                      : "▷"}
-                              </span>
+                              <span>{t("run.eval")}</span>
+                              <PipelineStatusIcon state={isEvalRunning ? "running" : isEvalDone ? "done" : isEvalError ? "error" : "ready"} className="ml-auto" />
                             </Button>
                             {isEvalRunning && (
                               <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
@@ -1374,7 +1439,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         const hasFiles = changedFiles?.length > 0;
                         return (
                           <Button
-                            variant="outline"
+                            variant={!isCommitPushDone && !isCommitPushError && !isCommitPushRunning && worktreeConfig?.specEvalStatus === "done" ? "default" : "outline"}
                             size="sm"
                             type="button"
                             disabled={isCommitPushRunning || !hasFiles}
@@ -1395,12 +1460,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                           >
                             <span>
                               {isCommitPushRunning
-                                ? "Enviando…"
+                                ? t("git.commitPush.sending")
                                 : isCommitPushError
-                                  ? "↺ Tentar"
+                                  ? t("git.commitPush.retry")
                                   : !hasFiles && isCommitPushDone
-                                    ? "✓ Enviado"
-                                    : "Commit & Push"}
+                                    ? t("git.commitPush.sent")
+                                    : t("run.commitPush")}
                             </span>
                           </Button>
                         );
@@ -1408,12 +1473,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       <div className="flex flex-col gap-1 mt-0.5">
                         <CopyCmd cmd={`git checkout ${worktreeConfig.branch}`} />
                         <CopyCmd cmd={`git fetch origin`} />
-                        <CopyCmd cmd={`git reset --hard origin/${worktreeConfig.branch}`} />
-                        <CopyCmd cmd="git reset --soft HEAD~1" />
-                        <CopyCmd cmd="git reset" />
                         <CopyCmd cmd="git add ." />
                         <CopyCmd cmd='git commit -m "message"' />
-                        <CopyCmd cmd={`git push --force-with-lease origin ${worktreeConfig.branch}`} />
+                        <AdvancedGitSection branch={worktreeConfig.branch} />
                       </div>
                       {worktreeConfig.originBranch && (() => {
                         const prStatus = worktreeConfig?.prStatus;
@@ -1424,7 +1486,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         return (
                           <div className="mt-1 flex flex-col gap-1">
                             <Button
-                              variant="outline"
+                              variant={(isPrDone || hasFiles || isPrError) ? "outline" : (!isPrRunning && worktreeConfig?.specEvalStatus === "done") ? "default" : "outline"}
                               size="sm"
                               type="button"
                               disabled={isPrRunning || hasFiles || changedFiles === null}
@@ -1444,12 +1506,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 : <GitMerge className="size-3.5" />}
                               <span>
                                 {isPrRunning
-                                  ? "Criando PR…"
+                                  ? t("git.pr.creating")
                                   : isPrError
-                                    ? "↺ Tentar PR"
+                                    ? t("git.pr.retry")
                                     : isPrDone
-                                      ? "✓ PR Criado"
-                                      : `Criar PR → ${worktreeConfig.originBranch}`}
+                                      ? t("git.pr.created")
+                                      : `${t("git.pr.create")} → ${worktreeConfig.originBranch}`}
                               </span>
                             </Button>
                             {isPrDone && worktreeConfig?.prUrl && (
@@ -1489,7 +1551,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                             >
                               <span
                                 className={cn(
-                                  "w-4 shrink-0 overflow-hidden text-center font-mono text-[10px] font-semibold",
+                                  "w-4 shrink-0 overflow-hidden text-center font-mono text-xs font-semibold",
                                   statusColor(file.status),
                                 )}
                                 title={statusLabel(file.status)}
@@ -1571,13 +1633,13 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
             {item.itemType && (
               <div className="flex flex-col gap-2">
-                <SidebarLabel>Tipo</SidebarLabel>
+                <SidebarLabel>{t("card.type")}</SidebarLabel>
                 <span className="text-sm">{item.itemType}</span>
               </div>
             )}
             {!item.itemType && item.type !== "Issue" && (
               <div className="flex flex-col gap-2">
-                <SidebarLabel>Tipo</SidebarLabel>
+                <SidebarLabel>{t("card.type")}</SidebarLabel>
                 <span className="text-sm">
                   {TYPE_LABEL[item.type] ?? item.type}
                 </span>

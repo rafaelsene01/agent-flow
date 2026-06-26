@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Settings, Copy, Check, FolderOpen, AlertTriangle, RefreshCw } from "lucide-react";
+import { useI18n } from "@/lib/i18nContext";
+import { Settings, Copy, Check, FolderOpen, AlertTriangle, RefreshCw, X, Zap, GitBranch, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -69,7 +70,7 @@ function CopyButton({ text }) {
 function CommandBlock({ label, cmd }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <div className="flex items-center gap-2">
@@ -94,13 +95,13 @@ function StatusChip({ loading, connected }) {
   if (connected) {
     return (
       <span className="inline-flex items-center justify-center size-6 rounded-full text-xs font-medium bg-state-completed/15 text-state-completed border border-state-completed/40">
-        ✓
+        <Check className="size-3.5" />
       </span>
     );
   }
   return (
     <span className="inline-flex items-center justify-center size-6 rounded-full text-xs font-medium bg-destructive/15 text-destructive border border-destructive/40">
-      ✕
+      <X className="size-3.5" />
     </span>
   );
 }
@@ -222,7 +223,7 @@ function SkillCard({ loading, installed, onInstalled, skill, name, description }
   return (
     <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
       <div className="flex items-start gap-3">
-        <div className={logoClass}>⚡</div>
+        <div className={logoClass}><Zap className="size-5" /></div>
 
         <div className="flex flex-col gap-0.5 flex-1 min-w-0">
           <span className="text-sm font-semibold leading-tight">Skill: {name}</span>
@@ -303,7 +304,8 @@ export default function SettingsModal({ onClose }) {
   const [pathInput, setPathInput]       = useState("");
   const [pathSaving, setPathSaving]     = useState(false);
   const [pathSaved, setPathSaved]       = useState(false);
-  const [language, setLanguage]         = useState("en");
+  const { lang: ctxLang, setLang }      = useI18n();
+  const [language, setLanguage]         = useState(ctxLang);
 
   const fetchStatus = useCallback((force = false) => {
     setLoading(true);
@@ -324,12 +326,13 @@ export default function SettingsModal({ onClose }) {
       .catch(() => {});
   }, []);
 
-  function saveLanguage(lang) {
-    setLanguage(lang);
+  function saveLanguage(newLang) {
+    setLanguage(newLang);
+    setLang(newLang);
     fetch("/api/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ language: lang }),
+      body: JSON.stringify({ language: newLang }),
     }).catch(() => {});
   }
 
@@ -393,7 +396,7 @@ export default function SettingsModal({ onClose }) {
                 onClick={onClose}
                 aria-label="Fechar"
               >
-                ✕
+                <X className="size-4" />
               </Button>
             )}
           </div>
@@ -410,14 +413,14 @@ export default function SettingsModal({ onClose }) {
         <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
           <IntegrationCard
             name="GitHub"
-            logo="⬡"
+            logo={<GitBranch className="size-5" />}
             loading={loading}
             data={status?.github}
             commands={githubCommands}
           />
           <IntegrationCard
             name="Claude"
-            logo="◆"
+            logo={<Bot className="size-5" />}
             loading={loading}
             data={status?.claude}
             commands={claudeCommands}
@@ -445,7 +448,7 @@ export default function SettingsModal({ onClose }) {
           <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
             <div className="flex items-start gap-3">
               <div className="flex items-center justify-center size-9 rounded-lg border text-lg shrink-0 text-state-completed bg-state-completed/10 border-state-completed/40">
-                ◉
+                <FolderOpen className="size-5" />
               </div>
               <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                 <span className="text-sm font-semibold leading-tight">Projects</span>
@@ -488,7 +491,7 @@ export default function SettingsModal({ onClose }) {
                   pathSaved && "text-state-completed border-state-completed"
                 )}
               >
-                {pathSaved ? "✓ Salvo" : pathSaving ? "…" : "Salvar"}
+                {pathSaved ? <><Check className="size-3.5" /> Salvo</> : pathSaving ? "…" : "Salvar"}
               </Button>
             </div>
           </div>

@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import UsageBadge from "@/components/UsageBadge.jsx";
+import { useI18n } from "@/lib/i18nContext";
+import CardStateLegend from "@/components/board/CardStateLegend.jsx";
 
 export default function Header({ onSettings, onInitBoard, boards = [], activePath = "", onSelectBoard, onRemoveBoard, theme = "dark", onToggleTheme }) {
+  const { t } = useI18n();
   return (
     <TooltipProvider>
       <header className="sticky top-0 z-50 flex items-center gap-2 border-b glass px-3 py-1.5">
@@ -23,34 +26,36 @@ export default function Header({ onSettings, onInitBoard, boards = [], activePat
             {boards.map((b) => {
               const isActive = boardSlug(b) === activePath.slice(1);
               return (
-                <button
+                <div
                   key={`${b.id}-${b.viewId ?? "no-view"}`}
-                  type="button"
-                  onClick={() => onSelectBoard(b)}
-                  className={cn(
-                    "group relative flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-t-md whitespace-nowrap shrink-0 transition-colors outline-none",
-                    "focus-visible:ring-2 focus-visible:ring-ring/50",
-                    isActive
-                      ? "border-b-2 border-primary text-foreground bg-background"
-                      : "border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
+                  className="group relative flex items-center rounded-t-md shrink-0"
                 >
-                  <span className="whitespace-nowrap">
-                    {b.viewName ? `${b.name} - ${b.viewName}` : b.name}
-                  </span>
-                  <span
+                  <button
+                    type="button"
+                    onClick={() => onSelectBoard(b)}
                     className={cn(
-                      "inline-flex items-center justify-center rounded-sm p-0.5 transition-opacity",
-                      "hover:bg-muted-foreground/20",
+                      "flex items-center gap-1 px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring/50",
+                      isActive
+                        ? "border-b-2 border-primary text-foreground bg-background"
+                        : "border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    {b.viewName ? `${b.name} - ${b.viewName}` : b.name}
+                  </button>
+                  <button
+                    type="button"
+                    title={t("header.remove.board")}
+                    onClick={() => onRemoveBoard(b)}
+                    className={cn(
+                      "inline-flex items-center justify-center rounded-sm p-0.5 mr-1 transition-opacity outline-none",
+                      "hover:bg-muted-foreground/20 focus-visible:ring-1 focus-visible:ring-ring",
                       isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"
                     )}
-                    role="button"
-                    title="Remover board"
-                    onClick={(e) => { e.stopPropagation(); onRemoveBoard(b); }}
                   >
                     <X size={12} strokeWidth={2} />
-                  </span>
-                </button>
+                  </button>
+                </div>
               );
             })}
           </nav>
@@ -72,13 +77,15 @@ export default function Header({ onSettings, onInitBoard, boards = [], activePat
                 className="size-7 text-primary"
                 type="button"
                 onClick={onInitBoard}
-                aria-label="Inicializar Board"
+                aria-label={t("board.init")}
               >
                 <Plus size={16} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">Inicializar Board</TooltipContent>
+            <TooltipContent side="bottom">{t("board.init")}</TooltipContent>
           </Tooltip>
+
+          <CardStateLegend />
 
           {/* Theme toggle */}
           <Tooltip>
@@ -89,13 +96,13 @@ export default function Header({ onSettings, onInitBoard, boards = [], activePat
                 className="size-7"
                 type="button"
                 onClick={onToggleTheme}
-                aria-label={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
+                aria-label={theme === "dark" ? t("header.theme.to-light") : t("header.theme.to-dark")}
               >
                 {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              {theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
+              {theme === "dark" ? t("header.theme.to-light") : t("header.theme.to-dark")}
             </TooltipContent>
           </Tooltip>
 
@@ -108,12 +115,12 @@ export default function Header({ onSettings, onInitBoard, boards = [], activePat
                 className="size-7"
                 type="button"
                 onClick={onSettings}
-                aria-label="Configurações"
+                aria-label={t("header.settings")}
               >
                 <Settings size={16} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">Configurações</TooltipContent>
+            <TooltipContent side="bottom">{t("header.settings")}</TooltipContent>
           </Tooltip>
         </div>
       </header>

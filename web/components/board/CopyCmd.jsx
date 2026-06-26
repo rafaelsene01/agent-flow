@@ -44,7 +44,7 @@ export default function CopyCmd({ cmd }) {
       </Button>
       {showSelect && (
         <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-md border bg-popover p-2 shadow-md">
-          <p className="mb-1.5 text-[10px] text-muted-foreground">Selecione e copie (Ctrl+C):</p>
+          <p className="mb-1.5 text-xs text-muted-foreground">Selecione e copie (Ctrl+C):</p>
           <input
             ref={inputRef}
             readOnly

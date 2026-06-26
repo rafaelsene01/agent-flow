@@ -10,7 +10,11 @@ import InitBoardModal from "@/components/InitBoardModal.jsx";
 import EditBoardModal from "@/components/EditBoardModal.jsx";
 import Board from "@/components/board/Board.jsx";
 import { Button } from "@/components/ui/button";
-import { Pencil, BrushCleaning, Plus } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Pencil, BrushCleaning, Plus, Search, X, CircleHelp } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useI18n } from "@/lib/i18nContext";
+import { useToast } from "@/lib/toast";
 
 function navigate(path) {
   window.history.pushState(null, "", path);
@@ -18,12 +22,16 @@ function navigate(path) {
 
 function AppContent() {
   const pathname = usePathname();
+  const { t } = useI18n();
+  const { toast } = useToast();
   const [state, dispatch] = useReducer(appReducer, { ...initialState, activePath: pathname });
   const { initializing, boards, activeBoard, activePath } = state;
 
   const [showSettings, setShowSettings]   = useState(false);
   const [showInitBoard, setShowInitBoard] = useState(false);
   const [showEditBoard, setShowEditBoard] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState(null);
+  const [cleanupConfirm, setCleanupConfirm] = useState(false);
 
   // Edição inline do filtro da view (com debounce antes de relistar/persistir).
   const [filterDraft, setFilterDraft] = useState(activeBoard?.viewFilter ?? "");
@@ -128,24 +136,27 @@ function AppContent() {
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         console.error("[cleanup-board] server error:", d.error);
+        toast({ title: t("toast.cleanup.error"), description: d.error ?? "Erro do servidor", variant: "error" });
       }
     } catch (err) {
       console.error("[cleanup-board]", err);
+      toast({ title: t("toast.cleanup.error"), description: err.message, variant: "error" });
     }
   }
 
   async function removeBoard(board) {
-    if (!confirm(`Excluir o board "${board.name}" e todos os worktrees e repositório associados? Esta ação não pode ser desfeita.`)) return;
+    setRemoveConfirm({ board });
+  }
 
+  async function confirmRemoveBoard() {
+    const board = removeConfirm.board;
+    setRemoveConfirm(null);
     await cleanupBoardData(board);
-
     const next = boards.filter((b) => b.viewId !== board.viewId);
     const fallback = next[0] ?? null;
     const fallbackPath = fallback ? `/${boardSlug(fallback)}` : "/";
-
     dispatch({ type: "BOARD_REMOVED", boardViewId: board.viewId, fallbackBoard: fallback, fallbackPath });
     navigate(fallbackPath);
-
     await fetch("/api/config", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -157,7 +168,7 @@ function AppContent() {
     return (
       <div className="flex flex-1 min-h-screen flex-col items-center justify-center gap-4">
         <span className="text-5xl">🌸</span>
-        <p className="text-sm text-muted-foreground">Verificando integrações…</p>
+        <p className="text-sm text-muted-foreground">{t("board.initializing")}</p>
         <div className="flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-muted-foreground animate-pulse [animation-delay:0ms]" />
           <span className="size-2 rounded-full bg-muted-foreground animate-pulse [animation-delay:150ms]" />
@@ -184,15 +195,49 @@ function AppContent() {
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex items-center justify-between px-4 py-2 border-b">
             <div className="min-w-0 flex-1 flex items-center gap-3">
-              <input
-                type="text"
-                value={filterDraft}
-                onChange={(e) => setFilterDraft(e.target.value)}
-                spellCheck={false}
-                placeholder="Filtrar cards (repo:… label:… texto ou número)"
-                aria-label="Filtro da view"
-                className="flex-1 min-w-0 max-w-xl bg-transparent text-xs text-muted-foreground font-mono outline-none border-b border-transparent hover:border-border focus:border-ring transition-colors py-0.5"
-              />
+              <div className="relative flex items-center flex-1 min-w-0 max-w-xl">
+                <Search className="absolute left-0 size-3 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={filterDraft}
+                  onChange={(e) => setFilterDraft(e.target.value)}
+                  spellCheck={false}
+                  placeholder={t("board.filter.placeholder")}
+                  aria-label={t("board.filter.label")}
+                  className="w-full bg-transparent text-xs text-muted-foreground font-mono outline-none border-b border-transparent hover:border-border focus:border-ring transition-colors py-0.5 pl-5 pr-5"
+                />
+                {filterDraft && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterDraft("")}
+                    className="absolute right-5 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Limpar filtro"
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="absolute right-0 text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                        aria-label={t("board.filter.help.title")}
+                      >
+                        <CircleHelp className="size-3" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start" className="max-w-xs">
+                      <p className="mb-1 font-semibold">{t("board.filter.help.title")}</p>
+                      <ul className="flex flex-col gap-0.5 font-mono">
+                        <li>{t("board.filter.help.repo")}</li>
+                        <li>{t("board.filter.help.label")}</li>
+                        <li>{t("board.filter.help.text")}</li>
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
             <div className="flex items-center gap-1">
               <Button
@@ -200,7 +245,7 @@ function AppContent() {
                 size="icon-sm"
                 type="button"
                 onClick={() => setShowEditBoard(true)}
-                title="Editar colunas"
+                title={t("board.edit.columns")}
               >
                 <Pencil />
               </Button>
@@ -208,12 +253,9 @@ function AppContent() {
                 variant="outline"
                 size="icon-sm"
                 type="button"
-                title="Apagar repositório e worktrees deste board"
+                title={t("board.cleanup.title")}
                 className="hover:text-destructive hover:border-destructive"
-                onClick={async () => {
-                  if (!confirm(`Apagar o repositório e todos os worktrees do board "${activeBoard.name}"?\nO board permanece na lista. Esta ação não pode ser desfeita.`)) return;
-                  await cleanupBoardData(activeBoard);
-                }}
+                onClick={() => setCleanupConfirm(true)}
               >
                 <BrushCleaning />
               </Button>
@@ -225,14 +267,14 @@ function AppContent() {
         <div className="flex flex-1 items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-center">
             <span className="text-5xl">🌸</span>
-            <h2 className="text-base font-semibold">Nenhum board inicializado</h2>
-            <p className="text-sm text-muted-foreground">Adicione um repositório GitHub para começar.</p>
+            <h2 className="text-base font-semibold">{t("board.none")}</h2>
+            <p className="text-sm text-muted-foreground">{t("board.none.desc")}</p>
             <Button
               type="button"
               onClick={() => setShowInitBoard(true)}
             >
               <Plus />
-              Inicializar Board
+              {t("board.init")}
             </Button>
           </div>
         </div>
@@ -252,6 +294,29 @@ function AppContent() {
           board={activeBoard}
           onClose={() => setShowEditBoard(false)}
           onSaved={handleBoardUpdated}
+        />
+      )}
+
+      {removeConfirm && (
+        <ConfirmDialog
+          open
+          targetName={removeConfirm.board.name}
+          title="Excluir board"
+          description="Todos os worktrees e o repositório associados serão removidos. Esta ação não pode ser desfeita."
+          destructive
+          onConfirm={confirmRemoveBoard}
+          onCancel={() => setRemoveConfirm(null)}
+        />
+      )}
+      {cleanupConfirm && activeBoard && (
+        <ConfirmDialog
+          open
+          targetName={activeBoard.name}
+          title="Apagar repositório e worktrees"
+          description="O board permanece na lista. Esta ação não pode ser desfeita."
+          destructive
+          onConfirm={async () => { setCleanupConfirm(false); await cleanupBoardData(activeBoard); }}
+          onCancel={() => setCleanupConfirm(false)}
         />
       )}
     </div>
