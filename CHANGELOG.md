@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/rafaelsene01/agent-flow/compare/v1.24.0...v1.25.0) (2026-06-26)
+
+
+### Features
+
+* enhance UI components with internationalization and improved user interactions ([3fd9560](https://github.com/rafaelsene01/agent-flow/commit/3fd95608cde98595fbf64ab8076748a71b7ac112))
+
 # [1.24.0](https://github.com/rafaelsene01/agent-flow/compare/v1.23.1...v1.24.0) (2026-06-26)
 
 
