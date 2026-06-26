@@ -1,3 +1,15 @@
+# [1.24.0](https://github.com/rafaelsene01/agent-flow/compare/v1.23.1...v1.24.0) (2026-06-26)
+
+
+### Bug Fixes
+
+* enhance task completion checks in CardModal component ([fe16d29](https://github.com/rafaelsene01/agent-flow/commit/fe16d29315119c3eb9d249a6c8639b9b09c13e3e))
+
+
+### Features
+
+* add file content editing and helper file management in runner.js and UI components ([6fca024](https://github.com/rafaelsene01/agent-flow/commit/6fca0240b97e35c5616f5c434c145f857f364978))
+
 ## [1.23.1](https://github.com/rafaelsene01/agent-flow/compare/v1.23.0...v1.23.1) (2026-06-26)
 
 
