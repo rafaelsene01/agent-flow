@@ -173,9 +173,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
   useEffect(() => {
     const taskDone =
-      worktreeConfig?.status === "done" || worktreeConfig?.tlcExecStatus === "done";
+      worktreeConfig?.status === "done" ||
+      worktreeConfig?.tlcExecStatus === "done" ||
+      worktreeConfig?.commitPushStatus === "done" ||
+      worktreeConfig?.commitPushStatus === "error";
     if (taskDone) loadChangedFiles();
-  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus]);
+  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus, worktreeConfig?.commitPushStatus]);
 
   async function handleExcludeFile(filePath) {
     try {
