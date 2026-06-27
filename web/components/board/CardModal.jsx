@@ -47,8 +47,6 @@ import { statusColor, statusLabel, fileIcon } from "@/lib/fileVisuals";
 import { useToast } from "@/lib/toast";
 import { useI18n } from "@/lib/i18nContext";
 import { Collapsible as CollapsiblePrimitive } from "radix-ui";
-import PipelineStatusIcon from "@/components/board/PipelineStatusIcon.jsx";
-import PipelineStepper from "@/components/board/PipelineStepper.jsx";
 
 const TYPE_LABEL = {
   Issue: "Issue",
@@ -990,38 +988,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
           {/* ── sidebar ── */}
           <aside className="flex w-[280px] shrink-0 flex-col gap-5 overflow-y-auto border-l bg-muted/30 p-5">
-            {isConfigured && (
-              <div className="flex flex-col gap-2">
-                <SidebarLabel>Pipeline</SidebarLabel>
-                <PipelineStepper stages={{
-                  branch: isConfigured ? "done" : "pending",
-                  task: worktreeConfig?.status === "done" ? "done"
-                    : worktreeConfig?.status === "running" || specSending ? "current"
-                    : worktreeConfig?.status === "error" ? "error"
-                    : "pending",
-                  tlc: worktreeConfig?.tlcStatus === "done" ? "done"
-                    : worktreeConfig?.tlcStatus === "running" || tlcSending ? "current"
-                    : worktreeConfig?.tlcStatus === "error" ? "error"
-                    : "pending",
-                  spec: worktreeConfig?.tlcExecStatus === "done" ? "done"
-                    : worktreeConfig?.tlcExecStatus === "running" || tlcExecSending ? "current"
-                    : worktreeConfig?.tlcExecStatus === "error" ? "error"
-                    : "pending",
-                  specEval: worktreeConfig?.specEvalStatus === "done" ? "done"
-                    : worktreeConfig?.specEvalStatus === "running" || specEvalSending ? "current"
-                    : worktreeConfig?.specEvalStatus === "error" ? "error"
-                    : "pending",
-                  commitPush: worktreeConfig?.commitPushStatus === "done" ? "done"
-                    : worktreeConfig?.commitPushStatus === "running" || commitPushSending ? "current"
-                    : worktreeConfig?.commitPushStatus === "error" ? "error"
-                    : "pending",
-                  pr: worktreeConfig?.prStatus === "done" ? "done"
-                    : worktreeConfig?.prStatus === "running" || createPrSending ? "current"
-                    : worktreeConfig?.prStatus === "error" ? "error"
-                    : "pending",
-                }} />
-              </div>
-            )}
             <div className="flex flex-col gap-2">
               <SidebarLabel>{t("card.triggers")}</SidebarLabel>
               <div className="flex flex-col gap-1.5">
@@ -1041,7 +1007,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   >
                     <GitBranch className="size-3.5" />
                     <span>Configurar Branch</span>
-                    <PipelineStatusIcon state={isConfigured ? "done" : "ready"} className="ml-auto" />
                   </Button>
                   {isConfigured && (
                     <Button
@@ -1143,7 +1108,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                             >
                               <Pencil className="size-3.5" />
                               <span>{t("run.task")}</span>
-                              <PipelineStatusIcon state={isRunning ? "running" : isDone ? "done" : isError ? "error" : "ready"} className="ml-auto" />
                             </Button>
                             {isRunning && (
                               <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
@@ -1201,7 +1165,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                             >
                               <Zap className="size-3.5" />
                               <span>{t("run.tlc")}</span>
-                              <PipelineStatusIcon state={isTlcRunning ? "running" : isTlcDone ? "done" : isTlcError ? "error" : "ready"} className="ml-auto" />
                             </Button>
                             {isTlcRunning && (
                               <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
@@ -1283,7 +1246,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                   >
                                     <Play className="size-3.5" />
                                     <span>{t("run.spec")}</span>
-                                    <PipelineStatusIcon state={isExecRunning ? "running" : isExecDone ? "done" : isExecError ? "error" : "ready"} className="ml-auto" />
                                   </Button>
                                   {isExecRunning && (
                                     <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
@@ -1375,7 +1337,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                             >
                               <ListChecks className="size-3.5" />
                               <span>{t("run.eval")}</span>
-                              <PipelineStatusIcon state={isEvalRunning ? "running" : isEvalDone ? "done" : isEvalError ? "error" : "ready"} className="ml-auto" />
                             </Button>
                             {isEvalRunning && (
                               <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
