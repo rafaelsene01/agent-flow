@@ -30,6 +30,7 @@ async function fetchUsage() {
     headers: {
       "Authorization": `Bearer ${token}`,
       "anthropic-version": "2023-06-01",
+      "anthropic-beta": "oauth-2025-04-20",
       "content-type": "application/json",
     },
     body: JSON.stringify({
