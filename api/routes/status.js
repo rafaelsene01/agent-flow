@@ -25,14 +25,16 @@ export default function statusRoutes(app) {
   });
 
   // Skills locais são copiadas de dentro do projeto; skills "git" são
-  // clonadas de um repositório remoto e o subdiretório indicado é copiado.
+  // clonadas de um repositório remoto e o subdiretório indicado é copiado;
+  // "plugin" instala via CLI do Claude Code (marketplace + plugin), ficando
+  // disponível em todos os projetos sem precisar invocar como skill.
   const INSTALLABLE_SKILLS = {
     "tlc-spec-driven":  { type: "local" },
     "spec-driven-eval": { type: "local" },
     "karpathy-guidelines": {
-      type: "git",
-      repo: "https://github.com/multica-ai/andrej-karpathy-skills.git",
-      subdir: join("skills", "karpathy-guidelines"),
+      type: "plugin",
+      marketplace: "forrestchang/andrej-karpathy-skills",
+      plugin: "andrej-karpathy-skills@karpathy-skills",
     },
     "caveman": {
       type: "git",
@@ -69,6 +71,21 @@ export default function statusRoutes(app) {
     }
   }
 
+  function installPlugin(cfg) {
+    // marketplace add é idempotente do ponto de vista do usuário, mas o CLI
+    // retorna erro se já estiver registrado — por isso ignoramos a falha aqui.
+    try {
+      execSync(`claude plugin marketplace add ${cfg.marketplace}`, {
+        stdio: "pipe", timeout: 120000,
+      });
+    } catch {
+      // marketplace provavelmente já adicionado
+    }
+    execSync(`claude plugin install ${cfg.plugin}`, {
+      stdio: "pipe", timeout: 120000,
+    });
+  }
+
   app.post("/api/status/install-skill", async (req, res) => {
     const skill = req.body?.skill ?? "tlc-spec-driven";
     const cfg = INSTALLABLE_SKILLS[skill];
@@ -77,18 +94,15 @@ export default function statusRoutes(app) {
       return res.status(400).json({ error: "Skill inválida." });
     }
 
-    const dest = join(homedir(), ".claude", "skills", skill);
-
-    if (existsSync(dest)) {
-      const data = await refresh();
-      return res.json(data);
-    }
-
     try {
-      if (cfg.type === "git") {
-        installGit(cfg, dest);
+      if (cfg.type === "plugin") {
+        installPlugin(cfg);
       } else {
-        installLocal(skill, dest);
+        const dest = join(homedir(), ".claude", "skills", skill);
+        if (!existsSync(dest)) {
+          if (cfg.type === "git") installGit(cfg, dest);
+          else installLocal(skill, dest);
+        }
       }
       const data = await refresh();
       res.json(data);

@@ -194,7 +194,7 @@ function IntegrationCard({ name, logo, loading, data, commands }) {
 }
 
 /* ── SkillCard ───────────────────────────────────────────────────────────── */
-function SkillCard({ loading, installed, onInstalled, skill, name, description }) {
+function SkillCard({ loading, installed, onInstalled, skill, name, description, kind = "Skill" }) {
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState(null);
 
@@ -228,7 +228,7 @@ function SkillCard({ loading, installed, onInstalled, skill, name, description }
         <div className={logoClass}><Zap className="size-5" /></div>
 
         <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-          <span className="text-sm font-semibold leading-tight">Skill: {name}</span>
+          <span className="text-sm font-semibold leading-tight">{kind}: {name}</span>
 
           {loading && (
             <span className="text-xs text-muted-foreground">Verificando…</span>
@@ -468,11 +468,12 @@ export default function SettingsModal({ onClose }) {
 
           <SkillCard
             loading={loading}
-            installed={status?.claude?.karpathySkill ?? false}
+            installed={status?.claude?.karpathyPlugin ?? false}
             onInstalled={setStatus}
             skill="karpathy-guidelines"
-            name="karpathy-guidelines"
-            description="Diretrizes de código no estilo Karpathy (mudanças cirúrgicas, simplicidade)"
+            name="andrej-karpathy-skills"
+            kind="Plugin"
+            description="Diretrizes de código no estilo Karpathy, disponíveis em todos os projetos"
           />
 
           <SkillCard

@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -7,6 +7,16 @@ function checkSkill(name) {
   const base = join(homedir(), ".claude", "skills");
   return existsSync(join(base, name)) ||
          existsSync(join(base, `${name}.md`));
+}
+
+// Plugins ficam registrados em ~/.claude/settings.json → enabledPlugins.
+function checkPlugin(id) {
+  try {
+    const raw = readFileSync(join(homedir(), ".claude", "settings.json"), "utf-8");
+    return JSON.parse(raw).enabledPlugins?.[id] === true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getStatus() {
@@ -20,10 +30,10 @@ export async function getStatus() {
       version,
       tlcSkill: checkSkill("tlc-spec-driven"),
       specDrivenEvalSkill: checkSkill("spec-driven-eval"),
-      karpathySkill: checkSkill("karpathy-guidelines"),
+      karpathyPlugin: checkPlugin("andrej-karpathy-skills@karpathy-skills"),
       cavemanSkill: checkSkill("caveman"),
     };
   } catch {
-    return { connected: false, tlcSkill: false, specDrivenEvalSkill: false, karpathySkill: false, cavemanSkill: false };
+    return { connected: false, tlcSkill: false, specDrivenEvalSkill: false, karpathyPlugin: false, cavemanSkill: false };
   }
 }
