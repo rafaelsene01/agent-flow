@@ -179,6 +179,17 @@
   animation: card-spin-border 2s linear infinite;
 }
 
+/* amber pulse border for cards awaiting user input */
+@keyframes card-waiting-pulse {
+  0%, 100% { opacity: 0.45; }
+  50%       { opacity: 1; }
+}
+
+.card-waiting {
+  background: #c8860a;
+  animation: card-waiting-pulse 1.4s ease-in-out infinite;
+}
+
 /* silver border for branch-configured cards (no execution yet) */
 .card-branch-silver {
   background: linear-gradient(
@@ -254,6 +265,11 @@
   .card-running {
     animation: none;
     background: conic-gradient(transparent 0%, #60a5fa 50%, transparent 100%);
+  }
+  .card-waiting {
+    animation: none;
+    background: #c8860a;
+    opacity: 0.8;
   }
   .card-branch-gold-inner::after {
     animation: none;

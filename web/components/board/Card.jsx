@@ -54,14 +54,18 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
   const isFinished =
     wt && (wt.status === "done" || wt.tlcExecStatus === "done");
   const hasBranch = !!wt;
+  const isWaiting =
+    wt &&
+    (wt.status === "waiting-input" || wt.tlcExecStatus === "waiting-input");
 
   return (
     <div
       className={cn(
         "rounded-lg",
         isRunning && "card-running p-[2px]",
-        !isRunning && isFinished && "card-branch-gold p-[2px]",
-        !isRunning && !isFinished && hasBranch && "card-branch-silver p-[2px]"
+        !isRunning && isWaiting && "card-waiting p-[2px]",
+        !isRunning && !isWaiting && isFinished && "card-branch-gold p-[2px]",
+        !isRunning && !isWaiting && !isFinished && hasBranch && "card-branch-silver p-[2px]"
       )}
     >
       <button
@@ -69,10 +73,10 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
         className={cn(
           "cursor-pointer flex flex-col gap-1.5 p-3 rounded-lg",
           "transition-all duration-200 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:shadow-card-hover hover:-translate-y-0.5 hover:bg-muted/30 text-left w-full",
-          isRunning || hasBranch
+          isRunning || hasBranch || isWaiting
             ? "bg-card border border-transparent"
             : "bg-card border border-l-[3px] border-l-border shadow-card",
-          !isRunning && isFinished && "card-branch-gold-inner"
+          !isRunning && !isWaiting && isFinished && "card-branch-gold-inner"
         )}
         onClick={() => onOpen(item)}
       >

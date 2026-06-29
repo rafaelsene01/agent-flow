@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { getSoundPrefs, setSoundPrefs, playWaiting } from "@/lib/sound";
 
 const GH_INSTALL = {
   win32:  { label: "Instalar (winget)",   cmd: "winget install --id GitHub.cli" },
@@ -304,8 +306,10 @@ export default function SettingsModal({ onClose }) {
   const [pathInput, setPathInput]       = useState("");
   const [pathSaving, setPathSaving]     = useState(false);
   const [pathSaved, setPathSaved]       = useState(false);
-  const { lang: ctxLang, setLang }      = useI18n();
+  const { lang: ctxLang, setLang, t }   = useI18n();
   const [language, setLanguage]         = useState(ctxLang);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundVolume, setSoundVolume]   = useState(0.5);
 
   const fetchStatus = useCallback((force = false) => {
     setLoading(true);
@@ -325,6 +329,24 @@ export default function SettingsModal({ onClose }) {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const prefs = getSoundPrefs();
+    setSoundEnabled(prefs.enabled);
+    setSoundVolume(prefs.volume);
+  }, []);
+
+  function handleSoundEnabled(enabled) {
+    setSoundEnabled(enabled);
+    setSoundPrefs({ enabled });
+    if (enabled) playWaiting();
+  }
+
+  function handleSoundVolume(volume) {
+    setSoundVolume(volume);
+    setSoundPrefs({ volume });
+    if (soundEnabled) playWaiting();
+  }
 
   function saveLanguage(newLang) {
     setLanguage(newLang);
@@ -493,6 +515,34 @@ export default function SettingsModal({ onClose }) {
               >
                 {pathSaved ? <><Check className="size-3.5" /> Salvo</> : pathSaving ? "…" : "Salvar"}
               </Button>
+            </div>
+          </div>
+
+          {/* Sound effects section */}
+          <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                {t("settings.sound.label")}
+              </span>
+              <Checkbox
+                checked={soundEnabled}
+                onCheckedChange={(checked) => handleSoundEnabled(checked === true)}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                {t("settings.sound.volume")}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={soundVolume}
+                disabled={!soundEnabled}
+                onChange={(e) => handleSoundVolume(parseFloat(e.target.value))}
+                className="w-full accent-primary disabled:opacity-50"
+              />
             </div>
           </div>
         </div>

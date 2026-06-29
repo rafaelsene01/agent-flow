@@ -47,6 +47,7 @@ import { statusColor, statusLabel, fileIcon } from "@/lib/fileVisuals";
 import { useToast } from "@/lib/toast";
 import { useI18n } from "@/lib/i18nContext";
 import { Collapsible as CollapsiblePrimitive } from "radix-ui";
+import { playDone, playWaiting, unlockAudio } from "@/lib/sound";
 
 const TYPE_LABEL = {
   Issue: "Issue",
@@ -182,8 +183,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [resetWorktreeSending, setResetWorktreeSending] = useState(false);
   const [createPrSending, setCreatePrSending] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState("__new__");
+  const [answerModal, setAnswerModal] = useState(null);
   const logRef = useRef(null);
   const prevAnyRunningRef = useRef(null);
+  const prevStatusRef = useRef(null);
 
   useEffect(() => {
     fetch("/api/status")
@@ -277,6 +280,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.messageStatus === "running" ||
     worktreeConfig?.prStatus === "running";
 
+  const isWaiting =
+    worktreeConfig?.status === "waiting-input" ||
+    worktreeConfig?.tlcExecStatus === "waiting-input";
+
   // Ao abrir o card sem run ativo: carrega log da última sessão do disco
   useEffect(() => {
     if (!worktreeId || !isConfigured || anyRunning) return;
@@ -355,6 +362,26 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.messageStatus,
     worktreeConfig?.prStatus,
   ]);
+
+  // Sound on status transition
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    const cur = {
+      status: worktreeConfig?.status,
+      tlcExecStatus: worktreeConfig?.tlcExecStatus,
+    };
+    if (prev) {
+      const wentDone =
+        (prev.status === "running" && cur.status === "done") ||
+        (prev.tlcExecStatus === "running" && cur.tlcExecStatus === "done");
+      const wentWaiting =
+        (prev.status === "running" && cur.status === "waiting-input") ||
+        (prev.tlcExecStatus === "running" && cur.tlcExecStatus === "waiting-input");
+      if (wentWaiting) playWaiting();
+      else if (wentDone) playDone();
+    }
+    prevStatusRef.current = cur;
+  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus]);
 
   async function handleSendMessage() {
     const text = messageText.trim();
@@ -581,6 +608,22 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
+  async function handleAnswer() {
+    const { session, model, effort, answer } = answerModal;
+    if (!answer.trim()) return;
+    unlockAudio();
+    setAnswerModal(null);
+    try {
+      await fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answer, sessionId: session, model, effort }),
+      });
+    } catch (_) {}
+    setSelectedSessionId(session);
+    loadWorktreeConfig();
+  }
+
   const displayLogText = useMemo(() => {
     if (!logText) return "";
     // Matches simple event-type lines like [system/thinking_tokens] or [tool/result]
@@ -772,6 +815,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                 <Button
                   size="sm"
                   onClick={() => {
+                    unlockAudio();
                     const { action, model, effort, validation, runTests, session } = runConfirmModal;
                     setRunConfirmModal(null);
                     if (action === "task") handleRunSpec({ model, effort, sessionId: session });
@@ -783,6 +827,99 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   }}
                 >
                   Executar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {answerModal && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="bg-background border rounded-lg shadow-xl w-full max-w-md overflow-hidden mx-4">
+              <div className="flex items-center border-b px-5 py-4">
+                <span className="text-sm font-semibold flex-1">
+                  {t("card.answer.title")}
+                </span>
+              </div>
+              <div className="flex flex-col gap-4 px-5 py-4">
+                {worktreeConfig?.pendingQuestion && (
+                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap">
+                    {worktreeConfig.pendingQuestion}
+                  </div>
+                )}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.session")}</span>
+                  <Select
+                    value={answerModal.session}
+                    onValueChange={(v) => setAnswerModal((s) => ({ ...s, session: v }))}
+                  >
+                    <SelectTrigger size="sm" className="text-xs w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...(worktreeConfig?.chatSessions ?? [])]
+                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                        .map((s) => (
+                          <SelectItem key={s.id} value={s.id} title={s.description}>
+                            [{ORIGIN_LABEL[s.origin] ?? s.origin}] {s.description}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.model")}</span>
+                  <Select
+                    value={answerModal.model}
+                    onValueChange={(v) => setAnswerModal((s) => ({ ...s, model: v }))}
+                  >
+                    <SelectTrigger size="sm" className="text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="haiku">Haiku</SelectItem>
+                      <SelectItem value="sonnet">Sonnet</SelectItem>
+                      <SelectItem value="opus">Opus</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.effort")}</span>
+                  <Select
+                    value={answerModal.effort}
+                    onValueChange={(v) => setAnswerModal((s) => ({ ...s, effort: v }))}
+                  >
+                    <SelectTrigger size="sm" className="text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">low</SelectItem>
+                      <SelectItem value="medium">medium</SelectItem>
+                      <SelectItem value="high">high</SelectItem>
+                      <SelectItem value="xhigh">xhigh</SelectItem>
+                      <SelectItem value="max">max</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <textarea
+                    rows={4}
+                    value={answerModal.answer}
+                    onChange={(e) => setAnswerModal((s) => ({ ...s, answer: e.target.value }))}
+                    placeholder={t("card.answer.placeholder")}
+                    className="w-full resize-none rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 border-t px-5 py-3">
+                <Button variant="ghost" size="sm" onClick={() => setAnswerModal(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!answerModal.answer.trim()}
+                  onClick={handleAnswer}
+                >
+                  {t("card.answer.send")}
                 </Button>
               </div>
             </div>
@@ -1083,6 +1220,26 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
                     {/* ── Aba 1: Executar ── */}
                     <TabsContent value="exec" className="flex flex-col gap-1.5 mt-2">
+                      {isWaiting && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          type="button"
+                          className="w-full justify-start gap-2 text-xs bg-amber-500 hover:bg-amber-600 text-white border-amber-500"
+                          onClick={() => {
+                            unlockAudio();
+                            setAnswerModal({
+                              session: worktreeConfig.pendingSessionId,
+                              model: "sonnet",
+                              effort: "medium",
+                              answer: "",
+                            });
+                          }}
+                        >
+                          <Send className="size-3.5" />
+                          <span>{t("card.answer.button")}</span>
+                        </Button>
+                      )}
                       {(() => {
                         const runStatus = worktreeConfig?.status;
                         const isRunning = runStatus === "running" || specSending;

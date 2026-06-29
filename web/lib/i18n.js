@@ -67,6 +67,10 @@ export const dictionaries = {
     "card.type": "Tipo",
     "card.run.background": "Executando em background…",
     "card.run.done.rerun": "✓ Concluído · clique para re-executar",
+    "card.answer.title": "Responder pergunta",
+    "card.answer.placeholder": "Digite sua resposta…",
+    "card.answer.send": "Enviar resposta",
+    "card.answer.button": "Responder",
 
     // Pipeline stages
     "pipeline.branch": "Branch",
@@ -114,6 +118,7 @@ export const dictionaries = {
     "legend.branch": "branch configurado",
     "legend.done": "execução concluída",
     "legend.running": "executando agora",
+    "legend.waiting": "Aguardando input",
 
     // Confirm dialog
     "confirm.destructive": "Esta ação não pode ser desfeita.",
@@ -122,6 +127,8 @@ export const dictionaries = {
 
     // Settings
     "settings.language": "Idioma",
+    "settings.sound.label": "Efeitos sonoros",
+    "settings.sound.volume": "Volume",
 
     // Git tab
     "git.advanced": "Avançado",
@@ -211,6 +218,10 @@ export const dictionaries = {
     "card.type": "Type",
     "card.run.background": "Running in background…",
     "card.run.done.rerun": "✓ Done · click to re-run",
+    "card.answer.title": "Answer question",
+    "card.answer.placeholder": "Type your answer…",
+    "card.answer.send": "Send answer",
+    "card.answer.button": "Answer",
 
     // Pipeline stages
     "pipeline.branch": "Branch",
@@ -258,6 +269,7 @@ export const dictionaries = {
     "legend.branch": "branch configured",
     "legend.done": "run completed",
     "legend.running": "running now",
+    "legend.waiting": "Waiting for input",
 
     // Confirm dialog
     "confirm.destructive": "This action cannot be undone.",
@@ -266,6 +278,8 @@ export const dictionaries = {
 
     // Settings
     "settings.language": "Language",
+    "settings.sound.label": "Sound effects",
+    "settings.sound.volume": "Volume",
 
     // Git tab
     "git.advanced": "Advanced",

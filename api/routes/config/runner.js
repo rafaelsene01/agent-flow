@@ -155,6 +155,31 @@ function extractFinalText(rawOutput) {
   return finalText;
 }
 
+// Instrução injetada nos prompts que precisam interromper a execução quando
+// falta uma decisão do usuário sem padrão razoável.
+const ASK_RULES =
+  "Se faltar uma decisão do usuário e não houver padrão razoável, " +
+  "NÃO tente adivinhar — pare a implementação e emita, como ÚLTIMA linha " +
+  "da resposta, exatamente `ASK: <pergunta objetiva>`. " +
+  "Caso contrário, implemente sem perguntar. Emita no máximo um ASK por resposta.";
+
+// Retorna a pergunta contida no marcador ASK: da última ocorrência na resposta
+// final do agente, ou null se não houver nenhum marcador.
+function parseAsk(finalText) {
+  const text = finalText ?? "";
+  const lines = text.split("\n");
+  // Encontra o índice da última linha que começa com "ASK:"
+  let lastIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^ASK:/.test(lines[i])) lastIdx = i;
+  }
+  if (lastIdx === -1) return null;
+  // Captura tudo a partir do "ASK:" até o fim do texto (inclusive múltiplas linhas)
+  const fromAsk = lines.slice(lastIdx).join("\n");
+  const m = fromAsk.match(/^ASK:\s*([\s\S]+)/);
+  return m ? m[1].trim() : null;
+}
+
 function buildCardLines({ title, number, body, branch }) {
   return [
     `# ${title ?? "Card"}`,
@@ -275,7 +300,7 @@ export default function runnerRoutes(app) {
           "You are an autonomous coding agent. Implement the task below immediately.\n" +
           "Rules:\n" +
           "- Use Write and Edit tools to create/modify files. Do NOT describe — just do it.\n" +
-          "- Do NOT ask questions or wait for confirmation.\n" +
+          ASK_RULES + "\n" +
           "- Do NOT run any git commands.\n" +
           "TASK:\n" +
           cardContent;
@@ -289,6 +314,19 @@ export default function runnerRoutes(app) {
           updateWorktreeStatus(id, {
             status: "error",
             lastError: `Implementation failed: ${failureDetail(impl, logStream.persistPath)}`,
+          });
+          return;
+        }
+
+        // Detecta pergunta do agente — estado terminal válido (não dispara "no files changed")
+        const ask = parseAsk(extractFinalText(impl.output));
+        if (ask) {
+          updateChatSession(id, runSessionId, { started: true });
+          await new Promise((resolve) => logStream.end(resolve));
+          updateWorktreeStatus(id, {
+            status: "waiting-input",
+            pendingQuestion: ask,
+            pendingSessionId: runSessionId,
           });
           return;
         }
@@ -661,7 +699,8 @@ export default function runnerRoutes(app) {
           langInstruction() +
           `Execute a spec em ${specFilePath} usando o máximo de subagentes possível. Não faça commits nem push.\n` +
           "Quando totalmente concluído, sua ÚLTIMA linha deve ser exatamente: COMMIT: <mensagem conventional commit>\n" +
-          "(ex: COMMIT: feat: implement card sorting)";
+          "(ex: COMMIT: feat: implement card sorting)\n" +
+          ASK_RULES;
 
         const impl = await (sessionStarted
           ? resumeClaude(execPrompt, wt.path, logStream, tlcExecSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" })
@@ -672,6 +711,19 @@ export default function runnerRoutes(app) {
           updateWorktreeStatus(id, {
             tlcExecStatus: "error",
             tlcExecLastError: `Execução falhou: ${failureDetail(impl, logStream.persistPath)}`,
+          });
+          return;
+        }
+
+        // Detecta pergunta do agente — estado terminal válido para tlcExec
+        const ask = parseAsk(extractFinalText(impl.output));
+        if (ask) {
+          updateChatSession(id, tlcExecSessionId, { started: true });
+          await new Promise((resolve) => logStream.end(resolve));
+          updateWorktreeStatus(id, {
+            tlcExecStatus: "waiting-input",
+            pendingQuestion: ask,
+            pendingSessionId: tlcExecSessionId,
           });
           return;
         }
@@ -700,6 +752,101 @@ export default function runnerRoutes(app) {
         updateChatSession(id, tlcExecSessionId, { started: true });
         await new Promise((resolve) => logStream.end(resolve));
         updateWorktreeStatus(id, { tlcExecStatus: "done" });
+      } finally {
+        unregisterProcess(id);
+        releaseSlot();
+      }
+    })();
+  });
+
+  // Retoma uma sessão pausada em "waiting-input" com a resposta do usuário.
+  app.post("/api/config/worktrees/:id/answer", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const { answer, sessionId, model, effort } = req.body ?? {};
+
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt)
+      return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+    if (!answer?.trim()) return sendError(res, 400, "Resposta obrigatória.");
+
+    // Determina qual campo de status está aguardando input
+    const field = wt.tlcExecStatus === "waiting-input" ? "tlcExecStatus" : "status";
+
+    if (wt[field] !== "waiting-input")
+      return sendError(res, 409, "Worktree não está aguardando input.");
+    if (wt.pendingSessionId !== sessionId)
+      return sendError(res, 400, "Sessão não corresponde à pergunta pendente.");
+
+    const entry = (wt.chatSessions ?? []).find((s) => s.id === sessionId);
+    if (!entry) return sendError(res, 400, "Sessão não encontrada.");
+
+    try {
+      acquireSlot();
+    } catch (err) {
+      return sendError(res, err.status ?? 500, err.message);
+    }
+
+    // Marca como running e limpa campos pendentes antes de responder ao cliente
+    updateWorktreeStatus(id, {
+      [field]: "running",
+      [field === "tlcExecStatus" ? "tlcExecLastRunAt" : "lastRunAt"]: new Date().toISOString(),
+      [field === "tlcExecStatus" ? "tlcExecLastError" : "lastError"]: null,
+      pendingQuestion: null,
+      pendingSessionId: null,
+    });
+    res.json({ ok: true });
+
+    const logFile = entry.logFile;
+    const helpersLogPath = path.join(getHelpersDir(wt), logFile);
+    const existing = fs.existsSync(helpersLogPath)
+      ? fs.readFileSync(helpersLogPath, "utf-8")
+      : "";
+    const logStream = createRunLog(wt, logFile, { append: true, initialContent: existing });
+
+    (async () => {
+      try {
+        logStream.write("=== Resposta do usuário (resume) ===\n");
+        const prompt =
+          langInstruction() +
+          "Resposta do usuário à sua pergunta:\n" +
+          answer.trim() +
+          "\n\nContinue a tarefa de onde parou. " +
+          ASK_RULES;
+
+        const result = await resumeClaude(
+          prompt,
+          wt.path,
+          logStream,
+          sessionId,
+          (child) => registerProcess(id, child),
+          { model: model || "sonnet", effort: effort || "medium" },
+        );
+
+        if (result.code !== 0) {
+          logStream.end();
+          updateWorktreeStatus(id, {
+            [field]: "error",
+            [field === "tlcExecStatus" ? "tlcExecLastError" : "lastError"]:
+              `Resume falhou: ${failureDetail(result, logStream.persistPath)}`,
+          });
+          return;
+        }
+
+        const ask = parseAsk(extractFinalText(result.output));
+        await new Promise((resolve) => logStream.end(resolve));
+        if (ask) {
+          // Agente fez outra pergunta — volta para waiting-input
+          updateWorktreeStatus(id, {
+            [field]: "waiting-input",
+            pendingQuestion: ask,
+            pendingSessionId: sessionId,
+          });
+        } else {
+          updateChatSession(id, sessionId, { started: true });
+          updateWorktreeStatus(id, { [field]: "done" });
+        }
       } finally {
         unregisterProcess(id);
         releaseSlot();

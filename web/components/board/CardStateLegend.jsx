@@ -37,6 +37,10 @@ export default function CardStateLegend() {
               <span className="size-3 rounded-full border-2 border-blue-400 shrink-0 animate-spin" style={{borderTopColor: 'transparent'}} />
               <span className="text-muted-foreground"><strong className="text-foreground">{t("legend.spinning")}</strong> — {t("legend.running")}</span>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="size-3 rounded-full border-2 border-amber-400 bg-amber-400 shrink-0 animate-pulse" />
+              <span className="text-muted-foreground"><strong className="text-foreground">{t("legend.waiting")}</strong></span>
+            </div>
           </div>
           <PopoverPrimitive.Arrow className="fill-border" />
         </PopoverPrimitive.Content>
