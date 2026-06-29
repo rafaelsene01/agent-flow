@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/rafaelsene01/agent-flow/compare/v1.25.0...v1.26.0) (2026-06-29)
+
+
+### Features
+
+* implement user input handling and sound effects in card interactions ([f3f7705](https://github.com/rafaelsene01/agent-flow/commit/f3f770548f5e2ac6dff3ad0b6a6ff0281b65bf7a))
+
 # [1.25.0](https://github.com/rafaelsene01/agent-flow/compare/v1.24.0...v1.25.0) (2026-06-26)
 
 
