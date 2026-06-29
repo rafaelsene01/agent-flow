@@ -20,8 +20,10 @@ export async function getStatus() {
       version,
       tlcSkill: checkSkill("tlc-spec-driven"),
       specDrivenEvalSkill: checkSkill("spec-driven-eval"),
+      karpathySkill: checkSkill("karpathy-guidelines"),
+      cavemanSkill: checkSkill("caveman"),
     };
   } catch {
-    return { connected: false, tlcSkill: false, specDrivenEvalSkill: false };
+    return { connected: false, tlcSkill: false, specDrivenEvalSkill: false, karpathySkill: false, cavemanSkill: false };
   }
 }

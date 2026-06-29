@@ -466,6 +466,24 @@ export default function SettingsModal({ onClose }) {
             description="Recomendada para avaliar implementações contra a spec/PRD"
           />
 
+          <SkillCard
+            loading={loading}
+            installed={status?.claude?.karpathySkill ?? false}
+            onInstalled={setStatus}
+            skill="karpathy-guidelines"
+            name="karpathy-guidelines"
+            description="Diretrizes de código no estilo Karpathy (mudanças cirúrgicas, simplicidade)"
+          />
+
+          <SkillCard
+            loading={loading}
+            installed={status?.claude?.cavemanSkill ?? false}
+            onInstalled={setStatus}
+            skill="caveman"
+            name="caveman"
+            description="Modo de comunicação ultra-compacto (~75% menos tokens)"
+          />
+
           {/* Projects path card */}
           <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
             <div className="flex items-start gap-3">
