@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Loader2, Clock, Check, GitBranch } from "lucide-react";
+import { useI18n } from "@/lib/i18nContext";
 
 function Assignee({ login, avatarUrl }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -27,21 +29,15 @@ function Assignee({ login, avatarUrl }) {
   );
 }
 
+// Apenas expõe a cor da label como CSS var; o contraste do texto é resolvido
+// por tema em globals.css (.label-chip), evitando texto escuro sobre fundo
+// escuro no dark mode. Ver regra color-accessible-pairs.
 function getLabelStyle(color) {
-  const hex = color ?? "888888"
-  const r = parseInt(hex.slice(0, 2), 16)
-  const g = parseInt(hex.slice(2, 4), 16)
-  const b = parseInt(hex.slice(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  const textColor = luminance > 0.6 ? "#1a1a1a" : `#${hex}`
-  return {
-    background: `#${hex}22`,
-    color: textColor,
-    borderColor: `#${hex}55`,
-  }
+  return { "--label-c": `#${color ?? "888888"}` }
 }
 
 export default function Card({ item, onOpen, worktrees = [], originRepo = null }) {
+  const { t } = useI18n();
   const worktreeId =
     originRepo && item.number != null ? `${originRepo}#${item.number}` : null;
   const wt = worktreeId ? worktrees.find((w) => w.id === worktreeId) : null;
@@ -57,6 +53,18 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
   const isWaiting =
     wt &&
     (wt.status === "waiting-input" || wt.tlcExecStatus === "waiting-input");
+
+  // Indicador de estado não dependente só de cor (regra color-not-only):
+  // além da borda colorida/animada, o card mostra um ícone + rótulo acessível.
+  const status = isRunning
+    ? { Icon: Loader2, spin: true, label: t("status.running"), className: "text-blue-500 dark:text-blue-400" }
+    : isWaiting
+      ? { Icon: Clock, label: t("legend.waiting"), className: "text-amber-500 dark:text-amber-400" }
+      : isFinished
+        ? { Icon: Check, label: t("legend.done"), className: "text-amber-600 dark:text-amber-400" }
+        : hasBranch
+          ? { Icon: GitBranch, label: t("legend.branch"), className: "text-muted-foreground" }
+          : null;
 
   return (
     <div
@@ -82,6 +90,18 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
       >
         <div className="flex items-center justify-between gap-1.5">
           <div className="flex items-center gap-1.5">
+            {status && (
+              <span
+                title={status.label}
+                aria-label={status.label}
+                className={cn("inline-flex shrink-0", status.className)}
+              >
+                <status.Icon
+                  className={cn("size-3.5", status.spin && "animate-spin motion-reduce:animate-none")}
+                  strokeWidth={2.25}
+                />
+              </span>
+            )}
             {item.number != null && (
               <span className="font-mono text-[11px] text-muted-foreground">
                 #{item.number}
@@ -113,7 +133,7 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
             {item.labels.map((l) => (
               <span
                 key={l.name}
-                className="text-[11px] px-2 py-px rounded-full border"
+                className="label-chip text-[11px] px-2 py-px rounded-full border"
                 style={getLabelStyle(l.color)}
               >
                 {l.name}

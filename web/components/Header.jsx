@@ -5,6 +5,7 @@ import { boardSlug } from "@/lib/boardSlug.js";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { FlowerMark } from "@/components/ui/flower-mark";
 import UsageBadge from "@/components/UsageBadge.jsx";
 import { useI18n } from "@/lib/i18nContext";
 import CardStateLegend from "@/components/board/CardStateLegend.jsx";
@@ -16,7 +17,7 @@ export default function Header({ onSettings, onInitBoard, boards = [], activePat
       <header className="sticky top-0 z-50 flex items-center gap-2 border-b glass px-3 py-1.5">
         {/* Logo + title */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <span aria-label="logo" className="text-base leading-none select-none">🌸</span>
+          <FlowerMark className="size-4 shrink-0" />
           <h1 className="text-base font-semibold leading-none">Agent Flow</h1>
         </div>
 

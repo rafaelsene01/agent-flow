@@ -11,6 +11,7 @@ import EditBoardModal from "@/components/EditBoardModal.jsx";
 import Board from "@/components/board/Board.jsx";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FlowerMark } from "@/components/ui/flower-mark";
 import { Pencil, BrushCleaning, Plus, Search, X, CircleHelp } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/lib/i18nContext";
@@ -167,7 +168,7 @@ function AppContent() {
   if (initializing) {
     return (
       <div className="flex flex-1 min-h-screen flex-col items-center justify-center gap-4">
-        <span className="text-5xl">🌸</span>
+        <FlowerMark className="size-12" />
         <p className="text-sm text-muted-foreground">{t("board.initializing")}</p>
         <div className="flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-muted-foreground animate-pulse [animation-delay:0ms]" />
@@ -210,8 +211,8 @@ function AppContent() {
                   <button
                     type="button"
                     onClick={() => setFilterDraft("")}
-                    className="absolute right-5 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Limpar filtro"
+                    className="absolute right-5 text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                    aria-label={t("board.filter.clear")}
                   >
                     <X className="size-3" />
                   </button>
@@ -266,7 +267,7 @@ function AppContent() {
       ) : (
         <div className="flex flex-1 items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-center">
-            <span className="text-5xl">🌸</span>
+            <FlowerMark className="size-12" />
             <h2 className="text-base font-semibold">{t("board.none")}</h2>
             <p className="text-sm text-muted-foreground">{t("board.none.desc")}</p>
             <Button
@@ -301,8 +302,8 @@ function AppContent() {
         <ConfirmDialog
           open
           targetName={removeConfirm.board.name}
-          title="Excluir board"
-          description="Todos os worktrees e o repositório associados serão removidos. Esta ação não pode ser desfeita."
+          title={t("confirm.remove.board")}
+          description={t("board.remove.confirm")}
           destructive
           onConfirm={confirmRemoveBoard}
           onCancel={() => setRemoveConfirm(null)}
@@ -312,8 +313,8 @@ function AppContent() {
         <ConfirmDialog
           open
           targetName={activeBoard.name}
-          title="Apagar repositório e worktrees"
-          description="O board permanece na lista. Esta ação não pode ser desfeita."
+          title={t("confirm.cleanup.board")}
+          description={t("board.cleanup.confirm")}
           destructive
           onConfirm={async () => { setCleanupConfirm(false); await cleanupBoardData(activeBoard); }}
           onCancel={() => setCleanupConfirm(false)}

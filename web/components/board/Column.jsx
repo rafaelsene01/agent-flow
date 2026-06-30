@@ -5,8 +5,9 @@ import Card from "@/components/board/Card.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Skeleton } from "@/components/ui/skeleton.jsx";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Inbox, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18nContext";
 
 // Intervalo do auto-refresh silencioso. Com o stale-while-revalidate do backend,
 // rebuscar periodicamente faz mudanças feitas no GitHub aparecerem sozinhas.
@@ -43,6 +44,7 @@ export default function Column({
   worktrees,
   originRepo,
 }) {
+  const { t } = useI18n();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -168,7 +170,7 @@ export default function Column({
         <Button
           variant="ghost"
           size="icon-xs"
-          title="Atualizar coluna"
+          title={t("column.refresh")}
           disabled={loading}
           onClick={() => {
             setItems([]);
@@ -182,10 +184,28 @@ export default function Column({
       <div className="p-2 flex flex-col gap-1.5 overflow-y-auto flex-1" onScroll={handleScroll}>
         {loading && <ColumnLoader />}
         {!loading && error && (
-          <p className="text-xs text-destructive text-center py-3">{error}</p>
+          <div className="flex flex-col items-center gap-2 py-5 text-center">
+            <AlertCircle className="size-5 text-destructive/70" />
+            <p className="text-xs text-destructive">{error}</p>
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => {
+                setItems([]);
+                pageRef.current = { hasNextPage: false, cursor: null };
+                fetchItems(null);
+              }}
+            >
+              <RefreshCw className="size-3" />
+              {t("column.retry")}
+            </Button>
+          </div>
         )}
         {!loading && !error && items.length === 0 && (
-          <p className="text-xs text-muted-foreground text-center py-5">Sem cards</p>
+          <div className="flex flex-col items-center gap-1.5 py-6 text-center text-muted-foreground">
+            <Inbox className="size-5 opacity-60" />
+            <p className="text-xs">{t("column.empty")}</p>
+          </div>
         )}
         {!loading &&
           items.map((item) => (
@@ -198,7 +218,7 @@ export default function Column({
             />
           ))}
         {loadingMore && (
-          <p className="text-xs text-muted-foreground text-center py-2">Carregando…</p>
+          <p className="text-xs text-muted-foreground text-center py-2">{t("column.loading")}</p>
         )}
       </div>
     </div>

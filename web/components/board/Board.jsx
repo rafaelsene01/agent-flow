@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Column from "@/components/board/Column.jsx";
 import CardModal from "@/components/board/CardModal.jsx";
+import { useI18n } from "@/lib/i18nContext";
 
 function normalizeColumns(raw) {
   return (raw ?? []).map((col) =>
@@ -11,6 +12,7 @@ function normalizeColumns(raw) {
 }
 
 export default function Board({ board }) {
+  const { t } = useI18n();
   const columns = normalizeColumns(board?.columns);
   const [activeCard, setActiveCard] = useState(null);
   const [worktrees, setWorktrees] = useState([]);
@@ -21,7 +23,7 @@ export default function Board({ board }) {
       .then(async (r) => {
         if (r.status === 429) {
           const d = await r.json().catch(() => ({}));
-          setRateLimitError(d.error ?? "GitHub rate limit atingido.");
+          setRateLimitError(d.error ?? t("board.rateLimit"));
           return null;
         }
         return r.json();
@@ -58,7 +60,7 @@ export default function Board({ board }) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <p className="text-sm text-muted-foreground">
-          Nenhuma coluna configurada. Edite o board para adicionar colunas.
+          {t("board.no.columns")}
         </p>
       </div>
     );

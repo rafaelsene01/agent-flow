@@ -154,6 +154,26 @@
 
   .shadow-card       { box-shadow: var(--shadow-card); }
   .shadow-card-hover { box-shadow: var(--shadow-card-hover); }
+
+  /* Chip de label: cor da label vem de --label-c; o texto é resolvido por tema
+     para garantir contraste (color-accessible-pairs) em vez de usar a cor crua,
+     que ficaria escura sobre fundo escuro no dark mode. */
+  .label-chip {
+    background: color-mix(in srgb, var(--label-c) 13%, transparent);
+    border-color: color-mix(in srgb, var(--label-c) 33%, transparent);
+    color: color-mix(in srgb, var(--label-c), black 30%);
+  }
+  .dark .label-chip {
+    color: color-mix(in srgb, var(--label-c) 65%, white);
+  }
+  /* Fallback para browsers sem color-mix: cor crua + fundo translúcido. */
+  @supports not (color: color-mix(in srgb, red, white)) {
+    .label-chip {
+      background: var(--label-c);
+      color: #fff;
+      border-color: var(--label-c);
+    }
+  }
 }
 
 /* spinning border for running cards */

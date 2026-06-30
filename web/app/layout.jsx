@@ -7,7 +7,7 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jet
 
 export const metadata = {
   title: "Agent Flow Board",
-  description: "🌸 Web Kanban for GutHub",
+  description: "Web Kanban for GitHub",
 };
 
 export default function RootLayout({ children }) {

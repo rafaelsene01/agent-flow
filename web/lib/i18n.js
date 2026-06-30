@@ -15,6 +15,15 @@ export const dictionaries = {
     "board.edit.columns": "Editar colunas",
     "board.cleanup.title": "Apagar repositório e worktrees deste board",
     "board.initializing": "Verificando integrações…",
+    "board.filter.clear": "Limpar filtro",
+    "board.no.columns": "Nenhuma coluna configurada. Edite o board para adicionar colunas.",
+    "board.rateLimit": "Limite de requisições do GitHub atingido.",
+
+    // Column
+    "column.refresh": "Atualizar coluna",
+    "column.empty": "Sem cards",
+    "column.loading": "Carregando…",
+    "column.retry": "Tentar novamente",
 
     // Confirm dialogs
     "board.remove.confirm": "Excluir o board e todos os worktrees e repositório associados? Esta ação não pode ser desfeita.",
@@ -166,6 +175,15 @@ export const dictionaries = {
     "board.edit.columns": "Edit columns",
     "board.cleanup.title": "Delete repository and worktrees for this board",
     "board.initializing": "Checking integrations…",
+    "board.filter.clear": "Clear filter",
+    "board.no.columns": "No columns configured. Edit the board to add columns.",
+    "board.rateLimit": "GitHub rate limit reached.",
+
+    // Column
+    "column.refresh": "Refresh column",
+    "column.empty": "No cards",
+    "column.loading": "Loading…",
+    "column.retry": "Try again",
 
     // Confirm dialogs
     "board.remove.confirm": "Delete the board and all associated worktrees and repository? This action cannot be undone.",
