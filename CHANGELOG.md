@@ -1,3 +1,11 @@
+# [1.27.0](https://github.com/rafaelsene01/agent-flow/compare/v1.26.0...v1.27.0) (2026-06-29)
+
+
+### Features
+
+* add new skills and installation methods in status management ([477e4b1](https://github.com/rafaelsene01/agent-flow/commit/477e4b150da58ce57fc019b620b1df64c873a22d))
+* enhance skill management with plugin support and installation updates ([a216311](https://github.com/rafaelsene01/agent-flow/commit/a21631129de039ebc2e9b53235c9591a60f86876))
+
 # [1.26.0](https://github.com/rafaelsene01/agent-flow/compare/v1.25.0...v1.26.0) (2026-06-29)
 
 
