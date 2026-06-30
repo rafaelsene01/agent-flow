@@ -1,3 +1,11 @@
+# [1.29.0](https://github.com/rafaelsene01/agent-flow/compare/v1.28.0...v1.29.0) (2026-06-30)
+
+
+### Features
+
+* improve child modal handling in CardModal component ([1b5e8ad](https://github.com/rafaelsene01/agent-flow/commit/1b5e8ad3421f761a3f3c8422376cdf5bb18dca8f))
+* integrate LogView component into CardModal for improved log display ([32e19c0](https://github.com/rafaelsene01/agent-flow/commit/32e19c0d8d9c9c60d040e19245a020dbb826e240))
+
 # [1.28.0](https://github.com/rafaelsene01/agent-flow/compare/v1.27.0...v1.28.0) (2026-06-30)
 
 
