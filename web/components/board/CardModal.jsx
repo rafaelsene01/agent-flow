@@ -284,6 +284,27 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.status === "waiting-input" ||
     worktreeConfig?.tlcExecStatus === "waiting-input";
 
+  // Modais Radix aninhados dentro deste card. Ao fechar qualquer um deles, o
+  // FocusScope restaura o foco e dispara um evento de "focus outside" residual
+  // na camada de dismissal do card — o que fechava o card junto. O ref abaixo
+  // mantém o guard ativo durante (e por um tick após) um filho estar aberto,
+  // absorvendo esse evento residual independentemente da corrida de estado.
+  const childModalOpen =
+    !!fileContentModal ||
+    !!helpersFileModal ||
+    !!tlcFileModal ||
+    showCreateBranch ||
+    !!errorModal;
+  const childModalGuardRef = useRef(false);
+  useEffect(() => {
+    if (childModalOpen) {
+      childModalGuardRef.current = true;
+      return undefined;
+    }
+    const id = setTimeout(() => { childModalGuardRef.current = false; }, 0);
+    return () => clearTimeout(id);
+  }, [childModalOpen]);
+
   // Ao abrir o card sem run ativo: carrega log da última sessão do disco
   useEffect(() => {
     if (!worktreeId || !isConfigured || anyRunning) return;
@@ -669,15 +690,15 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     <Dialog
       open
       onOpenChange={(o) => {
-        if (!o && !fileContentModal && !helpersFileModal && !tlcFileModal && !showCreateBranch && !errorModal) {
+        if (!o && !childModalOpen && !childModalGuardRef.current) {
           onClose();
         }
       }}
     >
       <DialogContent
         aria-describedby={undefined}
-        onInteractOutside={(e) => { if (anyRunning) e.preventDefault(); }}
-        onEscapeKeyDown={(e) => { if (anyRunning) e.preventDefault(); }}
+        onInteractOutside={(e) => { if (anyRunning || childModalOpen || childModalGuardRef.current) e.preventDefault(); }}
+        onEscapeKeyDown={(e) => { if (anyRunning || childModalOpen || childModalGuardRef.current) e.preventDefault(); }}
         className="w-full sm:max-w-[calc(100%-2rem)] h-[80vh] gap-0 overflow-hidden p-0"
       >
         {runConfirmModal && (
