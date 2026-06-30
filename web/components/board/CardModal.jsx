@@ -27,6 +27,7 @@ import CreateBranchModal from "@/components/CreateBranchModal.jsx";
 import CopyCmd from "@/components/board/CopyCmd.jsx";
 import TlcFileModal from "@/components/board/TlcFileModal.jsx";
 import FileContentModal from "@/components/board/FileContentModal.jsx";
+import LogView from "@/components/board/LogView.jsx";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
@@ -1029,9 +1030,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                 ref={logRef}
                 className="min-h-0 flex-1 overflow-y-auto bg-zinc-950 px-4 py-3"
               >
-                <pre className="font-mono text-[11px] leading-relaxed text-green-400/90 whitespace-pre-wrap break-all">
-                  {displayLogText}
-                </pre>
+                <LogView text={displayLogText} />
               </div>
             ) : (
               <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5">
