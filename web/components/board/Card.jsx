@@ -46,13 +46,16 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
     (wt.status === "running" ||
       wt.tlcStatus === "running" ||
       wt.tlcExecStatus === "running" ||
+      wt.agentStatus === "running" ||
       wt.commitPushStatus === "running");
   const isFinished =
-    wt && (wt.status === "done" || wt.tlcExecStatus === "done");
+    wt && (wt.status === "done" || wt.tlcExecStatus === "done" || wt.agentStatus === "done");
   const hasBranch = !!wt;
   const isWaiting =
     wt &&
-    (wt.status === "waiting-input" || wt.tlcExecStatus === "waiting-input");
+    (wt.status === "waiting-input" ||
+      wt.tlcExecStatus === "waiting-input" ||
+      wt.agentStatus === "waiting-input");
 
   // Indicador de estado não dependente só de cor (regra color-not-only):
   // além da borda colorida/animada, o card mostra um ícone + rótulo acessível.

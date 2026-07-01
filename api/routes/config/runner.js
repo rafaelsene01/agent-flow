@@ -27,6 +27,7 @@ import {
 } from "../../modules/config/config.service.js";
 import { sendError } from "../../lib/errors.js";
 import { scanTlcFeatures } from "./tlc.js";
+import { getAgent, buildAgentPrompt } from "../../modules/agents/agents.service.js";
 
 const execFileP = promisify(execFile);
 const INTERNAL = [
@@ -382,6 +383,186 @@ export default function runnerRoutes(app) {
         updateChatSession(id, runSessionId, { started: true });
         await new Promise((resolve) => logStream.end(resolve));
         updateWorktreeStatus(id, { status: "done" });
+      } finally {
+        unregisterProcess(id);
+        releaseSlot();
+      }
+    })();
+  });
+
+  // Executa um agente pela mesma pipeline autônoma do /run (CARD.md, squash de
+  // commits, detecção de ASK), mas com o prompt do agente (skills + instruções)
+  // como persona e usando o campo próprio `agentStatus` para o feedback visual.
+  app.post("/api/config/worktrees/:id/run-agent", (req, res) => {
+    const id = decodeURIComponent(req.params.id);
+    const { agentId, title, number, body, model, effort, sessionId } = req.body ?? {};
+
+    const wt = getWorktrees().find((w) => w.id === id);
+    if (!wt)
+      return sendError(res, 404, "Worktree não encontrado na configuração.");
+    if (!fs.existsSync(wt.path))
+      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
+
+    let agentPrompt, agentName;
+    try {
+      const agent = getAgent(agentId);
+      if (!agent) return sendError(res, 400, "Agente não encontrado.");
+      agentName = agent.name;
+      agentPrompt = buildAgentPrompt(agentId);
+    } catch (err) {
+      return sendError(res, 500, err.message, err);
+    }
+
+    try {
+      acquireSlot();
+    } catch (err) {
+      return sendError(res, err.status ?? 500, err.message);
+    }
+
+    try {
+      fs.writeFileSync(
+        path.join(getHelpersDir(wt), "CARD.md"),
+        buildCardLines({ title, number, body, branch: wt.branch }).join("\n"),
+        "utf-8",
+      );
+    } catch (err) {
+      releaseSlot();
+      return sendError(res, 500, `Erro ao criar CARD.md: ${err.message}`, err);
+    }
+
+    let runSessionId, logFile, sessionStarted;
+    if (sessionId) {
+      const entry = (wt.chatSessions ?? []).find((s) => s.id === sessionId);
+      if (entry) {
+        runSessionId = entry.id;
+        logFile = entry.logFile ?? makeLogFile("agent");
+        sessionStarted = entry.started;
+      }
+    }
+    if (!runSessionId) {
+      logFile = makeLogFile("agent");
+      runSessionId = makeSessionId(wt, "agent");
+      appendChatSession(id, {
+        id: runSessionId,
+        logFile,
+        origin: "agent",
+        description: truncateDesc(`${agentName}: ${body || title}`),
+        started: false,
+        createdAt: new Date().toISOString(),
+      });
+      sessionStarted = false;
+    }
+
+    updateWorktreeStatus(id, {
+      agentStatus: "running",
+      agentLastRunAt: new Date().toISOString(),
+      agentLastError: null,
+    });
+    res.json({ ok: true, sessionId: runSessionId });
+
+    const logStream = createRunLog(wt, logFile, { append: !!sessionId });
+
+    (async () => {
+      try {
+        const { stdout: headBefore } = await execFileP(
+          "git",
+          ["rev-parse", "HEAD"],
+          { cwd: wt.path, timeout: 5_000 },
+        ).catch(() => ({ stdout: "" }));
+        const initialHead = headBefore.trim();
+
+        logStream.write(`=== Executando agente: ${agentName} ===\n`);
+        const cardContent = fs.readFileSync(
+          path.join(getHelpersDir(wt), "CARD.md"),
+          "utf-8",
+        );
+
+        const prompt =
+          langInstruction() +
+          agentPrompt +
+          "\n\nRegras de execução:\n" +
+          "- Use as ferramentas Write e Edit para criar/modificar arquivos. NÃO descreva — faça.\n" +
+          ASK_RULES + "\n" +
+          "- NÃO rode nenhum comando git.\n" +
+          "TAREFA (card do board):\n" +
+          cardContent;
+
+        const impl = await (sessionStarted
+          ? resumeClaude(prompt, wt.path, logStream, runSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" })
+          : runClaude(prompt, wt.path, logStream, runSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" }));
+
+        if (impl.code !== 0) {
+          logStream.end();
+          updateWorktreeStatus(id, {
+            agentStatus: "error",
+            agentLastError: `Execução do agente falhou: ${failureDetail(impl, logStream.persistPath)}`,
+          });
+          return;
+        }
+
+        const ask = parseAsk(extractFinalText(impl.output));
+        if (ask) {
+          updateChatSession(id, runSessionId, { started: true });
+          await new Promise((resolve) => logStream.end(resolve));
+          updateWorktreeStatus(id, {
+            agentStatus: "waiting-input",
+            pendingQuestion: ask,
+            pendingSessionId: runSessionId,
+          });
+          return;
+        }
+
+        if (initialHead) {
+          const { stdout: countOut } = await execFileP(
+            "git",
+            ["rev-list", "--count", `${initialHead}..HEAD`],
+            { cwd: wt.path, timeout: 5_000 },
+          ).catch(() => ({ stdout: "0" }));
+          const claudeCommits = parseInt(countOut.trim(), 10) || 0;
+          if (claudeCommits > 0) {
+            logStream.write(
+              `\n=== Squashing ${claudeCommits} commit(s) from Claude ===\n`,
+            );
+            await execFileP(
+              "git",
+              ["reset", "--soft", `HEAD~${claudeCommits}`],
+              { cwd: wt.path, timeout: 15_000 },
+            ).catch((e) =>
+              logStream.write(`Warning: reset failed: ${e.message}\n`),
+            );
+          }
+        }
+
+        const { stdout: changesOut } = await execFileP(
+          "git",
+          ["status", "--porcelain"],
+          { cwd: wt.path, timeout: 10_000 },
+        ).catch(() => ({ stdout: "" }));
+        const realChanges = changesOut
+          .trim()
+          .split("\n")
+          .filter((l) => {
+            if (!l.trim()) return false;
+            const file = l.slice(3).trim();
+            return (
+              !INTERNAL.includes(file) &&
+              !file.endsWith(".log") &&
+              !file.startsWith(".specs/")
+            );
+          });
+
+        if (realChanges.length === 0) {
+          logStream.end();
+          updateWorktreeStatus(id, {
+            agentStatus: "error",
+            agentLastError: `Execução do agente falhou: nenhum arquivo foi alterado\n(log completo: ${logStream.persistPath})`,
+          });
+          return;
+        }
+
+        updateChatSession(id, runSessionId, { started: true });
+        await new Promise((resolve) => logStream.end(resolve));
+        updateWorktreeStatus(id, { agentStatus: "done" });
       } finally {
         unregisterProcess(id);
         releaseSlot();
@@ -772,7 +953,18 @@ export default function runnerRoutes(app) {
     if (!answer?.trim()) return sendError(res, 400, "Resposta obrigatória.");
 
     // Determina qual campo de status está aguardando input
-    const field = wt.tlcExecStatus === "waiting-input" ? "tlcExecStatus" : "status";
+    const field =
+      wt.tlcExecStatus === "waiting-input" ? "tlcExecStatus"
+        : wt.agentStatus === "waiting-input" ? "agentStatus"
+          : "status";
+    const lastRunField =
+      field === "tlcExecStatus" ? "tlcExecLastRunAt"
+        : field === "agentStatus" ? "agentLastRunAt"
+          : "lastRunAt";
+    const lastErrorField =
+      field === "tlcExecStatus" ? "tlcExecLastError"
+        : field === "agentStatus" ? "agentLastError"
+          : "lastError";
 
     if (wt[field] !== "waiting-input")
       return sendError(res, 409, "Worktree não está aguardando input.");
@@ -791,8 +983,8 @@ export default function runnerRoutes(app) {
     // Marca como running e limpa campos pendentes antes de responder ao cliente
     updateWorktreeStatus(id, {
       [field]: "running",
-      [field === "tlcExecStatus" ? "tlcExecLastRunAt" : "lastRunAt"]: new Date().toISOString(),
-      [field === "tlcExecStatus" ? "tlcExecLastError" : "lastError"]: null,
+      [lastRunField]: new Date().toISOString(),
+      [lastErrorField]: null,
       pendingQuestion: null,
       pendingSessionId: null,
     });
@@ -828,8 +1020,7 @@ export default function runnerRoutes(app) {
           logStream.end();
           updateWorktreeStatus(id, {
             [field]: "error",
-            [field === "tlcExecStatus" ? "tlcExecLastError" : "lastError"]:
-              `Resume falhou: ${failureDetail(result, logStream.persistPath)}`,
+            [lastErrorField]: `Resume falhou: ${failureDetail(result, logStream.persistPath)}`,
           });
           return;
         }

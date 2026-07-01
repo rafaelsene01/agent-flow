@@ -13,9 +13,11 @@ export function getAgent(id) {
   return listAgents().find((a) => a.id === id) ?? null;
 }
 
-// Cria um agent com nome, prompt e skills linkadas (por nome). Valida os campos
-// obrigatórios; skills desconhecidas são toleradas (ignoradas na montagem do prompt).
-export async function createAgent({ name, prompt, skills }) {
+// Cria um agent com nome, prompt, skills linkadas (por nome) e o par model/effort
+// que o runner usa ao executar. Valida os campos obrigatórios; skills desconhecidas
+// são toleradas (ignoradas na montagem do prompt). model/effort seguem os defaults
+// do runner (sonnet/medium) quando não informados.
+export async function createAgent({ name, prompt, skills, model, effort }) {
   const trimmedName = typeof name === "string" ? name.trim() : "";
   const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
   if (!trimmedName) throw new Error("name obrigatório");
@@ -27,11 +29,39 @@ export async function createAgent({ name, prompt, skills }) {
     name: trimmedName,
     prompt: trimmedPrompt,
     skills: [...new Set(linked)],
+    model: typeof model === "string" && model.trim() ? model.trim() : "sonnet",
+    effort: typeof effort === "string" && effort.trim() ? effort.trim() : "medium",
     createdAt: new Date().toISOString(),
   };
   const current = getConfig().agents ?? [];
   await setConfig({ agents: [...current, agent] });
   return agent;
+}
+
+// Edita um agent existente (mesmas regras/validação do createAgent). Preserva id
+// e createdAt; regrava name, prompt, skills e model/effort. Agent inexistente → erro.
+export async function updateAgent(id, { name, prompt, skills, model, effort }) {
+  const current = getConfig().agents ?? [];
+  const existing = current.find((a) => a.id === id);
+  if (!existing) throw new Error("Agent não encontrado");
+
+  const trimmedName = typeof name === "string" ? name.trim() : "";
+  const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
+  if (!trimmedName) throw new Error("name obrigatório");
+  if (!trimmedPrompt) throw new Error("prompt obrigatório");
+  const linked = Array.isArray(skills) ? skills.filter((s) => typeof s === "string") : [];
+
+  const updated = {
+    ...existing,
+    name: trimmedName,
+    prompt: trimmedPrompt,
+    skills: [...new Set(linked)],
+    model: typeof model === "string" && model.trim() ? model.trim() : "sonnet",
+    effort: typeof effort === "string" && effort.trim() ? effort.trim() : "medium",
+    updatedAt: new Date().toISOString(),
+  };
+  await setConfig({ agents: current.map((a) => (a.id === id ? updated : a)) });
+  return updated;
 }
 
 function skillBlock(s) {

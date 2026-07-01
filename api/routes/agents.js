@@ -1,4 +1,4 @@
-import { listAgents, createAgent, buildAgentPrompt } from "../modules/agents/agents.service.js";
+import { listAgents, createAgent, updateAgent, buildAgentPrompt } from "../modules/agents/agents.service.js";
 import { sendError } from "../lib/errors.js";
 
 export default function agentsRoutes(app) {
@@ -13,13 +13,30 @@ export default function agentsRoutes(app) {
 
   // Cria um agent (name, prompt, skills) e retorna a lista atualizada.
   app.post("/api/agents", async (req, res) => {
-    const { name, prompt, skills } = req.body ?? {};
+    const { name, prompt, skills, model, effort } = req.body ?? {};
     try {
-      await createAgent({ name, prompt, skills });
+      await createAgent({ name, prompt, skills, model, effort });
       res.json({ agents: listAgents() });
     } catch (err) {
       // Erros de validação (name/prompt obrigatório) → 400; o resto → 500.
       const status = /obrigatório/.test(err.message) ? 400 : 500;
+      sendError(res, status, err.message, status === 500 ? err : null);
+    }
+  });
+
+  // Edita um agent existente e retorna a lista atualizada.
+  app.put("/api/agents/:id", async (req, res) => {
+    const { name, prompt, skills, model, effort } = req.body ?? {};
+    try {
+      await updateAgent(req.params.id, { name, prompt, skills, model, effort });
+      res.json({ agents: listAgents() });
+    } catch (err) {
+      // Não encontrado → 404; validação (name/prompt obrigatório) → 400; resto → 500.
+      const status = /não encontrado/.test(err.message)
+        ? 404
+        : /obrigatório/.test(err.message)
+          ? 400
+          : 500;
       sendError(res, status, err.message, status === 500 ? err : null);
     }
   });

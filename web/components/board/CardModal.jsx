@@ -8,6 +8,7 @@ import "highlight.js/styles/github-dark.css";
 import {
   AlertTriangle,
   Archive,
+  Bot,
   FileText,
   FolderOpen,
   GitBranch,
@@ -30,6 +31,7 @@ import FileContentModal from "@/components/board/FileContentModal.jsx";
 import LogView from "@/components/board/LogView.jsx";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.jsx";
 import { Button } from "@/components/ui/button.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
@@ -62,6 +64,7 @@ const ORIGIN_LABEL = {
   eval: "eval",
   tlc: "tlc",
   chat: "chat",
+  agent: "agente",
   "create-pr": "PR",
 };
 
@@ -185,6 +188,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [createPrSending, setCreatePrSending] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState("__new__");
   const [answerModal, setAnswerModal] = useState(null);
+  const [agentModal, setAgentModal] = useState(null); // null | { agentId, model, effort, session }
+  const [agents, setAgents] = useState(null); // null=não carregado, array=carregado
+  const [agentSending, setAgentSending] = useState(false);
   const logRef = useRef(null);
   const prevAnyRunningRef = useRef(null);
   const prevStatusRef = useRef(null);
@@ -210,9 +216,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       worktreeConfig?.status === "done" ||
       worktreeConfig?.tlcExecStatus === "done" ||
       worktreeConfig?.commitPushStatus === "done" ||
-      worktreeConfig?.commitPushStatus === "error";
+      worktreeConfig?.commitPushStatus === "error" ||
+      worktreeConfig?.agentStatus === "done";
     if (taskDone) loadChangedFiles();
-  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus, worktreeConfig?.commitPushStatus]);
+  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus, worktreeConfig?.commitPushStatus, worktreeConfig?.agentStatus]);
 
   async function handleExcludeFile(filePath) {
     try {
@@ -279,11 +286,13 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.commitPushStatus === "running" ||
     worktreeConfig?.pullStatus === "running" ||
     worktreeConfig?.messageStatus === "running" ||
+    worktreeConfig?.agentStatus === "running" ||
     worktreeConfig?.prStatus === "running";
 
   const isWaiting =
     worktreeConfig?.status === "waiting-input" ||
-    worktreeConfig?.tlcExecStatus === "waiting-input";
+    worktreeConfig?.tlcExecStatus === "waiting-input" ||
+    worktreeConfig?.agentStatus === "waiting-input";
 
   // Modais Radix aninhados dentro deste card. Ao fechar qualquer um deles, o
   // FocusScope restaura o foco e dispara um evento de "focus outside" residual
@@ -382,6 +391,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     worktreeConfig?.commitPushStatus,
     worktreeConfig?.pullStatus,
     worktreeConfig?.messageStatus,
+    worktreeConfig?.agentStatus,
     worktreeConfig?.prStatus,
   ]);
 
@@ -391,19 +401,22 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     const cur = {
       status: worktreeConfig?.status,
       tlcExecStatus: worktreeConfig?.tlcExecStatus,
+      agentStatus: worktreeConfig?.agentStatus,
     };
     if (prev) {
       const wentDone =
         (prev.status === "running" && cur.status === "done") ||
-        (prev.tlcExecStatus === "running" && cur.tlcExecStatus === "done");
+        (prev.tlcExecStatus === "running" && cur.tlcExecStatus === "done") ||
+        (prev.agentStatus === "running" && cur.agentStatus === "done");
       const wentWaiting =
         (prev.status === "running" && cur.status === "waiting-input") ||
-        (prev.tlcExecStatus === "running" && cur.tlcExecStatus === "waiting-input");
+        (prev.tlcExecStatus === "running" && cur.tlcExecStatus === "waiting-input") ||
+        (prev.agentStatus === "running" && cur.agentStatus === "waiting-input");
       if (wentWaiting) playWaiting();
       else if (wentDone) playDone();
     }
     prevStatusRef.current = cur;
-  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus]);
+  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus, worktreeConfig?.agentStatus]);
 
   async function handleSendMessage() {
     const text = messageText.trim();
@@ -644,6 +657,57 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     } catch (_) {}
     setSelectedSessionId(session);
     loadWorktreeConfig();
+  }
+
+  // Abre o modal de agentes; carrega a lista uma vez (lazy). model/effort partem
+  // dos defaults do runner e só mudam quando um agente é selecionado.
+  function openAgentModal() {
+    unlockAudio();
+    setAgentModal({ agentId: null, model: "sonnet", effort: "medium", session: "__new__" });
+    if (agents === null) {
+      fetch("/api/agents")
+        .then((r) => r.json())
+        .then((d) => setAgents(d.agents ?? []))
+        .catch(() => setAgents([]));
+    }
+  }
+
+  // Executa o agente selecionado pela pipeline autônoma (/run-agent): roda na
+  // worktree com o prompt do agente (skills + instruções) + a descrição do card,
+  // usando o campo agentStatus para o feedback visual (running/done/error).
+  async function handleRunAgent() {
+    const { agentId, model, effort, session } = agentModal;
+    if (!agentId) return;
+    setAgentSending(true);
+    try {
+      const res = await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run-agent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            agentId,
+            title: item.title,
+            number: item.number,
+            body: item.body,
+            model,
+            effort,
+            sessionId: session === "__new__" ? undefined : session,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (data.sessionId) setSelectedSessionId(data.sessionId);
+      setAgentModal(null);
+      loadWorktreeConfig();
+      onWorktreeChange?.();
+    } catch (err) {
+      console.error("[run-agent]", err);
+      setErrorModal(err.message);
+    } finally {
+      setAgentSending(false);
+    }
   }
 
   const displayLogText = useMemo(() => {
@@ -942,6 +1006,125 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   onClick={handleAnswer}
                 >
                   {t("card.answer.send")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {agentModal && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="bg-background border rounded-lg shadow-xl w-full max-w-md overflow-hidden mx-4 flex flex-col max-h-[80vh]">
+              <div className="flex items-center border-b px-5 py-4">
+                <span className="text-sm font-semibold flex-1">{t("run.agent")}</span>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                {agents === null ? (
+                  <p className="text-xs text-muted-foreground">…</p>
+                ) : agents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{t("card.agent.empty")}</p>
+                ) : (
+                  <ul className="flex flex-col gap-1.5">
+                    {agents.map((a) => {
+                      const selected = agentModal.agentId === a.id;
+                      return (
+                        <li key={a.id}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAgentModal((s) => ({
+                                ...s,
+                                agentId: a.id,
+                                model: a.model ?? s.model,
+                                effort: a.effort ?? s.effort,
+                              }))
+                            }
+                            className={cn(
+                              "w-full text-left rounded-md border px-3 py-2 transition-colors",
+                              selected ? "border-primary bg-primary/10" : "hover:bg-muted/50",
+                            )}
+                          >
+                            <span className="block text-sm font-medium">{a.name}</span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap">
+                              {a.prompt}
+                            </span>
+                            <span className="mt-1 flex flex-wrap gap-1">
+                              {a.model && <Badge variant="outline">{a.model}</Badge>}
+                              {a.effort && <Badge variant="outline">{a.effort}</Badge>}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+              <div className="flex flex-col gap-4 border-t px-5 py-4">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.session")}</span>
+                  <Select
+                    value={agentModal.session}
+                    onValueChange={(v) => setAgentModal((s) => ({ ...s, session: v }))}
+                  >
+                    <SelectTrigger size="sm" className="text-xs w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__new__">{t("card.session.new")}</SelectItem>
+                      {[...(worktreeConfig?.chatSessions ?? [])]
+                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                        .map((s) => (
+                          <SelectItem key={s.id} value={s.id} title={s.description}>
+                            [{ORIGIN_LABEL[s.origin] ?? s.origin}] {s.description}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.model")}</span>
+                  <Select
+                    value={agentModal.model}
+                    onValueChange={(v) => setAgentModal((s) => ({ ...s, model: v }))}
+                  >
+                    <SelectTrigger size="sm" className="text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="haiku">Haiku</SelectItem>
+                      <SelectItem value="sonnet">Sonnet</SelectItem>
+                      <SelectItem value="opus">Opus</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.effort")}</span>
+                  <Select
+                    value={agentModal.effort}
+                    onValueChange={(v) => setAgentModal((s) => ({ ...s, effort: v }))}
+                  >
+                    <SelectTrigger size="sm" className="text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">low</SelectItem>
+                      <SelectItem value="medium">medium</SelectItem>
+                      <SelectItem value="high">high</SelectItem>
+                      <SelectItem value="xhigh">xhigh</SelectItem>
+                      <SelectItem value="max">max</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 border-t px-5 py-3">
+                <Button variant="ghost" size="sm" onClick={() => setAgentModal(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!agentModal.agentId || agentSending}
+                  onClick={handleRunAgent}
+                >
+                  {agentSending ? <Loader2 className="size-3.5 animate-spin" /> : "Executar"}
                 </Button>
               </div>
             </div>
@@ -1261,6 +1444,55 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         </Button>
                       )}
                       {(() => {
+                        const agentRunStatus = worktreeConfig?.agentStatus;
+                        const isAgentRunning = agentRunStatus === "running" || agentSending;
+                        const isAgentDone = agentRunStatus === "done";
+                        const isAgentError = agentRunStatus === "error";
+                        return (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              type="button"
+                              disabled={anyRunning}
+                              onClick={openAgentModal}
+                              className={cn(
+                                "w-full justify-start gap-2 text-xs",
+                                isAgentDone &&
+                                "border-state-completed/50 text-state-completed opacity-75",
+                                isAgentError &&
+                                "border-destructive/50 text-destructive opacity-75",
+                              )}
+                            >
+                              <Bot className="size-3.5" />
+                              <span>{t("run.agent")}</span>
+                            </Button>
+                            {isAgentRunning && (
+                              <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
+                                <Loader2 className="size-3 shrink-0 animate-spin" />
+                                {t("card.run.background")}
+                              </span>
+                            )}
+                            {isAgentDone && (
+                              <span className="text-[11px] text-state-completed">
+                                {t("card.run.done.rerun")}
+                              </span>
+                            )}
+                            {isAgentError && worktreeConfig?.agentLastError && (
+                              <button
+                                type="button"
+                                onClick={() => setErrorModal(worktreeConfig.agentLastError)}
+                                className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
+                              >
+                                <AlertTriangle className="size-3 shrink-0" />
+                                <span className="truncate">{worktreeConfig.agentLastError}</span>
+                              </button>
+                            )}
+                          </>
+                        );
+                      })()}
+
+                      {(() => {
                         const runStatus = worktreeConfig?.status;
                         const isRunning = runStatus === "running" || specSending;
                         const isDone = runStatus === "done";
@@ -1270,7 +1502,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         return (
                           <>
                             <Button
-                              variant={isConfigured && worktreeConfig?.status !== "done" && worktreeConfig?.tlcExecStatus !== "done" && worktreeConfig?.specEvalStatus !== "done" ? "default" : "outline"}
+                              variant="outline"
                               size="sm"
                               type="button"
                               disabled={isRunning || isTlcRunning}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, Plus, FileText } from "lucide-react";
+import { Bot, Plus, FileText, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/lib/i18nContext";
@@ -31,6 +38,7 @@ export default function AgentsView() {
   const [agents, setAgents] = useState(null); // null = carregando
   const [error, setError] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(null); // null | agent em edição
   const [promptView, setPromptView] = useState(null); // { name, prompt } | "loading"
   // Skills globais (ativas) — omitidas dos badges do agent, pois já se aplicam
   // globalmente e não são específicas do agent (mesma dedup do buildAgentPrompt).
@@ -89,18 +97,34 @@ export default function AgentsView() {
             <li key={a.id} className="flex flex-col gap-2 rounded-lg border bg-card/40 p-3">
               <div className="flex items-start justify-between gap-3">
                 <span className="min-w-0 flex-1 text-sm font-medium">{a.name}</span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => viewPrompt(a)}
-                  className="shrink-0 text-muted-foreground"
-                >
-                  <FileText className="size-4" />
-                  {t("agents.viewPrompt")}
-                </Button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditing(a)}
+                    className="text-muted-foreground"
+                  >
+                    <Pencil className="size-4" />
+                    {t("agents.edit")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => viewPrompt(a)}
+                    className="text-muted-foreground"
+                  >
+                    <FileText className="size-4" />
+                    {t("agents.viewPrompt")}
+                  </Button>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap">{a.prompt}</p>
+              <div className="flex flex-wrap gap-1">
+                {a.model && <Badge variant="outline">{a.model}</Badge>}
+                {a.effort && <Badge variant="outline">{a.effort}</Badge>}
+              </div>
               {(() => {
                 const skills = (a.skills ?? []).filter((s) => !activeSkills.has(s));
                 return skills.length > 0 && (
@@ -117,9 +141,17 @@ export default function AgentsView() {
       )}
 
       {creating && (
-        <CreateAgentDialog
+        <AgentDialog
           onClose={() => setCreating(false)}
-          onCreated={(list) => { setAgents(list); setCreating(false); }}
+          onSaved={(list) => { setAgents(list); setCreating(false); }}
+        />
+      )}
+
+      {editing && (
+        <AgentDialog
+          agent={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(list) => { setAgents(list); setEditing(null); }}
         />
       )}
 
@@ -153,13 +185,18 @@ export default function AgentsView() {
   );
 }
 
-function CreateAgentDialog({ onClose, onCreated }) {
+// Dialog de criar/editar agent. Com `agent` → modo edição (PUT, campos pré-preenchidos);
+// sem `agent` → modo criação (POST).
+function AgentDialog({ agent, onClose, onSaved }) {
   const { t } = useI18n();
   const { toast } = useToast();
-  const [name, setName] = useState("");
-  const [prompt, setPrompt] = useState("");
+  const isEdit = !!agent;
+  const [name, setName] = useState(agent?.name ?? "");
+  const [prompt, setPrompt] = useState(agent?.prompt ?? "");
+  const [model, setModel] = useState(agent?.model ?? "sonnet");
+  const [effort, setEffort] = useState(agent?.effort ?? "medium");
   const [skills, setSkills] = useState(null); // null = carregando
-  const [selected, setSelected] = useState(() => new Set());
+  const [selected, setSelected] = useState(() => new Set(agent?.skills ?? []));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -182,17 +219,17 @@ function CreateAgentDialog({ onClose, onCreated }) {
   async function save() {
     setSaving(true);
     try {
-      const res = await fetch("/api/agents", {
-        method: "POST",
+      const res = await fetch(isEdit ? `/api/agents/${agent.id}` : "/api/agents", {
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, prompt, skills: [...selected] }),
+        body: JSON.stringify({ name, prompt, model, effort, skills: [...selected] }),
       });
-      if (!res.ok) throw new Error("create");
+      if (!res.ok) throw new Error("save");
       const d = await res.json();
-      onCreated(d.agents ?? []);
+      onSaved(d.agents ?? []);
     } catch {
       setSaving(false);
-      toast({ title: t("agents.createError"), variant: "error" });
+      toast({ title: t(isEdit ? "agents.saveError" : "agents.createError"), variant: "error" });
     }
   }
 
@@ -202,7 +239,7 @@ function CreateAgentDialog({ onClose, onCreated }) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Bot className="size-4 shrink-0" />
-            {t("agents.new")}
+            {t(isEdit ? "agents.editTitle" : "agents.new")}
           </DialogTitle>
         </DialogHeader>
 
@@ -226,6 +263,37 @@ function CreateAgentDialog({ onClose, onCreated }) {
               placeholder={t("agents.promptPlaceholder")}
               className="min-h-32"
             />
+          </div>
+
+          <div className="flex gap-3">
+            <div className="flex flex-1 flex-col gap-1.5">
+              <Label>{t("card.model")}</Label>
+              <Select value={model} onValueChange={setModel}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="haiku">Haiku</SelectItem>
+                  <SelectItem value="sonnet">Sonnet</SelectItem>
+                  <SelectItem value="opus">Opus</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <Label>{t("card.effort")}</Label>
+              <Select value={effort} onValueChange={setEffort}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">low</SelectItem>
+                  <SelectItem value="medium">medium</SelectItem>
+                  <SelectItem value="high">high</SelectItem>
+                  <SelectItem value="xhigh">xhigh</SelectItem>
+                  <SelectItem value="max">max</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -268,7 +336,9 @@ function CreateAgentDialog({ onClose, onCreated }) {
             disabled={!name.trim() || !prompt.trim() || saving}
             onClick={save}
           >
-            {saving ? t("agents.creating") : t("agents.create")}
+            {saving
+              ? t(isEdit ? "agents.saving" : "agents.creating")
+              : t(isEdit ? "agents.save" : "agents.create")}
           </Button>
         </DialogFooter>
       </DialogContent>
