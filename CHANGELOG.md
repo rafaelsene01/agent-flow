@@ -1,3 +1,10 @@
+# [1.31.0](https://github.com/rafaelsene01/agent-flow/compare/v1.30.0...v1.31.0) (2026-07-01)
+
+
+### Features
+
+* enhance skill management with installation control ([8d4006b](https://github.com/rafaelsene01/agent-flow/commit/8d4006bd7ecb24e6583b8a770d351a90c5f9ecfe))
+
 # [1.30.0](https://github.com/rafaelsene01/agent-flow/compare/v1.29.0...v1.30.0) (2026-07-01)
 
 
