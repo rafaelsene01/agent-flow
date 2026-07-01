@@ -11,20 +11,31 @@ import { WEB_DIST_DIR } from "./paths.js";
 import { getConfig, getWorktrees, updateWorktreeStatus } from "./modules/config/config.service.js";
 
 function recoverInterruptedRuns() {
-  const runningStatuses = [
-    ["status",          "error", "Run interrompido por reinício do servidor"],
-    ["tlcExecStatus",   "error", "Run interrompido por reinício do servidor"],
-    ["commitPushStatus","error", "Run interrompido por reinício do servidor"],
+  // Todos os campos que o runner marca como "running". Se o servidor reinicia ou
+  // cai no meio de um run, o processo morre mas o campo fica preso em "running" —
+  // o que mantém o card girando "executando" no board para sempre. Reconcilia
+  // qualquer um deles para "error" no boot. Faltava (entre outros) tlcStatus, que
+  // o Card do board observa e fazia o card ficar travado em execução.
+  const RUN_FIELDS = [
+    ["status",           "lastError"],
+    ["messageStatus",    "messageLastError"],
+    ["tlcStatus",        "tlcLastError"],
+    ["tlcExecStatus",    "tlcExecLastError"],
+    ["specEvalStatus",   "specEvalLastError"],
+    ["commitPushStatus", "commitPushLastError"],
+    ["prStatus",         "prLastError"],
+    ["pullStatus",       "pullLastError"],
   ];
+  const MSG = "Run interrompido por reinício do servidor";
   for (const wt of getWorktrees()) {
-    for (const [field, , msg] of runningStatuses) {
+    const patch = {};
+    for (const [field, errField] of RUN_FIELDS) {
       if (wt[field] === "running") {
-        const errField = field === "status" ? "lastError"
-          : field === "tlcExecStatus" ? "tlcExecLastError"
-          : "commitPushLastError";
-        updateWorktreeStatus(wt.id, { [field]: "error", [errField]: msg });
+        patch[field] = "error";
+        patch[errField] = MSG;
       }
     }
+    if (Object.keys(patch).length) updateWorktreeStatus(wt.id, patch);
   }
 }
 

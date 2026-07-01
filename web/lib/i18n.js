@@ -156,6 +156,22 @@ export const dictionaries = {
     "header.remove.board": "Remover board",
     "header.settings": "Configurações",
 
+    // Sidebar
+    "sidebar.workspace": "Workspace",
+    "sidebar.boards": "Boards",
+    "sidebar.agents": "Agents",
+    "sidebar.skill": "Skill",
+    "sidebar.settings": "Configurações",
+    "sidebar.menu.open": "Abrir menu",
+    "sidebar.menu.close": "Fechar menu",
+    "sidebar.board.actions": "Ações do board",
+    "agents.title": "Agents",
+    "agents.desc": "Gerencie e configure seus agentes. Esta área está em construção.",
+    "agents.soon": "Em breve",
+    "skill.title": "Skill",
+    "skill.desc": "Crie e organize skills reutilizáveis. Esta área está em construção.",
+    "skill.soon": "Em breve",
+
     // InitBoardModal
     "board.add": "Adicionar Board",
     "board.saving": "Salvando…",
@@ -315,6 +331,22 @@ export const dictionaries = {
     "header.theme.to-dark": "Switch to dark theme",
     "header.remove.board": "Remove board",
     "header.settings": "Settings",
+
+    // Sidebar
+    "sidebar.workspace": "Workspace",
+    "sidebar.boards": "Boards",
+    "sidebar.agents": "Agents",
+    "sidebar.skill": "Skill",
+    "sidebar.settings": "Settings",
+    "sidebar.menu.open": "Open menu",
+    "sidebar.menu.close": "Close menu",
+    "sidebar.board.actions": "Board actions",
+    "agents.title": "Agents",
+    "agents.desc": "Manage and configure your agents. This area is under construction.",
+    "agents.soon": "Coming soon",
+    "skill.title": "Skill",
+    "skill.desc": "Create and organize reusable skills. This area is under construction.",
+    "skill.soon": "Coming soon",
 
     // InitBoardModal
     "board.add": "Add Board",

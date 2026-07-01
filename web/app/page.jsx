@@ -4,7 +4,9 @@ import { Suspense, useEffect, useReducer, useState } from "react";
 import { usePathname } from "next/navigation";
 import { boardSlug } from "@/lib/boardSlug.js";
 import { appReducer, initialState } from "@/lib/appReducer.js";
-import Header from "@/components/Header.jsx";
+import Sidebar from "@/components/sidebar/Sidebar.jsx";
+import AgentsView from "@/components/views/AgentsView.jsx";
+import SkillView from "@/components/views/SkillView.jsx";
 import SettingsModal from "@/components/SettingsModal.jsx";
 import InitBoardModal from "@/components/InitBoardModal.jsx";
 import EditBoardModal from "@/components/EditBoardModal.jsx";
@@ -12,7 +14,7 @@ import Board from "@/components/board/Board.jsx";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FlowerMark } from "@/components/ui/flower-mark";
-import { Pencil, BrushCleaning, Plus, Search, X, CircleHelp } from "lucide-react";
+import { Pencil, BrushCleaning, Plus, Search, X, CircleHelp, Menu } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/lib/i18nContext";
 import { useToast } from "@/lib/toast";
@@ -30,9 +32,14 @@ function AppContent() {
 
   const [showSettings, setShowSettings]   = useState(false);
   const [showInitBoard, setShowInitBoard] = useState(false);
-  const [showEditBoard, setShowEditBoard] = useState(false);
+  const [boardToEdit, setBoardToEdit]     = useState(null);
   const [removeConfirm, setRemoveConfirm] = useState(null);
-  const [cleanupConfirm, setCleanupConfirm] = useState(false);
+  const [cleanupTarget, setCleanupTarget] = useState(null);
+
+  // Seção ativa da navegação (somente UI — não persiste no backend).
+  const [section, setSection] = useState("board");
+  // Drawer da sidebar no mobile.
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Edição inline do filtro da view (com debounce antes de relistar/persistir).
   const [filterDraft, setFilterDraft] = useState(activeBoard?.viewFilter ?? "");
@@ -105,20 +112,28 @@ function AppContent() {
 
   function selectBoard(board) {
     const path = `/${boardSlug(board)}`;
+    setSection("board");
+    setMenuOpen(false);
     dispatch({ type: "SELECT_BOARD", board, path });
     navigate(path);
+  }
+
+  function selectSection(next) {
+    setSection(next);
+    setMenuOpen(false);
   }
 
   function handleBoardSaved(newBoard) {
     dispatch({ type: "BOARD_ADDED", board: newBoard });
     setShowInitBoard(false);
+    setSection("board");
     navigate(`/${boardSlug(newBoard)}`);
   }
 
   async function handleBoardUpdated(updatedBoard) {
     const next = boards.map((b) => b.viewId === updatedBoard.viewId ? updatedBoard : b);
     dispatch({ type: "BOARD_UPDATED", board: updatedBoard });
-    setShowEditBoard(false);
+    setBoardToEdit(null);
     await fetch("/api/config", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -180,19 +195,46 @@ function AppContent() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header
-        onSettings={() => setShowSettings(true)}
-        onInitBoard={() => setShowInitBoard(true)}
+    <div className="flex min-h-screen">
+      <Sidebar
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
         boards={boards}
         activePath={activePath}
+        section={section}
         onSelectBoard={selectBoard}
+        onSelectSection={selectSection}
+        onInitBoard={() => setShowInitBoard(true)}
         onRemoveBoard={removeBoard}
+        onSettings={() => setShowSettings(true)}
         theme={theme}
         onToggleTheme={toggleTheme}
       />
 
-      {activeBoard ? (
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Barra superior apenas no mobile (abre o drawer da sidebar) */}
+        <div className="flex items-center gap-2 border-b px-3 py-1.5 lg:hidden">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label={t("sidebar.menu.open")}
+          >
+            <Menu size={18} />
+          </Button>
+          <div className="flex items-center gap-1.5">
+            <FlowerMark className="size-4 shrink-0" />
+            <span className="text-base font-semibold leading-none">Agent Flow</span>
+          </div>
+        </div>
+
+        {section === "agents" ? (
+          <AgentsView />
+        ) : section === "skill" ? (
+          <SkillView />
+        ) : activeBoard ? (
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex items-center justify-between px-4 py-2 border-b">
             <div className="min-w-0 flex-1 flex items-center gap-3">
@@ -245,7 +287,7 @@ function AppContent() {
                 variant="ghost"
                 size="icon-sm"
                 type="button"
-                onClick={() => setShowEditBoard(true)}
+                onClick={() => setBoardToEdit(activeBoard)}
                 title={t("board.edit.columns")}
               >
                 <Pencil />
@@ -256,7 +298,7 @@ function AppContent() {
                 type="button"
                 title={t("board.cleanup.title")}
                 className="hover:text-destructive hover:border-destructive"
-                onClick={() => setCleanupConfirm(true)}
+                onClick={() => setCleanupTarget(activeBoard)}
               >
                 <BrushCleaning />
               </Button>
@@ -279,7 +321,8 @@ function AppContent() {
             </Button>
           </div>
         </div>
-      )}
+        )}
+      </div>
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
@@ -290,10 +333,10 @@ function AppContent() {
         />
       )}
 
-      {showEditBoard && activeBoard && (
+      {boardToEdit && (
         <EditBoardModal
-          board={activeBoard}
-          onClose={() => setShowEditBoard(false)}
+          board={boardToEdit}
+          onClose={() => setBoardToEdit(null)}
           onSaved={handleBoardUpdated}
         />
       )}
@@ -309,15 +352,15 @@ function AppContent() {
           onCancel={() => setRemoveConfirm(null)}
         />
       )}
-      {cleanupConfirm && activeBoard && (
+      {cleanupTarget && (
         <ConfirmDialog
           open
-          targetName={activeBoard.name}
+          targetName={cleanupTarget.name}
           title={t("confirm.cleanup.board")}
           description={t("board.cleanup.confirm")}
           destructive
-          onConfirm={async () => { setCleanupConfirm(false); await cleanupBoardData(activeBoard); }}
-          onCancel={() => setCleanupConfirm(false)}
+          onConfirm={async () => { const b = cleanupTarget; setCleanupTarget(null); await cleanupBoardData(b); }}
+          onCancel={() => setCleanupTarget(null)}
         />
       )}
     </div>
