@@ -58,8 +58,22 @@ export async function startServer({ port, apiOnly = false }) {
   usageRoutes(app);
 
   if (!apiOnly) {
-    app.use(express.static(WEB_DIST_DIR));
-    app.use((_req, res) => res.sendFile("index.html", { root: WEB_DIST_DIR }));
+    // redirect:false evita que "/agent" seja redirecionado para "/agent/" (o export
+    // cria um diretório homônimo), o que quebraria a resolução do .html abaixo.
+    app.use(express.static(WEB_DIST_DIR, { redirect: false }));
+    // Detalhe do board: slugs são de runtime, então servimos o shell estático do
+    // [slug] ("_") para qualquer /board/<slug> — o cliente resolve pelo pathname.
+    app.get("/board/:slug", (_req, res) => res.sendFile("board/_.html", { root: WEB_DIST_DIR }));
+    // Rotas do App Router exportam "<rota>.html". O export também cria um diretório
+    // "<rota>/" (com os segmentos RSC), que faz o express.static ignorar o .html —
+    // por isso resolvemos o HTML da rota manualmente aqui. Fallback final: home.
+    app.use((req, res) => {
+      const htmlPath = path.join(WEB_DIST_DIR, `${req.path}.html`);
+      if (req.path !== "/" && htmlPath.startsWith(WEB_DIST_DIR) && fs.existsSync(htmlPath)) {
+        return res.sendFile(htmlPath);
+      }
+      res.sendFile("index.html", { root: WEB_DIST_DIR });
+    });
   }
 
   // Garante que erros não capturados retornem JSON, nunca "Internal Server Error" em texto.

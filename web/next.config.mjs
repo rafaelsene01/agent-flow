@@ -22,10 +22,6 @@ const config = {
           source: "/api/:path*",
           destination: "http://localhost:5522/api/:path*",
         },
-        {
-          source: "/:path+",
-          destination: "/",
-        },
       ];
     },
   }),

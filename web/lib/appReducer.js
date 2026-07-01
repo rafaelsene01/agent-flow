@@ -1,56 +1,23 @@
-import { boardFromPath } from "@/lib/boardSlug.js";
-
 export const initialState = {
   initializing: true,
   boards: [],
-  activeBoard: null,
-  activePath: "/",
 };
 
+// Com rotas reais do App Router, a rota ativa e o board ativo vêm do pathname
+// (usePathname) — o reducer só cuida da lista de boards e do estado de boot.
 export function appReducer(state, action) {
   switch (action.type) {
     case "INIT_DONE":
-      return {
-        ...state,
-        initializing: false,
-        boards:      action.boards,
-        activeBoard: action.activeBoard,
-        activePath:  action.activePath,
-      };
-    case "SELECT_BOARD":
-      return { ...state, activeBoard: action.board, activePath: action.path };
+      return { ...state, initializing: false, boards: action.boards };
     case "BOARD_ADDED":
-      return {
-        ...state,
-        boards:      [...state.boards, action.board],
-        activeBoard: action.board,
-      };
+      return { ...state, boards: [...state.boards, action.board] };
     case "BOARD_UPDATED":
       return {
         ...state,
-        boards:      state.boards.map((b) => b.viewId === action.board.viewId ? action.board : b),
-        activeBoard: action.board,
+        boards: state.boards.map((b) => b.viewId === action.board.viewId ? action.board : b),
       };
-    case "BOARD_REMOVED": {
-      const next = state.boards.filter((b) => b.viewId !== action.boardViewId);
-      return {
-        ...state,
-        boards:      next,
-        activeBoard: action.fallbackBoard,
-        activePath:  action.fallbackPath ?? "/",
-      };
-    }
-    case "SET_PATH": {
-      // Path inalterado: retorna o mesmo estado para evitar re-render (e o loop
-      // causado por replaceState interno do Next disparando locationchange).
-      if (action.path === state.activePath) return state;
-      const matched = boardFromPath(state.boards, action.path);
-      return {
-        ...state,
-        activePath:  action.path,
-        activeBoard: matched ?? state.activeBoard,
-      };
-    }
+    case "BOARD_REMOVED":
+      return { ...state, boards: state.boards.filter((b) => b.viewId !== action.boardViewId) };
     default:
       return state;
   }
