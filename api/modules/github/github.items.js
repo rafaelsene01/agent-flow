@@ -192,6 +192,30 @@ export function warmItemsCache(projectId) {
   refreshInBackground(projectId).catch((err) => console.error("[items] erro no warm:", err.message));
 }
 
+// Polling contínuo em background: revalida os cards de todos os boards em
+// intervalos regulares, mesmo sem ninguém acessando, para mantê-los sempre
+// frescos. O boot faz o primeiro warm (warmItemsCache); este loop mantém a
+// atualização periódica dali em diante. O dedupe de refreshInBackground evita
+// buscas sobrepostas caso uma varredura demore mais que o intervalo.
+const POLL_INTERVAL_MS = 60_000;
+let _pollTimer = null;
+
+// getBoardIds é um callback (lido a cada tick) para que boards adicionados em
+// runtime também passem a ser revalidados sem reiniciar o servidor.
+export function startItemsPolling(getBoardIds, intervalMs = POLL_INTERVAL_MS) {
+  if (_pollTimer) return _pollTimer;
+  _pollTimer = setInterval(() => {
+    for (const id of getBoardIds() ?? []) warmItemsCache(id);
+  }, intervalMs);
+  // unref: o loop não deve, sozinho, impedir o processo de encerrar.
+  _pollTimer.unref?.();
+  return _pollTimer;
+}
+
+export function stopItemsPolling() {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
 // Invalida o cache em memória (ex: após mover um card). Sem argumento, limpa tudo.
 export function clearItemsCache(projectId) {
   if (projectId) _cache.delete(projectId);
