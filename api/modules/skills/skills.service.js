@@ -1,10 +1,10 @@
 import fs from "fs";
 import path from "path";
-import { homedir } from "os";
 import { getConfig, setConfig } from "../config/config.service.js";
 
-// Skills instaladas ficam em ~/.claude/skills (mesmo diretório usado por claude.service.js).
-const SKILLS_DIR = path.join(homedir(), ".claude", "skills");
+// Skills locais do projeto: <cwd>/.claude/skills (onde o agent-flow está rodando),
+// e não as globais em ~/.claude/skills.
+const SKILLS_DIR = path.join(process.cwd(), ".claude", "skills");
 
 // Resolve o arquivo de definição de uma skill: subdiretório com SKILL.md ou <nome>.md avulso.
 function skillFilePath(name) {
@@ -100,4 +100,22 @@ export function getActiveSkills() {
       } catch {}
       return { name: s.name, description: s.description, path: s.path, content };
     });
+}
+
+// Resolve o conteúdo bruto de skills por nome, preservando a ordem dos nomes
+// informados. Nomes desconhecidos são ignorados. Usado para injetar as skills
+// linkadas a um agent no prompt final.
+export function getSkillsContent(names) {
+  const byName = new Map(listSkills().map((s) => [s.name, s]));
+  const out = [];
+  for (const name of names ?? []) {
+    const s = byName.get(name);
+    if (!s) continue;
+    let content = "";
+    try {
+      content = fs.readFileSync(s.path, "utf-8");
+    } catch {}
+    out.push({ name: s.name, description: s.description, path: s.path, content });
+  }
+  return out;
 }

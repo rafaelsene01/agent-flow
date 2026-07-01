@@ -6,6 +6,7 @@ import configRoutes from "./routes/config.js";
 import githubRoutes from "./routes/github.js";
 import usageRoutes from "./routes/usage.js";
 import skillsRoutes from "./routes/skills.js";
+import agentsRoutes from "./routes/agents.js";
 import { warmup } from "./modules/status/status.cache.js";
 import { warmItemsCache } from "./modules/github/github.items.js";
 import { WEB_DIST_DIR } from "./paths.js";
@@ -58,6 +59,7 @@ export async function startServer({ port, apiOnly = false }) {
   githubRoutes(app);
   usageRoutes(app);
   skillsRoutes(app);
+  agentsRoutes(app);
 
   if (!apiOnly) {
     // redirect:false evita que "/agent" seja redirecionado para "/agent/" (o export
