@@ -206,6 +206,9 @@ export const dictionaries = {
     "skill.empty": "Nenhuma skill encontrada em .claude/skills.",
     "skill.loadError": "Falha ao carregar as skills.",
     "skill.toggleError": "Falha ao atualizar a skill.",
+    "skill.installed": "Instalada",
+    "skill.install": "Instalar",
+    "skill.installError": "Falha ao instalar a skill.",
 
     // InitBoardModal
     "board.add": "Adicionar Board",
@@ -417,6 +420,9 @@ export const dictionaries = {
     "skill.empty": "No skills found in .claude/skills.",
     "skill.loadError": "Failed to load skills.",
     "skill.toggleError": "Failed to update skill.",
+    "skill.installed": "Installed",
+    "skill.install": "Install",
+    "skill.installError": "Failed to install skill.",
 
     // InitBoardModal
     "board.add": "Add Board",

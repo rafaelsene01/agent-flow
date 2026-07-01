@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18nContext";
-import { Settings, Copy, Check, FolderOpen, AlertTriangle, RefreshCw, X, Zap, GitBranch, Bot } from "lucide-react";
+import { Settings, Copy, Check, FolderOpen, AlertTriangle, RefreshCw, X, GitBranch, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -108,22 +108,6 @@ function StatusChip({ loading, connected }) {
   );
 }
 
-/* ── WarnChip ────────────────────────────────────────────────────────────── */
-function WarnChip({ loading }) {
-  if (loading) {
-    return (
-      <span className="inline-flex items-center justify-center size-6 rounded-full text-xs font-medium animate-pulse text-muted-foreground bg-muted border border-border">
-        …
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center justify-center size-6 rounded-full text-xs font-medium bg-priority-high/15 text-priority-high border border-priority-high/40">
-      !
-    </span>
-  );
-}
-
 /* ── IntegrationCard ─────────────────────────────────────────────────────── */
 function IntegrationCard({ name, logo, loading, data, commands }) {
   const connected = !loading && !!data?.connected;
@@ -189,87 +173,6 @@ function IntegrationCard({ name, logo, loading, data, commands }) {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-/* ── SkillCard ───────────────────────────────────────────────────────────── */
-function SkillCard({ loading, installed, onInstalled, skill, name, description, kind = "Skill" }) {
-  const [installing, setInstalling] = useState(false);
-  const [installError, setInstallError] = useState(null);
-
-  function install() {
-    setInstalling(true);
-    setInstallError(null);
-    fetch("/api/status/install-skill", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ skill }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) throw new Error(data.error);
-        onInstalled(data);
-      })
-      .catch((err) => setInstallError(err.message))
-      .finally(() => setInstalling(false));
-  }
-
-  const logoClass = cn(
-    "flex items-center justify-center size-9 rounded-lg border text-lg shrink-0",
-    loading     && "text-muted-foreground bg-muted border-border",
-    !loading && installed   && "text-state-completed bg-state-completed/10 border-state-completed/40",
-    !loading && !installed  && "text-priority-high bg-priority-high/10 border-priority-high/40"
-  );
-
-  return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
-      <div className="flex items-start gap-3">
-        <div className={logoClass}><Zap className="size-5" /></div>
-
-        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-          <span className="text-sm font-semibold leading-tight">{kind}: {name}</span>
-
-          {loading && (
-            <span className="text-xs text-muted-foreground">Verificando…</span>
-          )}
-
-          {!loading && installed && (
-            <span className="text-xs text-state-completed">Instalada globalmente</span>
-          )}
-
-          {!loading && !installed && (
-            <>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs text-priority-high">Não instalada</span>
-                <Button
-                  variant="outline"
-                  size="xs"
-                  type="button"
-                  disabled={installing}
-                  onClick={install}
-                >
-                  {installing ? "…" : "Instalar"}
-                </Button>
-              </div>
-              {installError && (
-                <span className="text-xs text-destructive mt-0.5">{installError}</span>
-              )}
-              <span className="text-xs text-muted-foreground">
-                {description}
-              </span>
-            </>
-          )}
-        </div>
-
-        {loading ? (
-          <WarnChip loading={true} />
-        ) : installed ? (
-          <StatusChip loading={false} connected={true} />
-        ) : (
-          <WarnChip loading={false} />
-        )}
-      </div>
     </div>
   );
 }
@@ -446,43 +349,6 @@ export default function SettingsModal({ onClose }) {
             loading={loading}
             data={status?.claude}
             commands={claudeCommands}
-          />
-
-          <SkillCard
-            loading={loading}
-            installed={status?.claude?.tlcSkill ?? false}
-            onInstalled={setStatus}
-            skill="tlc-spec-driven"
-            name="tlc-spec-driven"
-            description="Recomendada para planejamento de features com IA"
-          />
-
-          <SkillCard
-            loading={loading}
-            installed={status?.claude?.specDrivenEvalSkill ?? false}
-            onInstalled={setStatus}
-            skill="spec-driven-eval"
-            name="spec-driven-eval"
-            description="Recomendada para avaliar implementações contra a spec/PRD"
-          />
-
-          <SkillCard
-            loading={loading}
-            installed={status?.claude?.karpathyPlugin ?? false}
-            onInstalled={setStatus}
-            skill="karpathy-guidelines"
-            name="andrej-karpathy-skills"
-            kind="Plugin"
-            description="Diretrizes de código no estilo Karpathy, disponíveis em todos os projetos"
-          />
-
-          <SkillCard
-            loading={loading}
-            installed={status?.claude?.cavemanSkill ?? false}
-            onInstalled={setStatus}
-            skill="caveman"
-            name="caveman"
-            description="Modo de comunicação ultra-compacto (~75% menos tokens)"
           />
 
           {/* Projects path card */}

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { getConfig, setConfig } from "../config/config.service.js";
+import { getInstallState } from "./installable.js";
 
 // Skills locais do projeto: <cwd>/.claude/skills (onde o agent-flow está rodando),
 // e não as globais em ~/.claude/skills.
@@ -81,10 +82,16 @@ export async function setSkillActive(name, active) {
   return next;
 }
 
-// R3: descoberta + estado (para a tela de skills).
+// R3: descoberta + estado (para a tela de skills). Além do estado de ativação,
+// anexa o estado de instalação global (installed/installable/kind) para a UI
+// oferecer o botão de instalar diretamente no card da skill.
 export function getSkills() {
   const active = new Set(getActiveSkillNames());
-  return listSkills().map((s) => ({ ...s, active: active.has(s.name) }));
+  return listSkills().map((s) => ({
+    ...s,
+    active: active.has(s.name),
+    ...getInstallState(s.name),
+  }));
 }
 
 // R5: apenas as skills ativas, com o conteúdo bruto pronto para injeção futura em prompt.

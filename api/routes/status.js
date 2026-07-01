@@ -3,6 +3,7 @@ import { execSync } from "child_process";
 import { join } from "path";
 import { homedir, tmpdir } from "os";
 import { getCache, refresh } from "../modules/status/status.cache.js";
+import { INSTALLABLE_SKILLS } from "../modules/skills/installable.js";
 import { PACKAGE_ROOT } from "../paths.js";
 
 export default function statusRoutes(app) {
@@ -23,25 +24,6 @@ export default function statusRoutes(app) {
       res.status(500).json({ error: err.message });
     }
   });
-
-  // Skills locais são copiadas de dentro do projeto; skills "git" são
-  // clonadas de um repositório remoto e o subdiretório indicado é copiado;
-  // "plugin" instala via CLI do Claude Code (marketplace + plugin), ficando
-  // disponível em todos os projetos sem precisar invocar como skill.
-  const INSTALLABLE_SKILLS = {
-    "tlc-spec-driven":  { type: "local" },
-    "spec-driven-eval": { type: "local" },
-    "karpathy-guidelines": {
-      type: "plugin",
-      marketplace: "forrestchang/andrej-karpathy-skills",
-      plugin: "andrej-karpathy-skills@karpathy-skills",
-    },
-    "caveman": {
-      type: "git",
-      repo: "https://github.com/juliusbrussee/caveman.git",
-      subdir: join("skills", "caveman"),
-    },
-  };
 
   function installLocal(skill, dest) {
     const src = join(PACKAGE_ROOT, ".claude", "skills", skill);
