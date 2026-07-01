@@ -471,6 +471,10 @@ export default function runnerRoutes(app) {
         ).catch(() => ({ stdout: "" }));
         const initialHead = headBefore.trim();
 
+        // Garante que artefatos internos (.specs/, logs, CARD.md) fiquem fora do
+        // git da worktree, caso alguma skill os gere durante a execução.
+        await ensureWorktreeExclude(wt.path);
+
         logStream.write(`=== Executando agente: ${agentName} ===\n`);
         const cardContent = fs.readFileSync(
           path.join(getHelpersDir(wt), "CARD.md"),
@@ -482,6 +486,9 @@ export default function runnerRoutes(app) {
           agentPrompt +
           "\n\nRegras de execução:\n" +
           "- Use as ferramentas Write e Edit para criar/modificar arquivos. NÃO descreva — faça.\n" +
+          "- Aja SOMENTE com base nas instruções e skills fornecidas acima neste prompt. " +
+          "NÃO acione nenhuma outra skill instalada (ferramenta Skill / slash-commands como tlc-spec-driven) " +
+          "nem inicie fluxos de spec/design/tasks que não tenham sido pedidos pela skill do agente.\n" +
           ASK_RULES + "\n" +
           "- NÃO rode nenhum comando git.\n" +
           "TAREFA (card do board):\n" +
@@ -511,6 +518,10 @@ export default function runnerRoutes(app) {
           });
           return;
         }
+
+        // Move qualquer .specs/ gerado na worktree para a pasta helpers, mantendo
+        // a worktree do projeto limpa (mesmo tratamento da pipeline TLC).
+        migrateSpecsToHelpers(wt.path, getHelpersDir(wt));
 
         if (initialHead) {
           const { stdout: countOut } = await execFileP(
