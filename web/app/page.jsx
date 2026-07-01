@@ -40,6 +40,9 @@ function AppContent() {
   const [section, setSection] = useState("board");
   // Drawer da sidebar no mobile.
   const [menuOpen, setMenuOpen] = useState(false);
+  // Incrementado após limpar dados do board — força o Board a recarregar as
+  // worktrees (senão os cards ficam com bordas/status obsoletos).
+  const [worktreeRefresh, setWorktreeRefresh] = useState(0);
 
   // Edição inline do filtro da view (com debounce antes de relistar/persistir).
   const [filterDraft, setFilterDraft] = useState(activeBoard?.viewFilter ?? "");
@@ -153,7 +156,10 @@ function AppContent() {
         const d = await res.json().catch(() => ({}));
         console.error("[cleanup-board] server error:", d.error);
         toast({ title: t("toast.cleanup.error"), description: d.error ?? "Erro do servidor", variant: "error" });
+        return;
       }
+      // Sucesso: worktrees do repo foram removidas no servidor — recarrega o Board.
+      setWorktreeRefresh((n) => n + 1);
     } catch (err) {
       console.error("[cleanup-board]", err);
       toast({ title: t("toast.cleanup.error"), description: err.message, variant: "error" });
@@ -304,7 +310,7 @@ function AppContent() {
               </Button>
             </div>
           </div>
-          <Board board={activeBoard} />
+          <Board board={activeBoard} refreshSignal={worktreeRefresh} />
         </div>
       ) : (
         <div className="flex flex-1 items-center justify-center">

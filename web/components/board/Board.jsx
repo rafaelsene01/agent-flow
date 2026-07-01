@@ -11,7 +11,7 @@ function normalizeColumns(raw) {
   );
 }
 
-export default function Board({ board }) {
+export default function Board({ board, refreshSignal = 0 }) {
   const { t } = useI18n();
   const columns = normalizeColumns(board?.columns);
   const [activeCard, setActiveCard] = useState(null);
@@ -33,6 +33,11 @@ export default function Board({ board }) {
   }
 
   useEffect(loadWorktrees, []);
+
+  // Recarrega worktrees quando o pai sinaliza (ex.: após limpar dados do board).
+  useEffect(() => {
+    if (refreshSignal) loadWorktrees();
+  }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-poll while any worktree has a running process
   useEffect(() => {
