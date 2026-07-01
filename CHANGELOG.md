@@ -1,3 +1,23 @@
+# [1.30.0](https://github.com/rafaelsene01/agent-flow/compare/v1.29.0...v1.30.0) (2026-07-01)
+
+
+### Bug Fixes
+
+* refine prompt handling in runner routes ([93b063e](https://github.com/rafaelsene01/agent-flow/commit/93b063e78e0b3d1fef3e34f56072a2edd9d2db69))
+
+
+### Features
+
+* add agents management feature with UI integration ([619491e](https://github.com/rafaelsene01/agent-flow/commit/619491ef30e65c65eb8a0794da9140675bf6b6cf))
+* add skills management feature with UI integration ([9975cfe](https://github.com/rafaelsene01/agent-flow/commit/9975cfe444d5923bb92da02fb8b9a6a0283642f9))
+* enhance agent management with create and update functionality ([4b0667f](https://github.com/rafaelsene01/agent-flow/commit/4b0667f3b58c416fcb817b22d7f6c44ba6abf0e7))
+* enhance navigation and routing in AppContent and Sidebar components ([6ace466](https://github.com/rafaelsene01/agent-flow/commit/6ace46664ab1c7ea5f67463c3712949aaba1ac44))
+* enhance runner functionality with worktree management ([433145b](https://github.com/rafaelsene01/agent-flow/commit/433145b908a6ed4b929a376563585e290c70d550))
+* enhance server routing and layout structure ([a5ec02e](https://github.com/rafaelsene01/agent-flow/commit/a5ec02eb739464756969e48a47f1a78443722918))
+* enhance server run recovery and improve UI navigation ([68db1d9](https://github.com/rafaelsene01/agent-flow/commit/68db1d954a02a5ed1eb42d1d52de8cc2f892506a))
+* implement worktree refresh mechanism in Board component ([9f245e8](https://github.com/rafaelsene01/agent-flow/commit/9f245e8332c692446a23fef67ab658cc841fb064))
+* improve user experience in Board component and enhance state management ([e1e97b5](https://github.com/rafaelsene01/agent-flow/commit/e1e97b57369f3bcd5e8d8c897e02652a197ceebc))
+
 # [1.29.0](https://github.com/rafaelsene01/agent-flow/compare/v1.28.0...v1.29.0) (2026-06-30)
 
 
