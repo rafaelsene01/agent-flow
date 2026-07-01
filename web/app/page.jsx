@@ -2,11 +2,13 @@
 
 import { Suspense, useEffect, useReducer, useState } from "react";
 import { usePathname } from "next/navigation";
-import { boardSlug } from "@/lib/boardSlug.js";
+import { boardSlug, boardFromPath } from "@/lib/boardSlug.js";
 import { appReducer, initialState } from "@/lib/appReducer.js";
 import Sidebar from "@/components/sidebar/Sidebar.jsx";
 import AgentsView from "@/components/views/AgentsView.jsx";
 import SkillView from "@/components/views/SkillView.jsx";
+import HomeView from "@/components/views/HomeView.jsx";
+import BoardListView from "@/components/views/BoardListView.jsx";
 import SettingsModal from "@/components/SettingsModal.jsx";
 import InitBoardModal from "@/components/InitBoardModal.jsx";
 import EditBoardModal from "@/components/EditBoardModal.jsx";
@@ -14,13 +16,24 @@ import Board from "@/components/board/Board.jsx";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FlowerMark } from "@/components/ui/flower-mark";
-import { Pencil, BrushCleaning, Plus, Search, X, CircleHelp, Menu } from "lucide-react";
+import { Pencil, BrushCleaning, LayoutGrid, Search, X, CircleHelp, Menu } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/lib/i18nContext";
 import { useToast } from "@/lib/toast";
 
 function navigate(path) {
   window.history.pushState(null, "", path);
+}
+
+// Deriva a "rota" a partir do pathname. Toda a navegação é client-side (o app é
+// um export estático servido com fallback para index.html), então não há page.jsx
+// por rota — o pathname é a fonte da verdade.
+function routeFromPath(pathname) {
+  if (pathname === "/agent") return "agent";
+  if (pathname === "/skill") return "skill";
+  if (pathname === "/board") return "boardList";
+  if (pathname.startsWith("/board/")) return "board";
+  return "home";
 }
 
 function AppContent() {
@@ -36,8 +49,8 @@ function AppContent() {
   const [removeConfirm, setRemoveConfirm] = useState(null);
   const [cleanupTarget, setCleanupTarget] = useState(null);
 
-  // Seção ativa da navegação (somente UI — não persiste no backend).
-  const [section, setSection] = useState("board");
+  // Rota atual derivada do pathname (home | agent | skill | boardList | board).
+  const route = routeFromPath(activePath);
   // Drawer da sidebar no mobile.
   const [menuOpen, setMenuOpen] = useState(false);
   // Incrementado após limpar dados do board — força o Board a recarregar as
@@ -97,16 +110,16 @@ function AppContent() {
       if (!status?.github?.connected || !status?.claude?.connected) setShowSettings(true);
       const saved = config.boards ?? [];
 
-      const slug    = pathname.slice(1);
-      const fromUrl = slug ? saved.find((b) => boardSlug(b) === slug) : null;
-      const initial = fromUrl ?? saved[0] ?? null;
-
+      // Back-compat: URLs antigas de board eram "/<slug>" (raiz). Redireciona
+      // para "/board/<slug>" quando o pathname casar com um board existente.
       let newPath = pathname;
-      if (!slug && initial) {
-        newPath = `/${boardSlug(initial)}`;
+      const bare = pathname.slice(1);
+      if (bare && route === "home" && saved.some((b) => boardSlug(b) === bare)) {
+        newPath = `/board/${bare}`;
         window.history.replaceState(null, "", newPath);
       }
 
+      const initial = boardFromPath(saved, newPath);
       dispatch({ type: "INIT_DONE", boards: saved, activeBoard: initial, activePath: newPath });
     }).catch(() => {
       dispatch({ type: "INIT_DONE", boards: [], activeBoard: null, activePath: pathname });
@@ -114,23 +127,25 @@ function AppContent() {
   }, []);
 
   function selectBoard(board) {
-    const path = `/${boardSlug(board)}`;
-    setSection("board");
+    const path = `/board/${boardSlug(board)}`;
     setMenuOpen(false);
     dispatch({ type: "SELECT_BOARD", board, path });
     navigate(path);
   }
 
-  function selectSection(next) {
-    setSection(next);
+  // Navegação genérica para rotas sem board (home, /agent, /skill, /board).
+  function goTo(path) {
     setMenuOpen(false);
+    dispatch({ type: "SET_PATH", path });
+    navigate(path);
   }
 
   function handleBoardSaved(newBoard) {
     dispatch({ type: "BOARD_ADDED", board: newBoard });
     setShowInitBoard(false);
-    setSection("board");
-    navigate(`/${boardSlug(newBoard)}`);
+    const path = `/board/${boardSlug(newBoard)}`;
+    dispatch({ type: "SET_PATH", path });
+    navigate(path);
   }
 
   async function handleBoardUpdated(updatedBoard) {
@@ -175,10 +190,8 @@ function AppContent() {
     setRemoveConfirm(null);
     await cleanupBoardData(board);
     const next = boards.filter((b) => b.viewId !== board.viewId);
-    const fallback = next[0] ?? null;
-    const fallbackPath = fallback ? `/${boardSlug(fallback)}` : "/";
-    dispatch({ type: "BOARD_REMOVED", boardViewId: board.viewId, fallbackBoard: fallback, fallbackPath });
-    navigate(fallbackPath);
+    dispatch({ type: "BOARD_REMOVED", boardViewId: board.viewId, fallbackBoard: null, fallbackPath: "/board" });
+    navigate("/board");
     await fetch("/api/config", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -207,9 +220,8 @@ function AppContent() {
         onClose={() => setMenuOpen(false)}
         boards={boards}
         activePath={activePath}
-        section={section}
         onSelectBoard={selectBoard}
-        onSelectSection={selectSection}
+        onNavigate={goTo}
         onInitBoard={() => setShowInitBoard(true)}
         onRemoveBoard={removeBoard}
         onSettings={() => setShowSettings(true)}
@@ -236,10 +248,18 @@ function AppContent() {
           </div>
         </div>
 
-        {section === "agents" ? (
+        {route === "agent" ? (
           <AgentsView />
-        ) : section === "skill" ? (
+        ) : route === "skill" ? (
           <SkillView />
+        ) : route === "home" ? (
+          <HomeView onGoBoards={() => goTo("/board")} />
+        ) : route === "boardList" ? (
+          <BoardListView
+            boards={boards}
+            onSelectBoard={selectBoard}
+            onInitBoard={() => setShowInitBoard(true)}
+          />
         ) : activeBoard ? (
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex items-center justify-between px-4 py-2 border-b">
@@ -316,14 +336,14 @@ function AppContent() {
         <div className="flex flex-1 items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-center">
             <FlowerMark className="size-12" />
-            <h2 className="text-base font-semibold">{t("board.none")}</h2>
-            <p className="text-sm text-muted-foreground">{t("board.none.desc")}</p>
+            <h2 className="text-base font-semibold">{t("board.notFound")}</h2>
+            <p className="text-sm text-muted-foreground">{t("board.notFound.desc")}</p>
             <Button
               type="button"
-              onClick={() => setShowInitBoard(true)}
+              onClick={() => goTo("/board")}
             >
-              <Plus />
-              {t("board.init")}
+              <LayoutGrid />
+              {t("home.cta")}
             </Button>
           </div>
         </div>

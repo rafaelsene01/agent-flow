@@ -1,4 +1,4 @@
-import { boardSlug } from "@/lib/boardSlug.js";
+import { boardFromPath } from "@/lib/boardSlug.js";
 
 export const initialState = {
   initializing: true,
@@ -44,8 +44,7 @@ export function appReducer(state, action) {
       // Path inalterado: retorna o mesmo estado para evitar re-render (e o loop
       // causado por replaceState interno do Next disparando locationchange).
       if (action.path === state.activePath) return state;
-      const slug    = action.path.slice(1);
-      const matched = slug ? state.boards.find((b) => boardSlug(b) === slug) : null;
+      const matched = boardFromPath(state.boards, action.path);
       return {
         ...state,
         activePath:  action.path,

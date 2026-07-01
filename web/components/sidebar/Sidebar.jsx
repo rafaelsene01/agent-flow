@@ -31,7 +31,7 @@ function NavItem({ icon: Icon, label, active, onClick }) {
 }
 
 function SidebarContent({
-  boards, activePath, section, onSelectBoard, onSelectSection,
+  boards, activePath, onSelectBoard, onNavigate,
   onInitBoard, onRemoveBoard,
   onSettings, theme, onToggleTheme,
 }) {
@@ -39,11 +39,15 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Marca */}
-      <div className="flex items-center gap-1.5 px-3 py-3">
+      {/* Marca (leva à home) */}
+      <button
+        type="button"
+        onClick={() => onNavigate("/")}
+        className="flex items-center gap-1.5 px-3 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
         <FlowerMark className="size-4 shrink-0" />
         <h1 className="text-base font-semibold leading-none">Agent Flow</h1>
-      </div>
+      </button>
 
       {/* Navegação */}
       <nav className="flex-1 overflow-y-auto px-2">
@@ -55,22 +59,31 @@ function SidebarContent({
           <NavItem
             icon={Bot}
             label={t("sidebar.agents")}
-            active={section === "agents"}
-            onClick={() => onSelectSection("agents")}
+            active={activePath === "/agent"}
+            onClick={() => onNavigate("/agent")}
           />
           <NavItem
             icon={Sparkles}
             label={t("sidebar.skill")}
-            active={section === "skill"}
-            onClick={() => onSelectSection("skill")}
+            active={activePath === "/skill"}
+            onClick={() => onNavigate("/skill")}
           />
         </div>
 
         {/* Boards */}
         <div className="flex items-center justify-between px-2.5 pb-1 pt-4">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+          <button
+            type="button"
+            onClick={() => onNavigate("/board")}
+            className={cn(
+              "text-[11px] font-medium uppercase tracking-wide outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-colors",
+              activePath === "/board"
+                ? "text-foreground"
+                : "text-muted-foreground/70 hover:text-foreground"
+            )}
+          >
             {t("sidebar.boards")}
-          </p>
+          </button>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -91,7 +104,7 @@ function SidebarContent({
               <SidebarBoardItem
                 key={`${b.id}-${b.viewId ?? "no-view"}`}
                 board={b}
-                isActive={section === "board" && boardSlug(b) === activePath.slice(1)}
+                isActive={activePath === `/board/${boardSlug(b)}`}
                 onSelect={onSelectBoard}
                 onRemove={onRemoveBoard}
               />
