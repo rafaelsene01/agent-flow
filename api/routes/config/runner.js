@@ -650,7 +650,8 @@ export default function runnerRoutes(app) {
 
     (async () => {
       try {
-        const prompt = langInstruction() + message.trim();
+        // Envia apenas o input do usuário, sem injetar nenhum outro prompt.
+        const prompt = message.trim();
         const opts = { model: model || "sonnet", effort: effort || "medium" };
         logStream.write(
           `=== Mensagem do usuário (sessão ${targetId}${started ? ", resume" : ", nova"}) ===\n`,
