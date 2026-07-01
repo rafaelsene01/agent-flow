@@ -181,6 +181,10 @@ export const dictionaries = {
     "skill.title": "Skill",
     "skill.desc": "Crie e organize skills reutilizáveis. Esta área está em construção.",
     "skill.soon": "Em breve",
+    "skill.subtitle": "Ative as skills de ~/.claude/skills para uso posterior.",
+    "skill.empty": "Nenhuma skill encontrada em ~/.claude/skills.",
+    "skill.loadError": "Falha ao carregar as skills.",
+    "skill.toggleError": "Falha ao atualizar a skill.",
 
     // InitBoardModal
     "board.add": "Adicionar Board",
@@ -367,6 +371,10 @@ export const dictionaries = {
     "skill.title": "Skill",
     "skill.desc": "Create and organize reusable skills. This area is under construction.",
     "skill.soon": "Coming soon",
+    "skill.subtitle": "Enable skills from ~/.claude/skills for later use.",
+    "skill.empty": "No skills found in ~/.claude/skills.",
+    "skill.loadError": "Failed to load skills.",
+    "skill.toggleError": "Failed to update skill.",
 
     // InitBoardModal
     "board.add": "Add Board",

@@ -4,3 +4,4 @@ web/out/
 web/.next/
 .agent-flow.json
 *.log
+.specs

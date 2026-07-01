@@ -1,0 +1,103 @@
+import fs from "fs";
+import path from "path";
+import { homedir } from "os";
+import { getConfig, setConfig } from "../config/config.service.js";
+
+// Skills instaladas ficam em ~/.claude/skills (mesmo diretório usado por claude.service.js).
+const SKILLS_DIR = path.join(homedir(), ".claude", "skills");
+
+// Resolve o arquivo de definição de uma skill: subdiretório com SKILL.md ou <nome>.md avulso.
+function skillFilePath(name) {
+  const dirFile = path.join(SKILLS_DIR, name, "SKILL.md");
+  if (fs.existsSync(dirFile)) return dirFile;
+  const flatFile = path.join(SKILLS_DIR, `${name}.md`);
+  if (fs.existsSync(flatFile)) return flatFile;
+  return null;
+}
+
+// Parser mínimo de frontmatter: extrai `description` do bloco `---`.
+// Suporta valor inline e escalar dobrado/literal (`description: >` ou `|` seguido de linhas indentadas).
+function parseDescription(content) {
+  const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return "";
+  const lines = m[1].split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const inline = lines[i].match(/^description:\s*(.*)$/);
+    if (!inline) continue;
+    const val = inline[1].trim();
+    if (val && val !== ">" && val !== "|") return val;
+    // Escalar multi-linha: junta as linhas indentadas seguintes.
+    const folded = [];
+    for (let j = i + 1; j < lines.length; j++) {
+      if (/^\s+\S/.test(lines[j])) folded.push(lines[j].trim());
+      else break;
+    }
+    return folded.join(" ");
+  }
+  return "";
+}
+
+// R1: descobre skills em ~/.claude/skills. Diretório ausente → [] (sem erro).
+export function listSkills() {
+  let entries;
+  try {
+    entries = fs.readdirSync(SKILLS_DIR, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const skills = [];
+  for (const e of entries) {
+    // existsSync/statSync seguem symlinks — skills podem ser junctions no Windows,
+    // então não dá para confiar em Dirent.isDirectory()/isFile().
+    const full = path.join(SKILLS_DIR, e.name);
+    let name = null;
+    if (fs.existsSync(path.join(full, "SKILL.md"))) {
+      name = e.name; // subdiretório (ou symlink p/ dir) com SKILL.md
+    } else if (e.name.endsWith(".md") && fs.statSync(full).isFile()) {
+      name = e.name.slice(0, -3); // arquivo .md avulso
+    }
+    if (!name) continue;
+    const filePath = skillFilePath(name);
+    let description = "";
+    try {
+      description = parseDescription(fs.readFileSync(filePath, "utf-8"));
+    } catch {}
+    skills.push({ name, description, path: filePath });
+  }
+  return skills;
+}
+
+// R2: estado de ativação persistido em config.json → activeSkills (default []).
+export function getActiveSkillNames() {
+  return getConfig().activeSkills ?? [];
+}
+
+export async function setSkillActive(name, active) {
+  const current = getConfig().activeSkills ?? [];
+  const next = active
+    ? [...new Set([...current, name])]
+    : current.filter((n) => n !== name);
+  await setConfig({ activeSkills: next });
+  return next;
+}
+
+// R3: descoberta + estado (para a tela de skills).
+export function getSkills() {
+  const active = new Set(getActiveSkillNames());
+  return listSkills().map((s) => ({ ...s, active: active.has(s.name) }));
+}
+
+// R5: apenas as skills ativas, com o conteúdo bruto pronto para injeção futura em prompt.
+// NÃO é consumido por nenhum fluxo hoje — criado para uso posterior.
+export function getActiveSkills() {
+  const active = new Set(getActiveSkillNames());
+  return listSkills()
+    .filter((s) => active.has(s.name))
+    .map((s) => {
+      let content = "";
+      try {
+        content = fs.readFileSync(s.path, "utf-8");
+      } catch {}
+      return { name: s.name, description: s.description, path: s.path, content };
+    });
+}
