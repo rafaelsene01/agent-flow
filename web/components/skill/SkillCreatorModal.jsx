@@ -13,6 +13,7 @@ import {
   FileText,
   Code,
   User,
+  ArrowLeft,
 } from "lucide-react";
 import {
   Dialog,
@@ -33,14 +34,23 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/lib/toast";
 
+// Nome vira o basename da pasta em .claude/skills/<name>; espelha a validação do
+// backend (saveSkill em skill-creator.js): minúsculas, números e hífens.
+const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
+
 /**
- * Modal de criação de skill: conduz uma entrevista com o Claude (skill-creator via
- * wrapper estruturado). Cada abertura gera um UUID novo usado como sessão (-n). Cada
- * turno volta como pergunta (com opções sugeridas) ou como a SKILL.md pronta, que o
- * usuário revisa (markdown/texto), nomeia e salva.
+ * Modal de criação de skill com dois modos:
+ * - "form" (padrão): o usuário informa o nome (pasta) e cola/edita o conteúdo da
+ *   SKILL.md, revisando em markdown ou texto, e salva.
+ * - "ai": conduz uma entrevista com o Claude (skill-creator via wrapper estruturado);
+ *   ao concluir, preenche nome/conteúdo e volta ao formulário para revisar e salvar.
+ * Cada abertura gera um UUID novo usado como sessão (-n) do fluxo de IA.
  */
 export default function SkillCreatorModal({ onClose, onSaved }) {
   const { toast } = useToast();
+  const [mode, setMode] = useState("form"); // "form" | "ai"
+
+  // Estado do fluxo de IA.
   const [sessionId] = useState(() => crypto.randomUUID());
   const [started, setStarted] = useState(false);
   const [model, setModel] = useState("sonnet");
@@ -49,17 +59,21 @@ export default function SkillCreatorModal({ onClose, onSaved }) {
   const [thread, setThread] = useState([]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState(null);
 
-  // Estado final (skill pronta para revisar/salvar).
-  const [final, setFinal] = useState(null); // marca que estamos na etapa de salvar
+  // Estado do formulário (revisar/nomear/salvar).
   const [name, setName] = useState("");
   const [content, setContent] = useState("");
-  const [view, setView] = useState("markdown"); // "markdown" | "text"
+  const [view, setView] = useState("text"); // "markdown" | "text"
   const [saving, setSaving] = useState(false);
+
+  const [error, setError] = useState(null);
 
   const lastQuestion = [...thread].reverse().find((m) => m.role === "assistant");
   const options = lastQuestion?.options ?? [];
+
+  const trimmedName = name.trim();
+  const nameInvalid = trimmedName.length > 0 && !NAME_RE.test(trimmedName);
+  const canSave = !saving && trimmedName.length > 0 && !nameInvalid && content.trim().length > 0;
 
   async function send() {
     const text = draft.trim();
@@ -78,10 +92,11 @@ export default function SkillCreatorModal({ onClose, onSaved }) {
       if (data.error) throw new Error(data.error);
       setStarted(true);
       if (data.type === "complete") {
+        // IA concluiu: preenche o formulário e volta para revisão/salvar.
         setName(data.name ?? "");
         setContent(data.content ?? "");
         setView("markdown");
-        setFinal(true);
+        setMode("form");
       } else {
         setThread((t) => [
           ...t,
@@ -110,14 +125,14 @@ export default function SkillCreatorModal({ onClose, onSaved }) {
   }
 
   async function save() {
-    if (!name.trim() || !content.trim() || saving) return;
+    if (!canSave) return;
     setSaving(true);
     setError(null);
     try {
       const res = await fetch("/api/skills/create/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), content }),
+        body: JSON.stringify({ name: trimmedName, content }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -142,9 +157,22 @@ export default function SkillCreatorModal({ onClose, onSaved }) {
         {/* ── Header ── */}
         <DialogHeader className="flex-row items-center justify-between gap-2 border-b px-5 py-3.5 shrink-0">
           <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-muted-foreground shrink-0" />
+            {mode === "ai" ? (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                type="button"
+                onClick={() => { setMode("form"); setError(null); }}
+                aria-label="Voltar"
+                title="Voltar ao formulário"
+              >
+                <ArrowLeft className="size-4" />
+              </Button>
+            ) : (
+              <Sparkles className="size-4 text-muted-foreground shrink-0" />
+            )}
             <DialogTitle className="text-sm font-semibold leading-none">
-              Criar skill
+              {mode === "ai" ? "Gerar skill com IA" : "Criar skill"}
             </DialogTitle>
           </div>
           <Button variant="ghost" size="icon-xs" type="button" onClick={onClose} aria-label="Fechar">
@@ -152,8 +180,8 @@ export default function SkillCreatorModal({ onClose, onSaved }) {
           </Button>
         </DialogHeader>
 
-        {final ? (
-          /* ── Etapa final: revisar, nomear e salvar ── */
+        {mode === "form" ? (
+          /* ── Formulário: nomear, colar/editar e salvar ── */
           <>
             <div className="flex flex-col gap-3 border-b px-5 py-3.5 shrink-0">
               <div className="flex flex-col gap-1.5">
@@ -166,31 +194,53 @@ export default function SkillCreatorModal({ onClose, onSaved }) {
                   placeholder="minha-skill"
                   autoComplete="off"
                   spellCheck="false"
-                  className="font-mono text-xs"
+                  aria-invalid={nameInvalid || undefined}
+                  className="font-mono text-xs aria-[invalid=true]:border-destructive aria-[invalid=true]:focus-visible:ring-destructive/20"
                 />
+                {nameInvalid ? (
+                  <p className="text-xs text-destructive">
+                    Use apenas letras minúsculas, números e hífens (começando por letra ou número).
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Vira a pasta <code className="text-[11px]">.claude/skills/{trimmedName || "minha-skill"}/SKILL.md</code>
+                  </p>
+                )}
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <Tabs value={view} onValueChange={setView}>
                   <TabsList className="h-7 px-[3px] py-[2px]">
-                    <TabsTrigger value="markdown" className="gap-1 text-xs px-2 py-0.5 h-[calc(100%-2px)]">
-                      <FileText className="size-3" />
-                      Markdown
-                    </TabsTrigger>
                     <TabsTrigger value="text" className="gap-1 text-xs px-2 py-0.5 h-[calc(100%-2px)]">
                       <Code className="size-3" />
                       Texto
                     </TabsTrigger>
+                    <TabsTrigger value="markdown" className="gap-1 text-xs px-2 py-0.5 h-[calc(100%-2px)]">
+                      <FileText className="size-3" />
+                      Markdown
+                    </TabsTrigger>
                   </TabsList>
                 </Tabs>
-                <Button
-                  size="sm"
-                  onClick={save}
-                  disabled={saving || !name.trim() || !content.trim()}
-                  className="h-7 gap-1 px-2.5 text-xs"
-                >
-                  {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
-                  Salvar
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => { setMode("ai"); setError(null); }}
+                    className="h-7 gap-1 px-2.5 text-xs"
+                  >
+                    <Sparkles className="size-3" />
+                    Gerar com IA
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={save}
+                    disabled={!canSave}
+                    className="h-7 gap-1 px-2.5 text-xs"
+                  >
+                    {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
+                    Criar
+                  </Button>
+                </div>
               </div>
               {error && <p className="text-xs text-destructive">⚠ {error}</p>}
             </div>
@@ -200,22 +250,27 @@ export default function SkillCreatorModal({ onClose, onSaved }) {
                   className="h-full min-h-0 resize-none font-mono text-[13px] leading-relaxed focus-visible:ring-1 [field-sizing:fixed]"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
+                  placeholder={"Cole aqui o conteúdo da SKILL.md…\n\n---\nname: minha-skill\ndescription: quando usar esta skill\n---\n\n# Minha Skill\n..."}
                   spellCheck={false}
                 />
               ) : (
                 <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[[rehypeHighlight, { detect: false }]]}
-                  >
-                    {content}
-                  </ReactMarkdown>
+                  {content.trim() ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[[rehypeHighlight, { detect: false }]]}
+                    >
+                      {content}
+                    </ReactMarkdown>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nada para pré-visualizar ainda.</p>
+                  )}
                 </div>
               )}
             </div>
           </>
         ) : (
-          /* ── Etapa de conversa ── */
+          /* ── Fluxo de IA: entrevista ── */
           <>
             <div className="min-h-0 flex-1 overflow-auto px-5 py-4 flex flex-col gap-4">
               {thread.length === 0 && (
