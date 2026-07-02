@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, Plus, FileText, Pencil } from "lucide-react";
+import { Bot, Plus, FileText, Pencil, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,8 +23,17 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useI18n } from "@/lib/i18nContext";
 import { useToast } from "@/lib/toast";
+
+// Accent por modelo — dá identidade visual ao badge sem depender de cor crua nos
+// componentes; usa tints com contraste testado em light/dark.
+const MODEL_BADGE = {
+  opus: "border-transparent bg-primary/12 text-primary",
+  sonnet: "border-transparent bg-blue-500/12 text-blue-600 dark:text-blue-400",
+  haiku: "border-transparent bg-emerald-500/12 text-emerald-600 dark:text-emerald-400",
+};
 
 /**
  * Tela "/agent": cria e lista agents. Cada agent tem nome, prompt e skills
@@ -40,6 +49,8 @@ export default function AgentsView() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null); // null | agent em edição
   const [promptView, setPromptView] = useState(null); // { name, prompt } | "loading"
+  const [confirmDelete, setConfirmDelete] = useState(null); // agent a excluir
+  const [deleting, setDeleting] = useState(false);
   // Skills globais (ativas) — omitidas dos badges do agent, pois já se aplicam
   // globalmente e não são específicas do agent (mesma dedup do buildAgentPrompt).
   const [activeSkills, setActiveSkills] = useState(() => new Set());
@@ -68,75 +79,130 @@ export default function AgentsView() {
     }
   }
 
+  async function handleDelete() {
+    const id = confirmDelete?.id;
+    if (!id) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/agents/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setAgents(data.agents ?? []);
+      setConfirmDelete(null);
+    } catch {
+      toast({ title: t("agents.deleteError"), variant: "error" });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col min-h-0 p-6">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Bot className="size-5 text-muted-foreground" />
-          <h1 className="text-xl font-semibold">{t("agents.title")}</h1>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+            <Bot className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight">{t("agents.title")}</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">{t("agents.subtitle")}</p>
+          </div>
         </div>
-        <Button type="button" size="sm" onClick={() => setCreating(true)}>
+        <Button type="button" size="sm" className="shrink-0" onClick={() => setCreating(true)}>
           <Plus className="size-4" />
           {t("agents.new")}
         </Button>
       </div>
-      <p className="mb-4 text-sm text-muted-foreground">{t("agents.subtitle")}</p>
 
       {agents === null ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
         </div>
       ) : error ? (
         <p className="text-sm text-destructive">{t("agents.loadError")}</p>
       ) : agents.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("agents.empty")}</p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-16 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <Bot className="size-6" />
+          </div>
+          <p className="text-sm text-muted-foreground">{t("agents.empty")}</p>
+          <Button type="button" size="sm" onClick={() => setCreating(true)}>
+            <Plus className="size-4" />
+            {t("agents.new")}
+          </Button>
+        </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {agents.map((a) => (
-            <li key={a.id} className="flex flex-col gap-2 rounded-lg border bg-card/40 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <span className="min-w-0 flex-1 text-sm font-medium">{a.name}</span>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditing(a)}
-                    className="text-muted-foreground"
-                  >
-                    <Pencil className="size-4" />
-                    {t("agents.edit")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => viewPrompt(a)}
-                    className="text-muted-foreground"
-                  >
-                    <FileText className="size-4" />
-                    {t("agents.viewPrompt")}
-                  </Button>
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {agents.map((a) => {
+            const skills = (a.skills ?? []).filter((s) => !activeSkills.has(s));
+            return (
+              <li
+                key={a.id}
+                className="group flex flex-col gap-3 rounded-xl border bg-card/50 p-4 shadow-card transition-all duration-200 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card-hover"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-primary/10">
+                    <Bot className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{a.name}</span>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {a.model && (
+                        <Badge className={MODEL_BADGE[a.model] ?? "border-transparent bg-muted text-muted-foreground"}>
+                          {a.model}
+                        </Badge>
+                      )}
+                      {a.effort && <Badge variant="outline">{a.effort}</Badge>}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                    <Button
+                      type="button"
+                      size="icon-xs"
+                      variant="ghost"
+                      onClick={() => setEditing(a)}
+                      title={t("agents.edit")}
+                      aria-label={t("agents.edit")}
+                      className="text-muted-foreground"
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-xs"
+                      variant="ghost"
+                      onClick={() => viewPrompt(a)}
+                      title={t("agents.viewPrompt")}
+                      aria-label={t("agents.viewPrompt")}
+                      className="text-muted-foreground"
+                    >
+                      <FileText className="size-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-xs"
+                      variant="ghost"
+                      onClick={() => setConfirmDelete(a)}
+                      title={t("agents.delete")}
+                      aria-label={t("agents.delete")}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap">{a.prompt}</p>
-              <div className="flex flex-wrap gap-1">
-                {a.model && <Badge variant="outline">{a.model}</Badge>}
-                {a.effort && <Badge variant="outline">{a.effort}</Badge>}
-              </div>
-              {(() => {
-                const skills = (a.skills ?? []).filter((s) => !activeSkills.has(s));
-                return skills.length > 0 && (
+                <p className="line-clamp-2 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{a.prompt}</p>
+                {skills.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {skills.map((s) => (
-                      <Badge key={s} variant="secondary">{s}</Badge>
+                      <Badge key={s} variant="secondary" className="font-normal">{s}</Badge>
                     ))}
                   </div>
-                );
-              })()}
-            </li>
-          ))}
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -154,6 +220,16 @@ export default function AgentsView() {
           onSaved={(list) => { setAgents(list); setEditing(null); }}
         />
       )}
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title={t("agents.delete")}
+        targetName={confirmDelete?.name}
+        description={deleting ? t("agents.deleting") : t("agents.deleteConfirm")}
+        destructive
+        onCancel={() => { if (!deleting) setConfirmDelete(null); }}
+        onConfirm={handleDelete}
+      />
 
       <Dialog open={!!promptView} onOpenChange={(o) => { if (!o) setPromptView(null); }}>
         <DialogContent className="max-w-[640px] max-h-[85vh] flex flex-col overflow-hidden">

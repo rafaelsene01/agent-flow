@@ -131,37 +131,53 @@ export default function SkillView() {
 
   return (
     <div className="flex flex-1 flex-col min-h-0 p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <Sparkles className="size-5 text-muted-foreground" />
-        <h1 className="text-xl font-semibold">{t("skill.title")}</h1>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+            <Sparkles className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight">{t("skill.title")}</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">{t("skill.subtitle")}</p>
+          </div>
+        </div>
         <Button
           size="sm"
           type="button"
-          className="ml-auto gap-1.5"
+          className="shrink-0"
           onClick={() => setCreating(true)}
         >
           <Plus className="size-4" />
           Criar skill
         </Button>
       </div>
-      <p className="mb-4 text-sm text-muted-foreground">{t("skill.subtitle")}</p>
 
       {skills === null ? (
         <div className="flex flex-col gap-2">
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
         </div>
       ) : error ? (
         <p className="text-sm text-destructive">{t("skill.loadError")}</p>
       ) : skills.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("skill.empty")}</p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-16 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <Sparkles className="size-6" />
+          </div>
+          <p className="text-sm text-muted-foreground">{t("skill.empty")}</p>
+          <Button type="button" size="sm" onClick={() => setCreating(true)}>
+            <Plus className="size-4" />
+            Criar skill
+          </Button>
+        </div>
       ) : (
         <ul className="flex flex-col gap-2">
           {skills.map((s) => (
             <li
               key={s.name}
-              className="flex items-start gap-3 rounded-lg border bg-card/40 p-3"
+              data-active={s.active || undefined}
+              className="group flex items-start gap-3 rounded-xl border bg-card/50 p-3.5 shadow-card transition-all duration-200 hover:border-primary/30 hover:shadow-card-hover data-[active]:border-primary/40 data-[active]:bg-primary/[0.04]"
             >
               <Checkbox
                 id={`skill-${s.name}`}
@@ -172,7 +188,7 @@ export default function SkillView() {
               <label htmlFor={`skill-${s.name}`} className="min-w-0 flex-1 cursor-pointer">
                 <span className="block text-sm font-medium">{s.name}</span>
                 {s.description && (
-                  <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
+                  <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground line-clamp-2">
                     {s.description}
                   </span>
                 )}
@@ -186,6 +202,7 @@ export default function SkillView() {
                   onClick={() => setEditing(s)}
                   title="Editar skill"
                   aria-label="Editar skill"
+                  className="text-muted-foreground opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                 >
                   <Pencil className="size-3.5" />
                 </Button>
@@ -196,7 +213,7 @@ export default function SkillView() {
                   onClick={() => setConfirmDelete(s)}
                   title="Excluir skill"
                   aria-label="Excluir skill"
-                  className="text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground opacity-60 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
                 >
                   <Trash2 className="size-3.5" />
                 </Button>

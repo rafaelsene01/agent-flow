@@ -64,6 +64,13 @@ export async function updateAgent(id, { name, prompt, skills, model, effort }) {
   return updated;
 }
 
+// Remove um agent pelo id. Agent inexistente → erro (mapeado para 404 na rota).
+export async function deleteAgent(id) {
+  const current = getConfig().agents ?? [];
+  if (!current.some((a) => a.id === id)) throw new Error("Agent não encontrado");
+  await setConfig({ agents: current.filter((a) => a.id !== id) });
+}
+
 function skillBlock(s) {
   return `## Skill: ${s.name}\n\n${s.content}`;
 }

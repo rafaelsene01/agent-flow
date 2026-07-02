@@ -1,4 +1,4 @@
-import { listAgents, createAgent, updateAgent, buildAgentPrompt } from "../modules/agents/agents.service.js";
+import { listAgents, createAgent, updateAgent, deleteAgent, buildAgentPrompt } from "../modules/agents/agents.service.js";
 import { sendError } from "../lib/errors.js";
 
 export default function agentsRoutes(app) {
@@ -37,6 +37,17 @@ export default function agentsRoutes(app) {
         : /obrigatório/.test(err.message)
           ? 400
           : 500;
+      sendError(res, status, err.message, status === 500 ? err : null);
+    }
+  });
+
+  // Remove um agent e retorna a lista atualizada.
+  app.delete("/api/agents/:id", async (req, res) => {
+    try {
+      await deleteAgent(req.params.id);
+      res.json({ agents: listAgents() });
+    } catch (err) {
+      const status = /não encontrado/.test(err.message) ? 404 : 500;
       sendError(res, status, err.message, status === 500 ? err : null);
     }
   });
