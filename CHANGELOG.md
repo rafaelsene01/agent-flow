@@ -1,3 +1,12 @@
+# [1.33.0](https://github.com/rafaelsene01/agent-flow/compare/v1.32.0...v1.33.0) (2026-07-02)
+
+
+### Features
+
+* add delete functionality for agents ([3a34a57](https://github.com/rafaelsene01/agent-flow/commit/3a34a57e71413bc7f8cedc104ddb72b8909ac1a5))
+* enhance skills management with CRUD operations and column counts ([32ec665](https://github.com/rafaelsene01/agent-flow/commit/32ec665a5c8fb6b2c96c91d7107abed2197d3de8))
+* improve skill installation comparison logic ([0604886](https://github.com/rafaelsene01/agent-flow/commit/06048868a3ae6e3107f4e348c8c5a2ec1de754a1))
+
 # [1.32.0](https://github.com/rafaelsene01/agent-flow/compare/v1.31.0...v1.32.0) (2026-07-01)
 
 
