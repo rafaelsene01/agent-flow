@@ -22,7 +22,9 @@ export async function createAgent({ name, prompt, skills, model, effort }) {
   const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
   if (!trimmedName) throw new Error("name obrigatório");
   if (!trimmedPrompt) throw new Error("prompt obrigatório");
-  const linked = Array.isArray(skills) ? skills.filter((s) => typeof s === "string") : [];
+  const linked = Array.isArray(skills)
+    ? skills.filter((s) => typeof s === "string")
+    : [];
 
   const agent = {
     id: randomUUID(),
@@ -30,7 +32,8 @@ export async function createAgent({ name, prompt, skills, model, effort }) {
     prompt: trimmedPrompt,
     skills: [...new Set(linked)],
     model: typeof model === "string" && model.trim() ? model.trim() : "sonnet",
-    effort: typeof effort === "string" && effort.trim() ? effort.trim() : "medium",
+    effort:
+      typeof effort === "string" && effort.trim() ? effort.trim() : "medium",
     createdAt: new Date().toISOString(),
   };
   const current = getConfig().agents ?? [];
@@ -49,7 +52,9 @@ export async function updateAgent(id, { name, prompt, skills, model, effort }) {
   const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
   if (!trimmedName) throw new Error("name obrigatório");
   if (!trimmedPrompt) throw new Error("prompt obrigatório");
-  const linked = Array.isArray(skills) ? skills.filter((s) => typeof s === "string") : [];
+  const linked = Array.isArray(skills)
+    ? skills.filter((s) => typeof s === "string")
+    : [];
 
   const updated = {
     ...existing,
@@ -57,7 +62,8 @@ export async function updateAgent(id, { name, prompt, skills, model, effort }) {
     prompt: trimmedPrompt,
     skills: [...new Set(linked)],
     model: typeof model === "string" && model.trim() ? model.trim() : "sonnet",
-    effort: typeof effort === "string" && effort.trim() ? effort.trim() : "medium",
+    effort:
+      typeof effort === "string" && effort.trim() ? effort.trim() : "medium",
     updatedAt: new Date().toISOString(),
   };
   await setConfig({ agents: current.map((a) => (a.id === id ? updated : a)) });
@@ -67,12 +73,11 @@ export async function updateAgent(id, { name, prompt, skills, model, effort }) {
 // Remove um agent pelo id. Agent inexistente → erro (mapeado para 404 na rota).
 export async function deleteAgent(id) {
   const current = getConfig().agents ?? [];
-  if (!current.some((a) => a.id === id)) throw new Error("Agent não encontrado");
+  if (!current.some((a) => a.id === id))
+    throw new Error("Agent não encontrado");
   await setConfig({ agents: current.filter((a) => a.id !== id) });
 }
 
-function skillBlock(s) {
-  return `## Skill: ${s.name}\n\n${s.content}`;
 // Formata a instrução que aponta as skills a usar, ex.: "Use as skills A, B e C."
 function skillsInstruction(names) {
   const list =
