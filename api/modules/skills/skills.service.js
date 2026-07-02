@@ -94,6 +94,50 @@ export function getSkills() {
   }));
 }
 
+// Conteúdo bruto da SKILL.md de uma skill (para edição na UI).
+export function getSkillContent(name) {
+  const file = skillFilePath(name);
+  if (!file) throw new Error("Skill não encontrada.");
+  return fs.readFileSync(file, "utf-8");
+}
+
+// Sobrescreve o conteúdo da SKILL.md existente. Segue junction/symlink (edita o alvo).
+export function updateSkillContent(name, content) {
+  const file = skillFilePath(name);
+  if (!file) throw new Error("Skill não encontrada.");
+  if (typeof content !== "string") throw new Error("Conteúdo inválido.");
+  fs.writeFileSync(file, content, "utf-8");
+  return { name, path: file };
+}
+
+// Remove a skill do projeto (subdiretório <name>/ ou arquivo avulso <name>.md) e
+// tira o nome de activeSkills. Para junction/symlink, remove só o vínculo.
+export async function deleteSkill(name) {
+  const dirPath = path.join(SKILLS_DIR, name);
+  const flatPath = path.join(SKILLS_DIR, `${name}.md`);
+  let target = null;
+  if (fs.existsSync(path.join(dirPath, "SKILL.md"))) target = dirPath;
+  else if (fs.existsSync(flatPath)) target = flatPath;
+  if (!target) throw new Error("Skill não encontrada.");
+
+  const stat = fs.lstatSync(target);
+  if (stat.isSymbolicLink()) {
+    // junction/symlink: remove apenas o vínculo, nunca o destino
+    try {
+      fs.unlinkSync(target);
+    } catch {
+      fs.rmSync(target, { recursive: false, force: true });
+    }
+  } else {
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+
+  const current = getConfig().activeSkills ?? [];
+  if (current.includes(name)) {
+    await setConfig({ activeSkills: current.filter((n) => n !== name) });
+  }
+}
+
 // R5: apenas as skills ativas, com o conteúdo bruto pronto para injeção futura em prompt.
 // NÃO é consumido por nenhum fluxo hoje — criado para uso posterior.
 export function getActiveSkills() {

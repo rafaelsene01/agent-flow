@@ -7,22 +7,12 @@ import { Button } from "@/components/ui/button.jsx";
 import { Skeleton } from "@/components/ui/skeleton.jsx";
 import { RefreshCw, Inbox, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { columnAccent } from "@/lib/columnColors.js";
 import { useI18n } from "@/lib/i18nContext";
 
 // Intervalo do auto-refresh silencioso. Com o stale-while-revalidate do backend,
 // rebuscar periodicamente faz mudanças feitas no GitHub aparecerem sozinhas.
 const AUTO_REFRESH_MS = 60_000;
-
-const GH_COLORS = {
-  GRAY: "#7d8590",
-  BLUE: "#58a6ff",
-  GREEN: "#3fb950",
-  YELLOW: "#e3b341",
-  ORANGE: "#fb8f44",
-  RED: "#f85149",
-  PINK: "#f778ba",
-  PURPLE: "#bf68d9",
-};
 
 function ColumnLoader() {
   return (
@@ -144,7 +134,7 @@ export default function Column({
 
   const { hasNextPage } = pageRef.current;
 
-  const accentColor = GH_COLORS[columnColor] ?? GH_COLORS.GRAY;
+  const accentColor = columnAccent(columnColor);
 
   return (
     <div

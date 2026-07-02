@@ -35,6 +35,18 @@ export default function statusRoutes(app) {
     cpSync(src, dest, { recursive: true });
   }
 
+  // Skill genérica (fora do catálogo, ex.: criada pelo usuário): copia de
+  // <cwd>/.claude/skills/<skill> para o Claude global.
+  function installProjectSkill(skill, dest) {
+    const src = join(process.cwd(), ".claude", "skills", skill);
+    if (!existsSync(src)) {
+      const err = new Error("Skill não encontrada no projeto.");
+      err.statusCode = 404;
+      throw err;
+    }
+    cpSync(src, dest, { recursive: true });
+  }
+
   function installGit(cfg, dest) {
     const tmp = mkdtempSync(join(tmpdir(), "agent-flow-skill-"));
     try {
@@ -70,20 +82,25 @@ export default function statusRoutes(app) {
 
   app.post("/api/status/install-skill", async (req, res) => {
     const skill = req.body?.skill ?? "tlc-spec-driven";
-    const cfg = INSTALLABLE_SKILLS[skill];
+    const force = req.body?.force === true;
 
-    if (!cfg) {
+    if (typeof skill !== "string" || !/^[a-zA-Z0-9._-]+$/.test(skill)) {
       return res.status(400).json({ error: "Skill inválida." });
     }
+    const cfg = INSTALLABLE_SKILLS[skill];
 
     try {
-      if (cfg.type === "plugin") {
+      if (cfg?.type === "plugin") {
+        // `claude plugin install` é idempotente e atualiza para a versão atual.
         installPlugin(cfg);
       } else {
         const dest = join(homedir(), ".claude", "skills", skill);
+        // "Atualizar" (force) remove a cópia global antes de reinstalar.
+        if (force && existsSync(dest)) rmSync(dest, { recursive: true, force: true });
         if (!existsSync(dest)) {
-          if (cfg.type === "git") installGit(cfg, dest);
-          else installLocal(skill, dest);
+          if (cfg?.type === "git") installGit(cfg, dest);
+          else if (cfg?.type === "local") installLocal(skill, dest);
+          else installProjectSkill(skill, dest); // genérica: copia do projeto
         }
       }
       const data = await refresh();

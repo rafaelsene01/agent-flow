@@ -262,6 +262,29 @@ export async function listAllItems(projectId, { first = 50, after = null, repoNa
   return { items: slice.map(toClientItemWithColumn), hasNextPage, endCursor };
 }
 
+// Contagem de cards por coluna, servida do mesmo cache em memória usado pelas
+// colunas do board (sem chamadas extras ao GitHub). Espelha o limite de 20 do
+// fetch por coluna: a contagem é limitada a 20, deixando o "+" a cargo do cliente.
+const COLUMN_COUNT_CAP = 20;
+
+export async function listColumnCounts(projectId, { repoName = null, labels = null, text = null } = {}) {
+  const all = await getAllProjectItems(projectId);
+  const byId = {};
+  const byName = {};
+  for (const item of all) {
+    if (!matchesFilters(item, { repoName, labels, text })) continue;
+    if (item._statusOptionId) byId[item._statusOptionId] = (byId[item._statusOptionId] ?? 0) + 1;
+    if (item._status) {
+      const key = item._status.toLowerCase();
+      byName[key] = (byName[key] ?? 0) + 1;
+    }
+  }
+  const cap = (map) => { for (const key in map) if (map[key] > COLUMN_COUNT_CAP) map[key] = COLUMN_COUNT_CAP; };
+  cap(byId);
+  cap(byName);
+  return { byId, byName };
+}
+
 export async function listItemsByColumn(projectId, { columnId, columnName }, { first = 20, after = null, repoName = null, labels = null, text = null } = {}) {
   const all = await getAllProjectItems(projectId);
   const matched = all.filter((item) => {

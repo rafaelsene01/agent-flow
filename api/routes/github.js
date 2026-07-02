@@ -1,12 +1,23 @@
 import { listRepos }                                  from "../modules/github/github.repos.js";
 import { listBoards, listViews, listColumns, listBoardRepos } from "../modules/github/github.boards.js";
-import { listItems, listAllItems, listItemsByColumn }  from "../modules/github/github.items.js";
+import { listItems, listAllItems, listItemsByColumn, listColumnCounts } from "../modules/github/github.items.js";
 import { listBranches }                                 from "../modules/github/github.branches.js";
 import { setupWorktree }                               from "../modules/git/git.worktree.js";
 
 function sendError(res, err) {
   if (res.headersSent) return;
   res.status(500).json({ error: err?.message ?? String(err) });
+}
+
+// Decompõe o filtro da view (repo:/label:/texto livre) usado na filtragem
+// server-side dos itens em cache.
+function parseViewFilter(viewFilter) {
+  if (!viewFilter) return { repoName: null, labels: null, text: null };
+  const repoName = viewFilter.match(/repo:([^\s]+)/i)?.[1] ?? null;
+  const labels   = viewFilter.match(/label:([^\s]+)/i)?.[1] ?? null;
+  const text = viewFilter
+    .replace(/-?[\w-]+:[^\s]+/g, " ").replace(/["']/g, " ").replace(/\s+/g, " ").trim() || null;
+  return { repoName, labels, text };
 }
 
 export default function githubRoutes(app) {
@@ -36,19 +47,22 @@ export default function githubRoutes(app) {
       const after      = req.query.after      || null;
       const columnId   = req.query.columnId   || null;
       const columnName = req.query.columnName || req.query.column || null;
-      const viewFilter = req.query.viewFilter || null;
-      const repoName   = viewFilter ? (viewFilter.match(/repo:([^\s]+)/i)?.[1] ?? null) : null;
-      const labels     = viewFilter ? (viewFilter.match(/label:([^\s]+)/i)?.[1] ?? null) : null;
-      // Texto livre: tudo que não é um qualificador `chave:valor` vira busca por título.
-      const text = viewFilter
-        ? (viewFilter.replace(/-?[\w-]+:[^\s]+/g, " ").replace(/["']/g, " ").replace(/\s+/g, " ").trim() || null)
-        : null;
+      const { repoName, labels, text } = parseViewFilter(req.query.viewFilter || null);
       const result = (columnId || columnName)
         ? await listItemsByColumn(req.params.id, { columnId, columnName }, { first, after, repoName, labels, text })
         : await listAllItems(req.params.id, { after, repoName, labels, text });
       res.json(result);
     } catch (err) {
       console.error("[items]", err);
+      sendError(res, err);
+    }
+  });
+
+  app.get("/api/github/boards/:id/column-counts", async (req, res) => {
+    try {
+      const { repoName, labels, text } = parseViewFilter(req.query.viewFilter || null);
+      res.json(await listColumnCounts(req.params.id, { repoName, labels, text }));
+    } catch (err) {
       sendError(res, err);
     }
   });

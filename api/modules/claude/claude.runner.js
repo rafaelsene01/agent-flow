@@ -247,7 +247,7 @@ export function runClaude(
   return new Promise((resolve) => {
     let output = "";
     let settled = false;
-    const { model = null, effort = null } = opts;
+    const { model = null, effort = null, sessionId = null } = opts;
     const baseArgs = [
       ...(model ? ["--model", model] : []),
       ...(effort ? ["--effort", effort] : []),
@@ -256,7 +256,15 @@ export function runClaude(
       "--verbose",
       "--dangerously-skip-permissions",
     ];
-    const args = sessionName ? ["-n", sessionName, ...baseArgs] : baseArgs;
+    // --session-id fixa o ID da sessão (resumível por --resume <uuid>); -n define
+    // só um nome de exibição. Fluxos de worktree usam -n; a criação de skill passa
+    // um UUID via opts.sessionId para poder retomar a conversa depois.
+    const sessionArgs = sessionId
+      ? ["--session-id", sessionId]
+      : sessionName
+        ? ["-n", sessionName]
+        : [];
+    const args = [...sessionArgs, ...baseArgs];
     const child = spawn("claude", args, {
       cwd,
       shell: isWin,
