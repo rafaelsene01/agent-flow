@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { getConfig, setConfig } from "../config/config.service.js";
-import { getActiveSkills, getSkillsContent } from "../skills/skills.service.js";
+import { listSkills, getActiveSkillNames } from "../skills/skills.service.js";
 
 // Agents persistem em ~/.agent-flow/config.json → agents (default []). Mesmo
 // padrão de read-modify-write usado por activeSkills nas skills.
@@ -73,33 +73,34 @@ export async function deleteAgent(id) {
 
 function skillBlock(s) {
   return `## Skill: ${s.name}\n\n${s.content}`;
+// Formata a instrução que aponta as skills a usar, ex.: "Use as skills A, B e C."
+function skillsInstruction(names) {
+  const list =
+    names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
+  return `Use ${names.length === 1 ? "a skill" : "as skills"} ${list}.`;
 }
 
 // Monta o prompt final do agent:
-//   1. contexto de TODAS as skills ativas (global)
-//   2. prompt do agent
-//   3. contexto das skills linkadas ao agent que ainda NÃO estão ativas
-// Skills que são ativas E linkadas aparecem só uma vez (no bloco 1), evitando
-// duplicação no prompt final.
+//   1. prompt do agent
+//   2. instrução apontando as skills a usar (ativas globais + linkadas ao agent)
+// As skills não são injetadas por conteúdo: o próprio agent as carrega quando
+// precisar. Assim o prompt/log fica limpo e sem duplicar o conteúdo bruto.
 export function buildAgentPrompt(id) {
   const agent = getAgent(id);
   if (!agent) throw new Error("Agent não encontrado");
 
-  const active = getActiveSkills();
-  const activeNames = new Set(active.map((s) => s.name));
-  const linkedOnly = getSkillsContent(agent.skills).filter(
-    (s) => !activeNames.has(s.name),
-  );
+  const known = new Set(listSkills().map((s) => s.name));
+  const names = [];
+  const seen = new Set();
+  for (const name of [...getActiveSkillNames(), ...(agent.skills ?? [])]) {
+    if (!known.has(name) || seen.has(name)) continue;
+    seen.add(name);
+    names.push(name);
+  }
 
-  const sections = [];
-  if (active.length) {
-    sections.push("# Skills Ativas");
-    for (const s of active) sections.push(skillBlock(s));
-  }
-  sections.push(`# Agent: ${agent.name}\n\n${agent.prompt}`);
-  if (linkedOnly.length) {
-    sections.push("# Skills Linkadas");
-    for (const s of linkedOnly) sections.push(skillBlock(s));
-  }
+  const sections = [`# Agent: ${agent.name}\n\n${agent.prompt}`];
+  if (names.length) sections.push(skillsInstruction(names));
   return sections.join("\n\n");
 }

@@ -308,7 +308,7 @@ export default function runnerRoutes(app) {
 
         const impl = await (sessionStarted
           ? resumeClaude(prompt, wt.path, logStream, runSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" })
-          : runClaude(prompt, wt.path, logStream, runSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" }));
+          : runClaude(prompt, wt.path, logStream, runSessionId, (child) => { registerProcess(id, child); updateChatSession(id, runSessionId, { started: true }); }, { model: model || "sonnet", effort: effort || "medium" }));
 
         if (impl.code !== 0) {
           logStream.end();
@@ -496,7 +496,7 @@ export default function runnerRoutes(app) {
 
         const impl = await (sessionStarted
           ? resumeClaude(prompt, wt.path, logStream, runSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" })
-          : runClaude(prompt, wt.path, logStream, runSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" }));
+          : runClaude(prompt, wt.path, logStream, runSessionId, (child) => { registerProcess(id, child); updateChatSession(id, runSessionId, { started: true }); }, { model: model || "sonnet", effort: effort || "medium" }));
 
         if (impl.code !== 0) {
           logStream.end();
@@ -671,7 +671,7 @@ export default function runnerRoutes(app) {
               wt.path,
               logStream,
               targetId,
-              (child) => registerProcess(id, child),
+              (child) => { registerProcess(id, child); updateChatSession(id, targetId, { started: true }); },
               opts,
             );
 
@@ -762,7 +762,7 @@ export default function runnerRoutes(app) {
 
       const result = await (sessionStarted
         ? resumeClaude(prompt, wt.path, logStream, tlcSessionId, null, { model: model || "opus", effort: effort || "high" })
-        : runClaude(prompt, wt.path, logStream, tlcSessionId, null, { model: model || "opus", effort: effort || "high" }));
+        : runClaude(prompt, wt.path, logStream, tlcSessionId, () => updateChatSession(id, tlcSessionId, { started: true }), { model: model || "opus", effort: effort || "high" }));
 
       if (result.code !== 0) {
         logStream.end();
@@ -897,7 +897,7 @@ export default function runnerRoutes(app) {
 
         const impl = await (sessionStarted
           ? resumeClaude(execPrompt, wt.path, logStream, tlcExecSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" })
-          : runClaude(execPrompt, wt.path, logStream, tlcExecSessionId, (child) => registerProcess(id, child), { model: model || "sonnet", effort: effort || "medium" }));
+          : runClaude(execPrompt, wt.path, logStream, tlcExecSessionId, (child) => { registerProcess(id, child); updateChatSession(id, tlcExecSessionId, { started: true }); }, { model: model || "sonnet", effort: effort || "medium" }));
 
         if (impl.code !== 0) {
           logStream.end();
@@ -1180,7 +1180,7 @@ export default function runnerRoutes(app) {
 
         const result = await (sessionStarted
           ? resumeClaude(evalPrompt, wt.path, logStream, evalSessionId, (child) => registerProcess(id, child), { model: model || "opus", effort: effort || "high" })
-          : runClaude(evalPrompt, wt.path, logStream, evalSessionId, (child) => registerProcess(id, child), { model: model || "opus", effort: effort || "high" }));
+          : runClaude(evalPrompt, wt.path, logStream, evalSessionId, (child) => { registerProcess(id, child); updateChatSession(id, evalSessionId, { started: true }); }, { model: model || "opus", effort: effort || "high" }));
 
         if (result.code !== 0) {
           logStream.end();
@@ -1431,14 +1431,15 @@ export default function runnerRoutes(app) {
             opts,
           );
         } else {
+          const newCommitSessionId = targetSessionId ?? commitSessionId;
           commitResult = await runClaude(
             langInstruction() +
               "Analise as mudanças staged (`git diff --staged`) e crie um commit semântico (conventional commits) " +
               "com `--no-verify`. Não faça push.",
             wt.path,
             logStream,
-            targetSessionId ?? commitSessionId,
-            null,
+            newCommitSessionId,
+            () => updateChatSession(id, newCommitSessionId, { started: true }),
             opts,
           );
         }
@@ -1570,7 +1571,7 @@ export default function runnerRoutes(app) {
 
         const result = await (sessionStarted
           ? resumeClaude(prompt, wt.path, logStream, targetSessionId, null, { model: model || "sonnet", effort: effort || "medium" })
-          : runClaude(prompt, wt.path, logStream, targetSessionId, null, { model: model || "sonnet", effort: effort || "medium" }));
+          : runClaude(prompt, wt.path, logStream, targetSessionId, () => updateChatSession(id, targetSessionId, { started: true }), { model: model || "sonnet", effort: effort || "medium" }));
 
         if (result.code !== 0) {
           await new Promise((resolve) => logStream.end(resolve));

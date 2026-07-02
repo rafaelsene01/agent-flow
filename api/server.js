@@ -8,7 +8,7 @@ import usageRoutes from "./routes/usage.js";
 import skillsRoutes from "./routes/skills.js";
 import agentsRoutes from "./routes/agents.js";
 import { warmup } from "./modules/status/status.cache.js";
-import { warmItemsCache } from "./modules/github/github.items.js";
+import { warmItemsCache, startItemsPolling } from "./modules/github/github.items.js";
 import { WEB_DIST_DIR } from "./paths.js";
 import { getConfig, getWorktrees, updateWorktreeStatus } from "./modules/config/config.service.js";
 
@@ -106,6 +106,9 @@ export async function startServer({ port, apiOnly = false }) {
   warmup();
   // Pré-aquece o cache de itens de cada board para o board carregar instantâneo.
   for (const b of getConfig().boards ?? []) warmItemsCache(b.id);
+  // Mantém os cards frescos: revalida todos os boards em background a cada 60s,
+  // mesmo sem ninguém acessando. Lê a config a cada tick para pegar boards novos.
+  startItemsPolling(() => (getConfig().boards ?? []).map((b) => b.id));
 
   return { app, server, url: `http://${host}:${port}` };
 }
