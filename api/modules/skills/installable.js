@@ -1,6 +1,12 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import { PACKAGE_ROOT } from "../../paths.js";
+
+// Metadado gravado pelo runtime do Claude Code após a instalação (hash +
+// timestamp). Não faz parte do conteúdo da skill, então é ignorado na
+// comparação — senão skills locais acusariam "atualizar" para sempre.
+const RUNTIME_META = ".skill-meta.json";
 
 // Skills/plugins que o agent-flow sabe instalar globalmente (~/.claude).
 // type: "local" copia de dentro do projeto; "git" clona um repo remoto e copia
@@ -47,8 +53,8 @@ function pathsEqual(a, b) {
     return readFileSync(a).equals(readFileSync(b));
   }
   if (sa.isDirectory() && sb.isDirectory()) {
-    const ea = readdirSync(a).sort();
-    const eb = readdirSync(b).sort();
+    const ea = readdirSync(a).filter((n) => n !== RUNTIME_META).sort();
+    const eb = readdirSync(b).filter((n) => n !== RUNTIME_META).sort();
     if (ea.length !== eb.length) return false;
     if (ea.some((n, i) => n !== eb[i])) return false;
     return ea.every((n) => pathsEqual(join(a, n), join(b, n)));
@@ -61,8 +67,12 @@ function pathsEqual(a, b) {
 //   - ausente             → installed:false            → UI mostra "Instalar"
 //   - presente e difere    → installed:true, upToDate:false → "Atualizar" (habilitado)
 //   - presente e idêntico  → installed:true, upToDate:true  → "Atualizar" (desabilitado)
-// A comparação usa a versão do projeto (<cwd>/.claude/skills/<name>) como origem,
-// que é exatamente a listada na tela.
+// A origem da comparação deve ser a MESMA que o instalador (status.js) usa por
+// tipo — senão a skill acusa "atualizar" para sempre:
+//   - git/plugin → origem é remota (repo/CLI), não comparável byte-a-byte
+//     localmente (ex.: caveman traz README.md só no repo). Instalada ⇒ atual.
+//   - local      → origem é o pacote (PACKAGE_ROOT/.claude/skills), não o cwd.
+//   - genérica   → cópia do projeto (<cwd>/.claude/skills/<name>).
 export function getInstallState(name) {
   const cfg = INSTALLABLE_SKILLS[name];
   const kind = cfg?.kind ?? "Skill";
@@ -72,10 +82,18 @@ export function getInstallState(name) {
     return { installable: true, installed: false, upToDate: false, kind };
   }
 
-  const projectPath = skillTarget(projectSkillsDir(), name);
+  // Sem origem local comparável: presença global já significa instalada e atual.
+  if (cfg?.type === "git" || cfg?.type === "plugin") {
+    return { installable: true, installed: true, upToDate: true, kind };
+  }
+
+  const srcBase = cfg?.type === "local"
+    ? join(PACKAGE_ROOT, ".claude", "skills")
+    : projectSkillsDir();
+  const sourcePath = skillTarget(srcBase, name);
   let upToDate = false;
   try {
-    upToDate = projectPath ? pathsEqual(projectPath, globalPath) : false;
+    upToDate = sourcePath ? pathsEqual(sourcePath, globalPath) : false;
   } catch {
     // symlink quebrado, permissão, etc. → trata como "há algo a atualizar"
     upToDate = false;
