@@ -16,15 +16,19 @@ import {
   GitPullRequest,
   ListChecks,
   Loader2,
+  MessageCircleQuestion,
   Palette,
   Pencil,
   Play,
+  Rocket,
   RotateCcw,
   Send,
   X,
   Zap,
 } from "lucide-react";
 import CreateBranchModal from "@/components/CreateBranchModal.jsx";
+import EnqueueAgentModal from "@/components/running/EnqueueAgentModal.jsx";
+import RunModal from "@/components/running/RunModal.jsx";
 import CopyCmd from "@/components/board/CopyCmd.jsx";
 import TlcFileModal from "@/components/board/TlcFileModal.jsx";
 import FileContentModal from "@/components/board/FileContentModal.jsx";
@@ -46,6 +50,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.jsx";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip.jsx";
 import { cn } from "@/lib/utils";
+import { collapseLogLines } from "@/lib/logFormat";
 import { statusColor, statusLabel, fileIcon } from "@/lib/fileVisuals";
 import { useToast } from "@/lib/toast";
 import { useI18n } from "@/lib/i18nContext";
@@ -66,6 +71,15 @@ const ORIGIN_LABEL = {
   chat: "chat",
   agent: "agente",
   "create-pr": "PR",
+};
+
+// Cores do "pill" de status dos agent-runs listados no card.
+const RUN_STATUS_PILL = {
+  queued: "border-border text-muted-foreground",
+  processing: "border-blue-400/50 text-blue-600 dark:text-blue-400",
+  "waiting-input": "border-amber-400/60 text-amber-600 dark:text-amber-400",
+  done: "border-emerald-400/50 text-emerald-600 dark:text-emerald-400",
+  error: "border-destructive/50 text-destructive",
 };
 
 const RUN_DEFAULTS = {
@@ -137,6 +151,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const { toast } = useToast();
   const { t } = useI18n();
   const [showCreateBranch, setShowCreateBranch] = useState(false);
+  const [showEnqueueAgent, setShowEnqueueAgent] = useState(false);
+  const [cardRuns, setCardRuns] = useState(null); // null=loading, array=loaded (agent-runs deste card)
+  const [openRunId, setOpenRunId] = useState(null); // run cujo chat está aberto
   const [tlcFileModal, setTlcFileModal] = useState(null); // null | "spec" | "design" | "tasks"
   const [worktreeConfig, setWorktreeConfig] = useState(null); // null=loading false=none object=found
 
@@ -159,6 +176,26 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   }
 
   useEffect(loadWorktreeConfig, [worktreeId]);
+
+  // Agent-runs (fila) relacionados a este card. Poll enquanto o card está aberto
+  // para refletir mudanças de status (ex.: um run que passa a aguardar resposta).
+  function loadCardRuns() {
+    if (!board?.originRepo || item.number == null) {
+      setCardRuns([]);
+      return;
+    }
+    const qs = new URLSearchParams({ repo: board.originRepo, card: String(item.number) });
+    fetch(`/api/agent-runs?${qs}`)
+      .then((r) => r.json())
+      .then((d) => setCardRuns(d.runs ?? []))
+      .catch(() => setCardRuns((prev) => prev ?? []));
+  }
+
+  useEffect(() => {
+    loadCardRuns();
+    const timer = setInterval(loadCardRuns, 3000);
+    return () => clearInterval(timer);
+  }, [board?.originRepo, item.number]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isConfigured = !!worktreeConfig;
   const isChecking = worktreeConfig === null && worktreeId !== null;
@@ -304,6 +341,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     !!helpersFileModal ||
     !!tlcFileModal ||
     showCreateBranch ||
+    showEnqueueAgent ||
+    !!openRunId ||
     !!errorModal;
   const childModalGuardRef = useRef(false);
   useEffect(() => {
@@ -710,46 +749,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  const displayLogText = useMemo(() => {
-    if (!logText) return "";
-    // Matches simple event-type lines like [system/thinking_tokens] or [tool/result]
-    const COLLAPSIBLE = /^\[[\w/]+\]$/;
-    const lines = logText.split("\n");
-    const out = [];
-    let lastCollapsible = null;   // the line text
-    let lastCollapsibleIdx = -1;  // its index in out[]
-    let count = 0;
-
-    for (const line of lines) {
-      if (!line.trim()) {
-        // Preserve at most one blank line; absorb extras
-        if (out.length > 0 && out[out.length - 1] !== "") out.push("");
-        continue;
-      }
-
-      if (COLLAPSIBLE.test(line) && line === lastCollapsible) {
-        // Same collapsible line: update the existing entry in-place
-        count++;
-        out[lastCollapsibleIdx] = `${line}  ×${count}`;
-        // Remove the trailing blank that was added after the previous occurrence
-        if (out[out.length - 1] === "") out.pop();
-      } else {
-        out.push(line);
-        if (COLLAPSIBLE.test(line)) {
-          lastCollapsible = line;
-          lastCollapsibleIdx = out.length - 1;
-          count = 1;
-        } else {
-          // Non-collapsible content resets the collapsible tracking
-          lastCollapsible = null;
-          lastCollapsibleIdx = -1;
-          count = 0;
-        }
-      }
-    }
-
-    return out.join("\n");
-  }, [logText]);
+  const displayLogText = useMemo(() => collapseLogLines(logText), [logText]);
 
   return (
     <Dialog
@@ -1363,6 +1363,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     </Button>
                   )}
                 </div>
+
                 {isConfigured && (
                   <>
                     <div className="flex flex-col rounded-lg border bg-muted/50 px-2.5 py-1.5">
@@ -1378,6 +1379,18 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       </span>
                     </div>
                     <CopyCmd cmd={`cd ${worktreeConfig.path}`} />
+
+                    {/* ── Executar agente (fila): pipeline de agentes na branch configurada ── */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      onClick={() => setShowEnqueueAgent(true)}
+                      className="w-full justify-start gap-2 text-xs"
+                    >
+                      <Rocket className="size-3.5" />
+                      <span>{t("running.launch.button")}</span>
+                    </Button>
                   </>
                 )}
 
@@ -2015,6 +2028,38 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                 </span>
               </div>
             )}
+
+            {/* ── Execuções (agent-runs) deste card ── */}
+            {Array.isArray(cardRuns) && cardRuns.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <SidebarLabel>{t("running.card.title")}</SidebarLabel>
+                <div className="flex flex-col gap-1.5">
+                  {cardRuns.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setOpenRunId(r.id)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg border bg-card/50 px-2.5 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/40",
+                        r.status === "waiting-input" && "border-amber-400/60 bg-amber-500/[0.06]",
+                      )}
+                    >
+                      {r.status === "processing" && <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />}
+                      {r.status === "waiting-input" && <MessageCircleQuestion className="size-3.5 shrink-0 text-amber-500" />}
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium">{r.agent_name}</span>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+                          RUN_STATUS_PILL[r.status] ?? "text-muted-foreground",
+                        )}
+                      >
+                        {t(`running.status.${r.status}`)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </aside>
         </div>
       </DialogContent>
@@ -2028,6 +2073,17 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             onWorktreeChange?.();
           }}
         />
+      )}
+      {showEnqueueAgent && board && isConfigured && (
+        <EnqueueAgentModal
+          board={board}
+          item={item}
+          worktree={worktreeConfig}
+          onClose={() => { setShowEnqueueAgent(false); loadCardRuns(); }}
+        />
+      )}
+      {openRunId && (
+        <RunModal runId={openRunId} onClose={() => { setOpenRunId(null); loadCardRuns(); }} />
       )}
       {tlcFileModal && (
         <TlcFileModal

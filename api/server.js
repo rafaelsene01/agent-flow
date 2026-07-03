@@ -7,10 +7,12 @@ import githubRoutes from "./routes/github.js";
 import usageRoutes from "./routes/usage.js";
 import skillsRoutes from "./routes/skills.js";
 import agentsRoutes from "./routes/agents.js";
+import agentRunsRoutes from "./routes/agent-runs.js";
 import { warmup } from "./modules/status/status.cache.js";
 import { warmItemsCache, startItemsPolling } from "./modules/github/github.items.js";
 import { WEB_DIST_DIR } from "./paths.js";
 import { getConfig, getWorktrees, updateWorktreeStatus } from "./modules/config/config.service.js";
+import { recoverAndDispatch } from "./modules/agent-runs/agent-runs.queue.js";
 
 function recoverInterruptedRuns() {
   // Todos os campos que o runner marca como "running". Se o servidor reinicia ou
@@ -60,6 +62,8 @@ export async function startServer({ port, apiOnly = false }) {
   usageRoutes(app);
   skillsRoutes(app);
   agentsRoutes(app);
+  agentRunsRoutes(app);
+  recoverAndDispatch();
 
   if (!apiOnly) {
     // redirect:false evita que "/agent" seja redirecionado para "/agent/" (o export

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, Plus, FileText, Pencil, Trash2 } from "lucide-react";
+import { Bot, Plus, FileText, Pencil, Trash2, Lock } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -154,20 +154,28 @@ export default function AgentsView() {
                         </Badge>
                       )}
                       {a.effort && <Badge variant="outline">{a.effort}</Badge>}
+                      {a.isDefault && (
+                        <Badge variant="outline" className="gap-1 border-primary/20 text-primary">
+                          <Lock className="size-2.5" />
+                          {t("agents.default")}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                    <Button
-                      type="button"
-                      size="icon-xs"
-                      variant="ghost"
-                      onClick={() => setEditing(a)}
-                      title={t("agents.edit")}
-                      aria-label={t("agents.edit")}
-                      className="text-muted-foreground"
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
+                    {!a.isDefault && (
+                      <Button
+                        type="button"
+                        size="icon-xs"
+                        variant="ghost"
+                        onClick={() => setEditing(a)}
+                        title={t("agents.edit")}
+                        aria-label={t("agents.edit")}
+                        className="text-muted-foreground"
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       size="icon-xs"
@@ -179,17 +187,19 @@ export default function AgentsView() {
                     >
                       <FileText className="size-3.5" />
                     </Button>
-                    <Button
-                      type="button"
-                      size="icon-xs"
-                      variant="ghost"
-                      onClick={() => setConfirmDelete(a)}
-                      title={t("agents.delete")}
-                      aria-label={t("agents.delete")}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
+                    {!a.isDefault && (
+                      <Button
+                        type="button"
+                        size="icon-xs"
+                        variant="ghost"
+                        onClick={() => setConfirmDelete(a)}
+                        title={t("agents.delete")}
+                        aria-label={t("agents.delete")}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <p className="line-clamp-2 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{a.prompt}</p>

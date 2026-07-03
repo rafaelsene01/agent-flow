@@ -32,6 +32,7 @@ export default function Column({
   viewFilter,
   onCardOpen,
   worktrees,
+  runsAttention,
   originRepo,
 }) {
   const { t } = useI18n();
@@ -204,6 +205,7 @@ export default function Column({
               item={item}
               onOpen={onCardOpen}
               worktrees={worktrees}
+              runsAttention={runsAttention}
               originRepo={originRepo}
             />
           ))}

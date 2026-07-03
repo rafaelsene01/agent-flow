@@ -1,12 +1,17 @@
 import { randomUUID } from "crypto";
 import { getConfig, setConfig } from "../config/config.service.js";
 import { listSkills, getActiveSkillNames } from "../skills/skills.service.js";
+import { DEFAULT_AGENTS, isDefaultAgentId } from "./defaults/index.js";
 
 // Agents persistem em ~/.agent-flow/config.json → agents (default []). Mesmo
 // padrão de read-modify-write usado por activeSkills nas skills.
+//
+// Além dos criados pelo usuário, sempre expomos os agentes default que
+// acompanham o app (api/modules/agents/defaults/). Eles vêm primeiro na lista,
+// são marcados com isDefault e não podem ser editados nem excluídos.
 
 export function listAgents() {
-  return getConfig().agents ?? [];
+  return [...DEFAULT_AGENTS, ...(getConfig().agents ?? [])];
 }
 
 export function getAgent(id) {
@@ -44,6 +49,8 @@ export async function createAgent({ name, prompt, skills, model, effort }) {
 // Edita um agent existente (mesmas regras/validação do createAgent). Preserva id
 // e createdAt; regrava name, prompt, skills e model/effort. Agent inexistente → erro.
 export async function updateAgent(id, { name, prompt, skills, model, effort }) {
+  if (isDefaultAgentId(id))
+    throw new Error("Agent default não pode ser editado");
   const current = getConfig().agents ?? [];
   const existing = current.find((a) => a.id === id);
   if (!existing) throw new Error("Agent não encontrado");
@@ -72,6 +79,8 @@ export async function updateAgent(id, { name, prompt, skills, model, effort }) {
 
 // Remove um agent pelo id. Agent inexistente → erro (mapeado para 404 na rota).
 export async function deleteAgent(id) {
+  if (isDefaultAgentId(id))
+    throw new Error("Agent default não pode ser excluído");
   const current = getConfig().agents ?? [];
   if (!current.some((a) => a.id === id))
     throw new Error("Agent não encontrado");

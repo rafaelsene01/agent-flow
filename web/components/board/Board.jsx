@@ -16,6 +16,7 @@ export default function Board({ board, refreshSignal = 0 }) {
   const columns = normalizeColumns(board?.columns);
   const [activeCard, setActiveCard] = useState(null);
   const [worktrees, setWorktrees] = useState([]);
+  const [runsAttention, setRunsAttention] = useState({}); // "repo#num" -> { waiting, active }
   const [rateLimitError, setRateLimitError] = useState(null);
 
   function loadWorktrees() {
@@ -33,6 +34,25 @@ export default function Board({ board, refreshSignal = 0 }) {
   }
 
   useEffect(loadWorktrees, []);
+
+  // Sinalização de agent-runs por card (ex.: aguardando resposta). Poll leve e
+  // contínuo — independe de haver worktree, pois o run vive só no SQLite.
+  function loadRunsAttention() {
+    fetch("/api/agent-runs/attention")
+      .then((r) => r.json())
+      .then((d) => {
+        const map = {};
+        for (const c of d.cards ?? []) map[`${c.repo}#${c.cardNumber}`] = c;
+        setRunsAttention(map);
+      })
+      .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadRunsAttention();
+    const timer = setInterval(loadRunsAttention, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Recarrega worktrees quando o pai sinaliza (ex.: após limpar dados do board).
   useEffect(() => {
@@ -84,6 +104,7 @@ export default function Board({ board, refreshSignal = 0 }) {
             viewFilter={board.viewFilter ?? null}
             onCardOpen={setActiveCard}
             worktrees={worktrees}
+            runsAttention={runsAttention}
             originRepo={board?.originRepo ?? null}
           />
         ))}

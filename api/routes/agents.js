@@ -31,12 +31,14 @@ export default function agentsRoutes(app) {
       await updateAgent(req.params.id, { name, prompt, skills, model, effort });
       res.json({ agents: listAgents() });
     } catch (err) {
-      // Não encontrado → 404; validação (name/prompt obrigatório) → 400; resto → 500.
-      const status = /não encontrado/.test(err.message)
-        ? 404
-        : /obrigatório/.test(err.message)
-          ? 400
-          : 500;
+      // Default (não editável) → 403; não encontrado → 404; validação → 400; resto → 500.
+      const status = /default/.test(err.message)
+        ? 403
+        : /não encontrado/.test(err.message)
+          ? 404
+          : /obrigatório/.test(err.message)
+            ? 400
+            : 500;
       sendError(res, status, err.message, status === 500 ? err : null);
     }
   });
@@ -47,7 +49,12 @@ export default function agentsRoutes(app) {
       await deleteAgent(req.params.id);
       res.json({ agents: listAgents() });
     } catch (err) {
-      const status = /não encontrado/.test(err.message) ? 404 : 500;
+      // Default (não excluível) → 403; não encontrado → 404; resto → 500.
+      const status = /default/.test(err.message)
+        ? 403
+        : /não encontrado/.test(err.message)
+          ? 404
+          : 500;
       sendError(res, status, err.message, status === 500 ? err : null);
     }
   });

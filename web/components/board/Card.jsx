@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Clock, Check, GitBranch } from "lucide-react";
+import { Loader2, Clock, Check, GitBranch, MessageCircleQuestion } from "lucide-react";
 import { useI18n } from "@/lib/i18nContext";
 
 function Assignee({ login, avatarUrl }) {
@@ -36,18 +36,26 @@ function getLabelStyle(color) {
   return { "--label-c": `#${color ?? "888888"}` }
 }
 
-export default function Card({ item, onOpen, worktrees = [], originRepo = null }) {
+export default function Card({ item, onOpen, worktrees = [], runsAttention = {}, originRepo = null }) {
   const { t } = useI18n();
   const worktreeId =
     originRepo && item.number != null ? `${originRepo}#${item.number}` : null;
   const wt = worktreeId ? worktrees.find((w) => w.id === worktreeId) : null;
+  // Sinalização de agent-runs (fluxo novo, vive só no SQLite) — independe da worktree.
+  const runAttention =
+    originRepo && item.number != null ? runsAttention[`${originRepo}#${item.number}`] : null;
+  const runNeedsAnswer = !!runAttention?.waiting;
+  // Um agent-run (queued/processing) sinaliza execução mesmo sem worktree — ele
+  // vive só no SQLite. Trata como "running" para reaproveitar borda e ícone.
+  const runActive = !!runAttention?.active;
   const isRunning =
-    wt &&
-    (wt.status === "running" ||
-      wt.tlcStatus === "running" ||
-      wt.tlcExecStatus === "running" ||
-      wt.agentStatus === "running" ||
-      wt.commitPushStatus === "running");
+    runActive ||
+    (wt &&
+      (wt.status === "running" ||
+        wt.tlcStatus === "running" ||
+        wt.tlcExecStatus === "running" ||
+        wt.agentStatus === "running" ||
+        wt.commitPushStatus === "running"));
   const isFinished =
     wt && (wt.status === "done" || wt.tlcExecStatus === "done" || wt.agentStatus === "done");
   const hasBranch = !!wt;
@@ -103,6 +111,15 @@ export default function Card({ item, onOpen, worktrees = [], originRepo = null }
                   className={cn("size-3.5", status.spin && "animate-spin motion-reduce:animate-none")}
                   strokeWidth={2.25}
                 />
+              </span>
+            )}
+            {runNeedsAnswer && (
+              <span
+                title={t("card.runsWaiting")}
+                aria-label={t("card.runsWaiting")}
+                className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/60 bg-amber-500/10 px-1 py-px text-amber-600 dark:text-amber-400"
+              >
+                <MessageCircleQuestion className="size-3" strokeWidth={2.25} />
               </span>
             )}
             {item.number != null && (
