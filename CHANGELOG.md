@@ -1,3 +1,13 @@
+# [1.35.0](https://github.com/rafaelsene01/agent-flow/compare/v1.34.0...v1.35.0) (2026-07-03)
+
+
+### Features
+
+* add run deletion and clearing functionality in agent runs ([6870b2d](https://github.com/rafaelsene01/agent-flow/commit/6870b2dd4a7c4a186cf33c87ded660dea496a60c))
+* enhance agent run processing with worktree management ([8711c23](https://github.com/rafaelsene01/agent-flow/commit/8711c23f649bede5d4eff6b528d549469e7ae422))
+* implement agent runs management and database integration ([34a172a](https://github.com/rafaelsene01/agent-flow/commit/34a172ab56e51b05d0fc42c06146efc6a6802d39))
+* implement breakpoint functionality in agent runs ([4133c3d](https://github.com/rafaelsene01/agent-flow/commit/4133c3dd462a56a13b318525d01fd493779d4dd9))
+
 # [1.34.0](https://github.com/rafaelsene01/agent-flow/compare/v1.33.0...v1.34.0) (2026-07-02)
 
 
