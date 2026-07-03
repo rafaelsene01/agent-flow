@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, GitBranch, GripVertical, ArrowUp, ArrowDown, X } from "lucide-react";
+import { Bot, GitBranch, GripVertical, ArrowUp, ArrowDown, X, Hand, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,13 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
 
+  // Ponto de parada: passo que não roda no Claude, só destrava o próximo quando
+  // o usuário o aprova manualmente na tela de execução. Pode haver vários.
+  function addBreakpoint() {
+    setError(null);
+    setSteps((prev) => [...prev, { id: newStepId(), kind: "breakpoint" }]);
+  }
+
   function move(index, dir) {
     setSteps((prev) => {
       const next = [...prev];
@@ -99,7 +106,11 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
           worktreeId: worktree.id,
           title: item.title,
           body: item.body,
-          steps: steps.map((s) => ({ id: s.id, agentId: s.agentId, model: s.model, effort: s.effort })),
+          steps: steps.map((s) =>
+            s.kind === "breakpoint"
+              ? { id: s.id, kind: "breakpoint" }
+              : { id: s.id, agentId: s.agentId, model: s.model, effort: s.effort },
+          ),
         }),
       });
       const data = await res.json();
@@ -141,8 +152,8 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
           {/* Worktree/branch reusada (somente leitura) */}
           <div className="flex items-center gap-2 bg-muted/50 border rounded-lg px-3 py-2">
             <GitBranch className="size-3.5 text-muted-foreground shrink-0" />
-            <span className="text-xs font-mono font-medium truncate">{worktree.branch}</span>
-            <span className="text-[11px] text-muted-foreground truncate">← {worktree.originBranch}</span>
+            <span className="text-[11px] text-muted-foreground truncate">{worktree.originBranch}</span>
+            <span className="text-xs font-mono font-medium truncate">→ {worktree.branch}</span>
           </div>
 
           {/* Seleção de agentes */}
@@ -175,9 +186,21 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
           {/* Pipeline ordenada */}
           {steps.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                {t("running.launch.order")}
-              </Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                  {t("running.launch.order")}
+                </Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 text-[11px]"
+                  onClick={addBreakpoint}
+                >
+                  <Plus className="size-3" />
+                  {t("running.launch.addBreakpoint")}
+                </Button>
+              </div>
               <p className="text-[11px] text-muted-foreground">{t("running.launch.orderHint")}</p>
               <div className="flex flex-col gap-1.5">
                 {steps.map((s, i) => (
@@ -207,23 +230,32 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
                     <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
                       {i + 1}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium">{s.name}</span>
-                    <Select value={s.model} onValueChange={(v) => patchStep(s.id, { model: v })}>
-                      <SelectTrigger size="sm" className="h-7 w-[92px] text-[11px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="haiku">Haiku</SelectItem>
-                        <SelectItem value="sonnet">Sonnet</SelectItem>
-                        <SelectItem value="opus">Opus</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={s.effort} onValueChange={(v) => patchStep(s.id, { effort: v })}>
-                      <SelectTrigger size="sm" className="h-7 w-[86px] text-[11px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">low</SelectItem>
-                        <SelectItem value="medium">medium</SelectItem>
-                        <SelectItem value="high">high</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {s.kind === "breakpoint" ? (
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                        <Hand className="size-3.5 shrink-0" />
+                        <span className="truncate">{t("running.launch.breakpoint")}</span>
+                      </span>
+                    ) : (
+                      <>
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium">{s.name}</span>
+                        <Select value={s.model} onValueChange={(v) => patchStep(s.id, { model: v })}>
+                          <SelectTrigger size="sm" className="h-7 w-[92px] text-[11px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="haiku">Haiku</SelectItem>
+                            <SelectItem value="sonnet">Sonnet</SelectItem>
+                            <SelectItem value="opus">Opus</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select value={s.effort} onValueChange={(v) => patchStep(s.id, { effort: v })}>
+                          <SelectTrigger size="sm" className="h-7 w-[86px] text-[11px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">low</SelectItem>
+                            <SelectItem value="medium">medium</SelectItem>
+                            <SelectItem value="high">high</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
                     <div className="flex shrink-0 flex-col">
                       <button
                         type="button"

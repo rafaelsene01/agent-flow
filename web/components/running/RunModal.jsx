@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Loader2, ScrollText, ArrowLeft, Send, CornerDownRight, User } from "lucide-react";
+import { X, Loader2, ScrollText, ArrowLeft, Send, CornerDownRight, User, Hand, CheckCircle2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ const STATUS_CLASS = {
   queued: "",
   processing: "border-blue-400 text-blue-600 dark:text-blue-400",
   "waiting-input": "border-amber-400 text-amber-600 dark:text-amber-400",
+  "waiting-approval": "border-amber-400 text-amber-600 dark:text-amber-400",
   done: "border-emerald-400 text-emerald-600 dark:text-emerald-400",
   error: "",
 };
@@ -105,6 +106,46 @@ function ExecBlock({ label, status, active, onOpen }) {
       {status && <StatusBadge status={status} />}
       <span className="text-[11px] text-muted-foreground">{t("running.chat.viewLog")}</span>
     </button>
+  );
+}
+
+// Ponto de parada na pipeline: não roda no Claude, só destrava o próximo passo
+// quando o usuário aprova. Enquanto o passo anterior não conclui, fica na fila.
+function BreakpointCard({ run, index, onApprove, approving }) {
+  const { t } = useI18n();
+  const isWaiting = run.status === "waiting-approval";
+  const isDone = run.status === "done";
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-xl border border-dashed border-amber-400/50 bg-amber-50/40 p-3.5 dark:bg-amber-950/10">
+      <div className="flex items-center gap-2">
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+          {index + 1}
+        </span>
+        <Hand className="size-3.5 shrink-0 text-amber-500" />
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{t("running.launch.breakpoint")}</span>
+        <StatusBadge status={run.status} />
+      </div>
+
+      {run.status === "queued" && (
+        <p className="text-[11px] italic text-muted-foreground">{t("running.chat.waitingPrev")}</p>
+      )}
+      {isDone && (
+        <p className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 className="size-3.5" />
+          {t("running.breakpoint.released")}
+        </p>
+      )}
+      {isWaiting && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">{t("running.breakpoint.waitingHint")}</p>
+          <Button size="sm" className="w-fit" disabled={approving} onClick={() => onApprove(run)}>
+            {approving ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
+            {t("running.breakpoint.approve")}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -266,6 +307,7 @@ export default function RunModal({ runId, onClose }) {
   const [chain, setChain] = useState(null); // array de runs | null=carregando
   const [openLog, setOpenLog] = useState(null); // segmento aberto | null
   const [sendingId, setSendingId] = useState(null);
+  const [approvingId, setApprovingId] = useState(null);
 
   function load() {
     fetch(`/api/agent-runs/${encodeURIComponent(runId)}/chain`)
@@ -297,6 +339,20 @@ export default function RunModal({ runId, onClose }) {
       return false;
     } finally {
       setSendingId(null);
+    }
+  }
+
+  async function handleApprove(run) {
+    setApprovingId(run.id);
+    try {
+      const res = await fetch(`/api/agent-runs/${encodeURIComponent(run.id)}/approve`, { method: "POST" });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      load();
+    } catch (err) {
+      toast({ title: err.message || t("running.sendError"), variant: "error" });
+    } finally {
+      setApprovingId(null);
     }
   }
 
@@ -333,16 +389,26 @@ export default function RunModal({ runId, onClose }) {
           ) : chain.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("running.empty")}</p>
           ) : (
-            chain.map((r, i) => (
-              <RunChatCard
-                key={r.id}
-                run={r}
-                index={i}
-                onOpenLog={setOpenLog}
-                onSend={handleSend}
-                sending={sendingId === r.id}
-              />
-            ))
+            chain.map((r, i) =>
+              r.kind === "breakpoint" ? (
+                <BreakpointCard
+                  key={r.id}
+                  run={r}
+                  index={i}
+                  onApprove={handleApprove}
+                  approving={approvingId === r.id}
+                />
+              ) : (
+                <RunChatCard
+                  key={r.id}
+                  run={r}
+                  index={i}
+                  onOpenLog={setOpenLog}
+                  onSend={handleSend}
+                  sending={sendingId === r.id}
+                />
+              ),
+            )
           )}
         </div>
 

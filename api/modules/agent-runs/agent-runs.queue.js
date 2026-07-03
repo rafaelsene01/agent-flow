@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { getConfig } from "../config/config.service.js";
-import { createRun, getRun, patchRun, runsProcessingByAgent, nextQueuedForFreeAgents, failDependents, resetProcessingToQueued } from "./agent-runs.store.js";
+import { createRun, getRun, patchRun, runsProcessingByAgent, nextQueuedForFreeAgents, failDependents, resetProcessingToQueued, promoteReadyBreakpoints, approveBreakpoint as approveBreakpointStore } from "./agent-runs.store.js";
 import { startRun } from "./agent-runs.runner.js";
 
 // Lock em memória por agent_id, além do estado no DB — evita corrida entre
@@ -8,6 +8,10 @@ import { startRun } from "./agent-runs.runner.js";
 const active = new Set();
 
 export function tick() {
+  // Pontos de parada prontos (passo anterior `done`) passam a aguardar aprovação
+  // do usuário — não consomem slot de concorrência nem rodam no Claude.
+  promoteReadyBreakpoints();
+
   const cap = getConfig().maxConcurrentRuns ?? 3;
   if (active.size >= cap) return;
 
@@ -55,6 +59,7 @@ export function enqueueChain({ steps, ...common }) {
       ...common,
       chainId,
       id: step.id,
+      kind: step.kind,
       agentId: step.agentId,
       agentName: step.agentName,
       model: step.model,
@@ -66,6 +71,13 @@ export function enqueueChain({ steps, ...common }) {
   }
   tick();
   return runs;
+}
+
+// Aprova um ponto de parada aguardando: marca `done` e destrava o próximo passo.
+export function approveBreakpoint(id) {
+  const ok = approveBreakpointStore(id);
+  if (ok) tick();
+  return ok;
 }
 
 export function recoverAndDispatch() {

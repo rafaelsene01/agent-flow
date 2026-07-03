@@ -223,6 +223,7 @@ export const dictionaries = {
     "running.status.queued": "Na fila",
     "running.status.processing": "Executando",
     "running.status.waiting-input": "Aguardando resposta",
+    "running.status.waiting-approval": "Aguardando liberação",
     "running.status.done": "Concluído",
     "running.status.error": "Erro",
     "running.session": "Sessão",
@@ -253,6 +254,11 @@ export const dictionaries = {
     "running.launch.cancel": "Cancelar",
     "running.launch.enqueue": "Enfileirar",
     "running.launch.enqueuing": "Enfileirando…",
+    "running.launch.breakpoint": "Ponto de parada",
+    "running.launch.addBreakpoint": "Ponto de parada",
+    "running.breakpoint.waitingHint": "Revise o passo anterior. Libere quando estiver pronto para o próximo agente.",
+    "running.breakpoint.approve": "Aprovar e liberar",
+    "running.breakpoint.released": "Liberado",
 
     // InitBoardModal
     "board.add": "Adicionar Board",
@@ -481,6 +487,7 @@ export const dictionaries = {
     "running.status.queued": "Queued",
     "running.status.processing": "Running",
     "running.status.waiting-input": "Waiting for input",
+    "running.status.waiting-approval": "Waiting for release",
     "running.status.done": "Done",
     "running.status.error": "Error",
     "running.session": "Session",
@@ -511,6 +518,11 @@ export const dictionaries = {
     "running.launch.cancel": "Cancel",
     "running.launch.enqueue": "Enqueue",
     "running.launch.enqueuing": "Enqueuing…",
+    "running.launch.breakpoint": "Breakpoint",
+    "running.launch.addBreakpoint": "Breakpoint",
+    "running.breakpoint.waitingHint": "Review the previous step. Release when you're ready for the next agent.",
+    "running.breakpoint.approve": "Approve and release",
+    "running.breakpoint.released": "Released",
 
     // InitBoardModal
     "board.add": "Add Board",

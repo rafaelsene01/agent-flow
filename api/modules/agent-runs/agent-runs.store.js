@@ -19,6 +19,7 @@ const PATCHABLE_COLUMNS = new Set([
 export function createRun({
   id,
   chainId,
+  kind,
   agentId,
   agentName,
   repo,
@@ -37,17 +38,21 @@ export function createRun({
   const runId = id || randomUUID();
   const sessionId = randomUUID();
   const now = new Date().toISOString();
+  // Ponto de parada não roda no Claude: é uma linha na chain que só destrava o
+  // próximo passo quando o usuário a aprova. Usa sentinelas nas colunas NOT NULL.
+  const isBreakpoint = kind === "breakpoint";
   db.prepare(
     `INSERT INTO agent_runs (
-      id, session_id, agent_id, agent_name, repo, card_number, card_title, card_body,
+      id, session_id, kind, agent_id, agent_name, repo, card_number, card_title, card_body,
       origin_branch, target_branch, worktree_path, helpers_dir, depends_on, chain_id,
       model, effort, status, resume, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?)`,
   ).run(
     runId,
     sessionId,
-    agentId,
-    agentName,
+    isBreakpoint ? "breakpoint" : "agent",
+    isBreakpoint ? "__breakpoint__" : agentId,
+    isBreakpoint ? "Ponto de parada" : agentName,
     repo,
     cardNumber ?? null,
     cardTitle ?? null,
@@ -94,8 +99,8 @@ export function runsAttentionSummary() {
   const rows = getDb()
     .prepare(
       `SELECT repo, card_number,
-        SUM(CASE WHEN status = 'waiting-input' THEN 1 ELSE 0 END) AS waiting,
-        SUM(CASE WHEN status IN ('queued','processing') THEN 1 ELSE 0 END) AS active
+        SUM(CASE WHEN status IN ('waiting-input','waiting-approval') THEN 1 ELSE 0 END) AS waiting,
+        SUM(CASE WHEN status IN ('queued','processing','waiting-approval') THEN 1 ELSE 0 END) AS active
        FROM agent_runs
        WHERE card_number IS NOT NULL
        GROUP BY repo, card_number`,
@@ -146,6 +151,7 @@ export function nextQueuedForFreeAgents(busyAgentIds) {
     .prepare(
       `SELECT r.* FROM agent_runs r
        WHERE r.status = 'queued'
+         AND r.kind = 'agent'
          AND (
            r.depends_on IS NULL
            OR EXISTS (
@@ -164,6 +170,33 @@ export function nextQueuedForFreeAgents(busyAgentIds) {
     result.push(row);
   }
   return result;
+}
+
+// Pontos de parada (kind='breakpoint') cuja dependência já concluiu `done` e que
+// ainda estão na fila: passam para `waiting-approval`, aguardando o usuário. Não
+// são despachados ao Claude — só destravam o próximo passo quando aprovados.
+export function promoteReadyBreakpoints() {
+  const now = new Date().toISOString();
+  const info = getDb()
+    .prepare(
+      `UPDATE agent_runs SET status = 'waiting-approval', updated_at = ?
+       WHERE kind = 'breakpoint' AND status = 'queued'
+         AND (
+           depends_on IS NULL
+           OR EXISTS (SELECT 1 FROM agent_runs d WHERE d.id = agent_runs.depends_on AND d.status = 'done')
+         )`,
+    )
+    .run(now);
+  return info.changes > 0;
+}
+
+// Aprova um ponto de parada aguardando: marca `done` para destravar o próximo
+// passo. Retorna false se o run não for um breakpoint aguardando aprovação.
+export function approveBreakpoint(id) {
+  const run = getRun(id);
+  if (!run || run.kind !== "breakpoint" || run.status !== "waiting-approval") return false;
+  patchRun(id, { status: "done", finished_at: new Date().toISOString() });
+  return true;
 }
 
 // Falha em cascata os runs que dependem (direta ou transitivamente) de um run que

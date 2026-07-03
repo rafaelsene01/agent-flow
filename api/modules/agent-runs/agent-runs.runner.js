@@ -148,6 +148,19 @@ function buildPrompt(run, agentPrompt, { allowGit } = {}) {
     : "- NÃO faça commit e NÃO faça push em hipótese " +
       "alguma — apenas altere os arquivos. Versionar as mudanças é responsabilidade " +
       "exclusiva do agente Commit & Push.\n";
+  // Pasta de helpers desta worktree: diretório irmão fora da árvore versionada
+  // (`<worktree>-helpers`) onde vive o planejamento TLC (.specs/features/...).
+  // Como o cwd do agente é a worktree, injetamos o caminho absoluto para que o
+  // planner grave e o reviewer/executor leiam sempre no lugar certo — nunca dentro
+  // da worktree (onde .specs poluiria a árvore e o scan de TLC não enxerga).
+  const helpersContext = run.helpers_dir
+    ? "\n\nPasta de helpers desta worktree (FORA da árvore versionada; o cwd é a worktree):\n" +
+      `- Caminho absoluto da pasta helpers: \`${run.helpers_dir}\`\n` +
+      `- O planejamento TLC vive em \`${run.helpers_dir}/.specs/features/<feature>/\` ` +
+      "(spec.md, design.md, tasks.md).\n" +
+      "- SEMPRE grave e leia o planejamento nesse caminho absoluto. NUNCA crie `.specs/` " +
+      "dentro da worktree.\n"
+    : "";
   // Interceptor: agentes não git-capazes têm as palavras commit/push removidas do
   // próprio prompt/skill antes da execução (o Commit & Push é o único isento).
   const effectivePrompt = allowGit ? agentPrompt : stripGitWords(agentPrompt);
@@ -155,6 +168,7 @@ function buildPrompt(run, agentPrompt, { allowGit } = {}) {
     langInstruction() +
     effectivePrompt +
     gitContext +
+    helpersContext +
     "\n\nRegras de execução:\n" +
     fileRule +
     "- Aja SOMENTE com base nas instruções e skills fornecidas acima neste prompt. " +

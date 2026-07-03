@@ -8,12 +8,14 @@ import codeReviewer from "./code-reviewer.json" with { type: "json" };
 import featurePlanner from "./feature-planner.json" with { type: "json" };
 import implementer from "./implementer.json" with { type: "json" };
 import commitPush from "./commit-push.json" with { type: "json" };
+import developer from "./developer.json" with { type: "json" };
 
 const FILES = {
   "code-reviewer": codeReviewer,
   "feature-planner": featurePlanner,
   implementer,
   "commit-push": commitPush,
+  developer,
 };
 
 // Cada default vira um agent completo com id estável e a flag isDefault, que

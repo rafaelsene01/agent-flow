@@ -16,6 +16,7 @@ export function getDb() {
     CREATE TABLE IF NOT EXISTS agent_runs (
       id            TEXT PRIMARY KEY,
       session_id    TEXT NOT NULL,
+      kind          TEXT NOT NULL DEFAULT 'agent',
       agent_id      TEXT NOT NULL,
       agent_name    TEXT NOT NULL,
       repo          TEXT NOT NULL,
@@ -51,5 +52,6 @@ export function getDb() {
   if (!cols.includes("chain_id")) db.exec(`ALTER TABLE agent_runs ADD COLUMN chain_id TEXT`);
   if (!cols.includes("resume_message")) db.exec(`ALTER TABLE agent_runs ADD COLUMN resume_message TEXT`);
   if (!cols.includes("turns")) db.exec(`ALTER TABLE agent_runs ADD COLUMN turns TEXT`);
+  if (!cols.includes("kind")) db.exec(`ALTER TABLE agent_runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'agent'`);
   return db;
 }

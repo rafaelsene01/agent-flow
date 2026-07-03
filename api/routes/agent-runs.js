@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { getAgent } from "../modules/agents/agents.service.js";
 import { getRun, getChain, listRuns, listRunsForCard, runsAttentionSummary, patchRun, appendTurn } from "../modules/agent-runs/agent-runs.store.js";
-import { enqueue, enqueueChain, tick } from "../modules/agent-runs/agent-runs.queue.js";
+import { enqueue, enqueueChain, tick, approveBreakpoint } from "../modules/agent-runs/agent-runs.queue.js";
 import { registerSseClient } from "../modules/claude/claude.runner.js";
 import { cancelProcess } from "../modules/claude/claude.concurrency.js";
 import { getWorktrees } from "../modules/config/config.service.js";
@@ -49,8 +49,13 @@ export default function agentRunsRoutes(app) {
     if (!wt) return sendError(res, 400, "Worktree não configurada para este card.");
 
     // Resolve o nome de cada agente (denormalizado, resiliente a delete) e valida.
+    // Pontos de parada (kind='breakpoint') não têm agente: passam direto.
     const resolved = [];
     for (const step of steps) {
+      if (step.kind === "breakpoint") {
+        resolved.push({ id: step.id, kind: "breakpoint" });
+        continue;
+      }
       const agent = getAgent(step.agentId);
       if (!agent) return sendError(res, 400, `Agente não encontrado: ${step.agentId}`);
       resolved.push({
@@ -180,6 +185,15 @@ export default function agentRunsRoutes(app) {
     const logPath = path.join(run.helpers_dir, file);
     const content = fs.existsSync(logPath) ? fs.readFileSync(logPath, "utf-8") : "";
     res.json({ content });
+  });
+
+  // Aprova um ponto de parada aguardando: destrava o próximo passo da pipeline.
+  app.post("/api/agent-runs/:id/approve", (req, res) => {
+    const run = getRun(req.params.id);
+    if (!run) return sendError(res, 404, "Run não encontrado.");
+    if (!approveBreakpoint(run.id))
+      return sendError(res, 409, "Ponto de parada não está aguardando aprovação.");
+    res.json({ ok: true });
   });
 
   app.post("/api/agent-runs/:id/cancel", (req, res) => {
