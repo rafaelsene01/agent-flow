@@ -246,6 +246,18 @@ export function updateLastExecTurn(id, patch) {
   }
 }
 
+// Remove um run do banco. Usado só pela tela "/running" (limpeza manual).
+export function deleteRun(id) {
+  const info = getDb().prepare(`DELETE FROM agent_runs WHERE id = ?`).run(id);
+  return info.changes > 0;
+}
+
+// Apaga todos os runs do banco. Retorna a quantidade removida.
+export function clearRuns() {
+  const info = getDb().prepare(`DELETE FROM agent_runs`).run();
+  return info.changes;
+}
+
 export function resetProcessingToQueued() {
   const now = new Date().toISOString();
   getDb()

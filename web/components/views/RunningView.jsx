@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity } from "lucide-react";
+import { Activity, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/lib/i18nContext";
 import RunModal from "@/components/running/RunModal.jsx";
@@ -48,16 +49,41 @@ export default function RunningView() {
     return () => clearInterval(interval);
   }, []);
 
+  function remove(id) {
+    if (!window.confirm(t("running.deleteConfirm"))) return;
+    // Some da lista na hora; o poll reconcilia se algo der errado.
+    setRuns((prev) => (prev ?? []).filter((r) => r.id !== id));
+    fetch(`/api/agent-runs/${id}`, { method: "DELETE" }).finally(load);
+  }
+
+  function clearAll() {
+    if (!window.confirm(t("running.clearAllConfirm"))) return;
+    setRuns([]);
+    fetch("/api/agent-runs", { method: "DELETE" }).finally(load);
+  }
+
   return (
     <div className="flex flex-1 flex-col min-h-0 p-6">
       <div className="mb-6 flex items-center gap-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
           <Activity className="size-5" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold tracking-tight">{t("running.title")}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{t("running.subtitle")}</p>
         </div>
+        {runs && runs.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearAll}
+            className="shrink-0 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="size-4" />
+            {t("running.clearAll")}
+          </Button>
+        )}
       </div>
 
       {runs === null ? (
@@ -76,11 +102,14 @@ export default function RunningView() {
       ) : (
         <ul className="flex flex-col gap-2">
           {runs.map((r) => (
-            <li key={r.id}>
+            <li
+              key={r.id}
+              className="group flex items-center gap-2 rounded-xl border bg-card/50 pr-2 shadow-card transition-all duration-200 hover:border-primary/30 hover:shadow-card-hover"
+            >
               <button
                 type="button"
                 onClick={() => setSelectedId(r.id)}
-                className="flex w-full items-center gap-3 rounded-xl border bg-card/50 p-3.5 text-left shadow-card transition-all duration-200 hover:border-primary/30 hover:shadow-card-hover"
+                className="flex min-w-0 flex-1 items-center gap-3 p-3.5 text-left"
               >
                 <div className="min-w-0 flex-1">
                   <span className="block text-sm font-medium">{r.agent_name}</span>
@@ -90,6 +119,15 @@ export default function RunningView() {
                   </span>
                 </div>
                 <StatusBadge status={r.status} />
+              </button>
+              <button
+                type="button"
+                onClick={() => remove(r.id)}
+                title={t("running.delete")}
+                aria-label={t("running.delete")}
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-60 transition-colors hover:bg-destructive/10 hover:text-destructive hover:opacity-100"
+              >
+                <Trash2 className="size-4" />
               </button>
             </li>
           ))}

@@ -8,6 +8,7 @@ import codeReviewer from "./code-reviewer.json" with { type: "json" };
 import featurePlanner from "./feature-planner.json" with { type: "json" };
 import implementer from "./implementer.json" with { type: "json" };
 import commitPush from "./commit-push.json" with { type: "json" };
+import createPr from "./create-pr.json" with { type: "json" };
 import developer from "./developer.json" with { type: "json" };
 
 const FILES = {
@@ -15,6 +16,7 @@ const FILES = {
   "feature-planner": featurePlanner,
   implementer,
   "commit-push": commitPush,
+  "create-pr": createPr,
   developer,
 };
 

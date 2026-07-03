@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { getAgent } from "../modules/agents/agents.service.js";
-import { getRun, getChain, listRuns, listRunsForCard, runsAttentionSummary, patchRun, appendTurn } from "../modules/agent-runs/agent-runs.store.js";
+import { getRun, getChain, listRuns, listRunsForCard, runsAttentionSummary, patchRun, appendTurn, deleteRun, clearRuns } from "../modules/agent-runs/agent-runs.store.js";
 import { enqueue, enqueueChain, tick, approveBreakpoint } from "../modules/agent-runs/agent-runs.queue.js";
 import { registerSseClient } from "../modules/claude/claude.runner.js";
 import { cancelProcess } from "../modules/claude/claude.concurrency.js";
@@ -92,6 +92,21 @@ export default function agentRunsRoutes(app) {
         return res.json({ runs: listRunsForCard(repo, Number(card)) });
       }
       res.json({ runs: listRuns() });
+    } catch (err) {
+      sendError(res, 500, err.message, err);
+    }
+  });
+
+  // Apaga TODOS os runs do banco (limpeza manual da tela "/running"). Cancela antes
+  // qualquer processo ativo para não deixar processos órfãos. Registrado antes de
+  // "/:id" para não ser capturado como um id.
+  app.delete("/api/agent-runs", (_req, res) => {
+    try {
+      for (const run of listRuns()) {
+        if (run.status === "processing") cancelProcess(run.id);
+      }
+      const removed = clearRuns();
+      res.json({ ok: true, removed });
     } catch (err) {
       sendError(res, 500, err.message, err);
     }
@@ -193,6 +208,16 @@ export default function agentRunsRoutes(app) {
     if (!run) return sendError(res, 404, "Run não encontrado.");
     if (!approveBreakpoint(run.id))
       return sendError(res, 409, "Ponto de parada não está aguardando aprovação.");
+    res.json({ ok: true });
+  });
+
+  // Apaga um único run do banco (lixeira da tela "/running"). Cancela antes o
+  // processo, se estiver ativo, para não deixar processos órfãos.
+  app.delete("/api/agent-runs/:id", (req, res) => {
+    const run = getRun(req.params.id);
+    if (!run) return sendError(res, 404, "Run não encontrado.");
+    if (run.status === "processing") cancelProcess(run.id);
+    deleteRun(run.id);
     res.json({ ok: true });
   });
 
