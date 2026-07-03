@@ -5,5 +5,6 @@
     "tlc-spec-driven"
   ],
   "model": "opus",
-  "effort": "high"
+  "effort": "high",
+  "skipWorktreeCheck": true
 }

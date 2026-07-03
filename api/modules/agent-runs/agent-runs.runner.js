@@ -86,13 +86,16 @@ function extractFinalText(rawOutput) {
 function parseAsk(finalText) {
   const text = finalText ?? "";
   const lines = text.split("\n");
+  // O modelo às vezes envolve o marcador em markdown (ex.: `**ASK:**`). Removemos
+  // marcadores de ênfase/lista/citação do início da linha antes de detectar o `ASK:`.
+  const stripMd = (l) => l.replace(/^[\s>*_#-]+/, "");
   let lastIdx = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (/^ASK:/.test(lines[i])) lastIdx = i;
+    if (/^ASK:/.test(stripMd(lines[i]))) lastIdx = i;
   }
   if (lastIdx === -1) return null;
 
-  const askLine = lines[lastIdx].replace(/^ASK:\s*/, "").trim();
+  const askLine = stripMd(lines[lastIdx]).replace(/^ASK:\**\s*/, "").trim();
   const questionParts = [askLine];
   const options = [];
   let collectingOptions = false;
@@ -210,7 +213,7 @@ async function finishStep(
   logStream,
   result,
   onSettled,
-  { allowGit } = {},
+  { allowGit, skipWorktreeCheck } = {},
 ) {
   try {
     if (result.code !== 0) {
@@ -245,10 +248,12 @@ async function finishStep(
       return;
     }
 
-    // Agentes git-capazes (Commit & Push) fazem seus próprios commits e push; não
-    // fazemos squash nem exigimos mudanças pendentes no working tree — commitar e
-    // deixar a árvore limpa é justamente o resultado esperado.
-    if (allowGit) {
+    // Dois tipos de agente encerram sem tocar na árvore versionada:
+    // - git-capazes (Commit & Push): fazem seus próprios commits/push e deixam a
+    //   árvore limpa — squash/exigência de working tree sujo não se aplicam.
+    // - de planejamento/review (Feature Planner, Code Reviewer, skipWorktreeCheck):
+    //   gravam na pasta helpers, fora da worktree — logo não há mudança a exigir.
+    if (allowGit || skipWorktreeCheck) {
       await new Promise((resolve) => logStream.end(resolve));
       updateLastExecTurn(run.id, {
         status: "done",
@@ -317,6 +322,10 @@ export async function startRun(run, { onSettled } = {}) {
   // allowGit libera o agente a rodar git (add/commit/push) e altera o pós-processamento
   // (sem squash nem exigência de working tree sujo). Ver defaults/commit-push.json.
   const allowGit = !!getAgent(run.agent_id)?.allowGit;
+  // skipWorktreeCheck: agentes que gravam fora da worktree (pasta helpers), como
+  // Feature Planner e Code Reviewer, não produzem mudanças na árvore versionada —
+  // sem essa flag o pós-processamento os marcaria como "nenhum arquivo foi alterado".
+  const skipWorktreeCheck = !!getAgent(run.agent_id)?.skipWorktreeCheck;
 
   try {
     run = await ensureWorktree(run);
@@ -388,5 +397,5 @@ export async function startRun(run, { onSettled } = {}) {
     );
   }
 
-  await finishStep(run, logStream, result, onSettled, { allowGit });
+  await finishStep(run, logStream, result, onSettled, { allowGit, skipWorktreeCheck });
 }

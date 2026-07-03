@@ -22,12 +22,15 @@ const FILES = {
 
 // Cada default vira um agent completo com id estável e a flag isDefault, que
 // bloqueia edição/exclusão no serviço e esconde os botões na UI. A flag opcional
-// allowGit (ex.: Commit & Push) libera o agente a rodar git no runner.
+// allowGit (ex.: Commit & Push) libera o agente a rodar git no runner; a flag
+// skipWorktreeCheck (ex.: Feature Planner, Code Reviewer) marca agentes que gravam
+// fora da worktree (pasta helpers) e portanto não exigem mudanças na árvore.
 export const DEFAULT_AGENTS = Object.entries(FILES).map(([slug, data]) => ({
   id: `default:${slug}`,
   ...data,
   skills: Array.isArray(data.skills) ? data.skills : [],
   allowGit: !!data.allowGit,
+  skipWorktreeCheck: !!data.skipWorktreeCheck,
   isDefault: true,
 }));
 
