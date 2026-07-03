@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { getConfig } from "../config/config.service.js";
-import { createRun, getRun, patchRun, runsProcessingByAgent, worktreesOccupied, nextQueuedForFreeAgents, failDependents, resetProcessingToQueued, promoteReadyBreakpoints, approveBreakpoint as approveBreakpointStore } from "./agent-runs.store.js";
+import { createRun, getRun, patchRun, runsProcessingByAgent, worktreeKey, worktreesOccupied, nextQueuedForFreeAgents, failDependents, resetProcessingToQueued, promoteReadyBreakpoints, approveBreakpoint as approveBreakpointStore } from "./agent-runs.store.js";
 import { startRun } from "./agent-runs.runner.js";
 
 // Lock em memória por agent_id, além do estado no DB — evita corrida entre
@@ -11,7 +11,7 @@ const active = new Set();
 // o DB refletir `processing`, complementando worktreesOccupied().
 const activeWorktrees = new Set();
 
-const wtKey = (run) => `${run.repo} ${run.target_branch}`;
+const wtKey = (run) => worktreeKey(run.repo, run.target_branch);
 
 export function tick() {
   // Pontos de parada prontos (passo anterior `done`) passam a aguardar aprovação

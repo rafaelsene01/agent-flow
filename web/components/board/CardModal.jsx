@@ -8,7 +8,6 @@ import "highlight.js/styles/github-dark.css";
 import {
   AlertTriangle,
   Archive,
-  Bot,
   FileText,
   FolderOpen,
   GitBranch,
@@ -47,8 +46,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.jsx";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.jsx";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip.jsx";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs.jsx";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip.jsx";
 import { cn } from "@/lib/utils";
 import { collapseLogLines } from "@/lib/logFormat";
 import { statusColor, statusLabel, fileIcon } from "@/lib/fileVisuals";
@@ -83,14 +92,43 @@ const RUN_STATUS_PILL = {
 };
 
 const RUN_DEFAULTS = {
-  task: { model: "sonnet", effort: "high", label: "Executar Tarefa", labelKey: "run.task" },
-  tlc: { model: "opus", effort: "high", label: "Executar TLC", labelKey: "run.tlc" },
-  spec: { model: "sonnet", effort: "medium", label: "Executar Spec", labelKey: "run.spec" },
-  eval: { model: "sonnet", effort: "high", label: "Executar Spec-Eval", labelKey: "run.eval" },
-  commitPush: { model: "haiku", effort: "low", label: "Commit & Push", labelKey: "run.commitPush" },
-  createPR: { model: "haiku", effort: "medium", label: "Criar Pull Request", labelKey: "run.createPR" },
+  task: {
+    model: "sonnet",
+    effort: "high",
+    label: "Executar Tarefa",
+    labelKey: "run.task",
+  },
+  tlc: {
+    model: "opus",
+    effort: "high",
+    label: "Executar TLC",
+    labelKey: "run.tlc",
+  },
+  spec: {
+    model: "sonnet",
+    effort: "medium",
+    label: "Executar Spec",
+    labelKey: "run.spec",
+  },
+  eval: {
+    model: "sonnet",
+    effort: "high",
+    label: "Executar Spec-Eval",
+    labelKey: "run.eval",
+  },
+  commitPush: {
+    model: "haiku",
+    effort: "low",
+    label: "Commit & Push",
+    labelKey: "run.commitPush",
+  },
+  createPR: {
+    model: "haiku",
+    effort: "medium",
+    label: "Criar Pull Request",
+    labelKey: "run.createPR",
+  },
 };
-
 
 function Assignee({ login, avatarUrl, size = "size-6" }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -129,17 +167,22 @@ function AdvancedGitSection({ branch }) {
   return (
     <CollapsiblePrimitive.Root open={open} onOpenChange={setOpen}>
       <CollapsiblePrimitive.Trigger asChild>
-        <button type="button" className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+        <button
+          type="button"
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        >
           <span>{open ? "▾" : "▸"}</span>
           <span>{t("git.advanced")}</span>
         </button>
       </CollapsiblePrimitive.Trigger>
       <CollapsiblePrimitive.Content>
         <div className="flex flex-col gap-1 mt-0.5 pl-2 border-l border-destructive/30">
-          <span className="text-xs text-destructive/70 uppercase tracking-wide">{t("git.advanced.desc")}</span>
+          <span className="text-xs text-destructive/70 uppercase tracking-wide">
+            {t("git.advanced.desc")}
+          </span>
           <CopyCmd cmd={`git reset --hard origin/${branch}`} />
           <CopyCmd cmd="git reset --soft HEAD~1" />
-          <CopyCmd cmd="git reset" />
+          <CopyCmd cmd="git restore --staged ." />
           <CopyCmd cmd={`git push --force-with-lease origin ${branch}`} />
         </div>
       </CollapsiblePrimitive.Content>
@@ -184,7 +227,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       setCardRuns([]);
       return;
     }
-    const qs = new URLSearchParams({ repo: board.originRepo, card: String(item.number) });
+    const qs = new URLSearchParams({
+      repo: board.originRepo,
+      card: String(item.number),
+    });
     fetch(`/api/agent-runs?${qs}`)
       .then((r) => r.json())
       .then((d) => setCardRuns(d.runs ?? []))
@@ -225,9 +271,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [createPrSending, setCreatePrSending] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState("__new__");
   const [answerModal, setAnswerModal] = useState(null);
-  const [agentModal, setAgentModal] = useState(null); // null | { agentId, model, effort, session }
-  const [agents, setAgents] = useState(null); // null=não carregado, array=carregado
-  const [agentSending, setAgentSending] = useState(false);
   const logRef = useRef(null);
   const prevAnyRunningRef = useRef(null);
   const prevStatusRef = useRef(null);
@@ -242,7 +285,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   function loadChangedFiles() {
     if (!worktreeId) return;
     setChangedFiles(null);
-    fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/changed-files`)
+    fetch(
+      `/api/config/worktrees/${encodeURIComponent(worktreeId)}/changed-files`,
+    )
       .then((r) => r.json())
       .then((d) => setChangedFiles(d.files ?? []))
       .catch(() => setChangedFiles([]));
@@ -256,7 +301,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       worktreeConfig?.commitPushStatus === "error" ||
       worktreeConfig?.agentStatus === "done";
     if (taskDone) loadChangedFiles();
-  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus, worktreeConfig?.commitPushStatus, worktreeConfig?.agentStatus]);
+  }, [
+    worktreeConfig?.status,
+    worktreeConfig?.tlcExecStatus,
+    worktreeConfig?.commitPushStatus,
+    worktreeConfig?.agentStatus,
+  ]);
 
   async function handleExcludeFile(filePath) {
     try {
@@ -268,14 +318,20 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       toast({ title: t("toast.exclude.success"), variant: "success" });
     } catch (err) {
       console.error("[exclude-file]", err);
-      toast({ title: t("toast.exclude.error"), description: err.message, variant: "error" });
+      toast({
+        title: t("toast.exclude.error"),
+        description: err.message,
+        variant: "error",
+      });
     }
   }
 
   function loadBehindCount() {
     if (!worktreeId) return;
     setPullBehind(null);
-    fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/behind-count`)
+    fetch(
+      `/api/config/worktrees/${encodeURIComponent(worktreeId)}/behind-count`,
+    )
       .then((r) => r.json())
       .then((d) => setPullBehind(d.behind ?? 0))
       .catch(() => setPullBehind(0));
@@ -284,7 +340,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   function loadHelpersFiles() {
     if (!worktreeId) return;
     setHelpersFiles(null);
-    fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/helpers-files`)
+    fetch(
+      `/api/config/worktrees/${encodeURIComponent(worktreeId)}/helpers-files`,
+    )
       .then((r) => r.json())
       .then((d) => setHelpersFiles(d.files ?? []))
       .catch(() => setHelpersFiles([]));
@@ -302,7 +360,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       toast({ title: t("toast.pull.success"), variant: "success" });
     } catch (err) {
       console.error("[pull]", err);
-      toast({ title: t("toast.pull.error"), description: err.message, variant: "error" });
+      toast({
+        title: t("toast.pull.error"),
+        description: err.message,
+        variant: "error",
+      });
     } finally {
       setPullSending(false);
     }
@@ -350,7 +412,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       childModalGuardRef.current = true;
       return undefined;
     }
-    const id = setTimeout(() => { childModalGuardRef.current = false; }, 0);
+    const id = setTimeout(() => {
+      childModalGuardRef.current = false;
+    }, 0);
     return () => clearTimeout(id);
   }, [childModalOpen]);
 
@@ -366,8 +430,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       `/api/config/worktrees/${encodeURIComponent(worktreeId)}/helpers-file?file=${encodeURIComponent(last.logFile)}`,
     )
       .then((r) => r.json())
-      .then((d) => { if (d.content) setLogText(d.content); })
-      .catch(() => { });
+      .then((d) => {
+        if (d.content) setLogText(d.content);
+      })
+      .catch(() => {});
   }, [worktreeId, isConfigured]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Conecta SSE apenas quando há run ativo (na abertura ou quando um novo run inicia)
@@ -449,13 +515,18 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
         (prev.agentStatus === "running" && cur.agentStatus === "done");
       const wentWaiting =
         (prev.status === "running" && cur.status === "waiting-input") ||
-        (prev.tlcExecStatus === "running" && cur.tlcExecStatus === "waiting-input") ||
+        (prev.tlcExecStatus === "running" &&
+          cur.tlcExecStatus === "waiting-input") ||
         (prev.agentStatus === "running" && cur.agentStatus === "waiting-input");
       if (wentWaiting) playWaiting();
       else if (wentDone) playDone();
     }
     prevStatusRef.current = cur;
-  }, [worktreeConfig?.status, worktreeConfig?.tlcExecStatus, worktreeConfig?.agentStatus]);
+  }, [
+    worktreeConfig?.status,
+    worktreeConfig?.tlcExecStatus,
+    worktreeConfig?.agentStatus,
+  ]);
 
   async function handleSendMessage() {
     const text = messageText.trim();
@@ -471,7 +542,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             message: text,
             model: messageModel,
             effort: messageEffort,
-            sessionId: selectedSessionId === "__new__" ? undefined : selectedSessionId,
+            sessionId:
+              selectedSessionId === "__new__" ? undefined : selectedSessionId,
           }),
         },
       );
@@ -484,7 +556,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       toast({ title: t("toast.send.success"), variant: "success" });
     } catch (err) {
       console.error("[send-message]", err);
-      toast({ title: t("toast.send.error"), description: err.message, variant: "error" });
+      toast({
+        title: t("toast.send.error"),
+        description: err.message,
+        variant: "error",
+      });
     } finally {
       setMessageSending(false);
     }
@@ -515,7 +591,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       toast({ title: t("toast.tlc.success"), variant: "success" });
     } catch (err) {
       console.error("[run-tlc]", err);
-      toast({ title: t("toast.tlc.error"), description: err.message, variant: "error" });
+      toast({
+        title: t("toast.tlc.error"),
+        description: err.message,
+        variant: "error",
+      });
     } finally {
       setTlcSending(false);
     }
@@ -534,7 +614,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       toast({ title: t("toast.reset.success"), variant: "success" });
     } catch (err) {
       console.error("[reset-worktree]", err);
-      toast({ title: t("toast.reset.error"), description: err.message, variant: "error" });
+      toast({
+        title: t("toast.reset.error"),
+        description: err.message,
+        variant: "error",
+      });
     } finally {
       setResetWorktreeSending(false);
     }
@@ -564,13 +648,22 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       toast({ title: t("toast.pr.success"), variant: "success" });
     } catch (err) {
       console.error("[create-pr]", err);
-      toast({ title: t("toast.pr.error"), description: err.message, variant: "error" });
+      toast({
+        title: t("toast.pr.error"),
+        description: err.message,
+        variant: "error",
+      });
     } finally {
       setCreatePrSending(false);
     }
   }
 
-  async function handleRunTlcExec({ model, effort, sessionId } = {}) {
+  async function handleRunTlcExec({
+    model,
+    effort,
+    validation,
+    sessionId,
+  } = {}) {
     setTlcExecSending(true);
     try {
       const res = await fetch(
@@ -578,7 +671,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model, effort, sessionId: sessionId === "__new__" ? undefined : sessionId }),
+          body: JSON.stringify({
+            model,
+            effort,
+            validation,
+            sessionId: sessionId === "__new__" ? undefined : sessionId,
+          }),
         },
       );
       const data = await res.json();
@@ -593,7 +691,13 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunSpecEval({ model, effort, validation, runTests, sessionId } = {}) {
+  async function handleRunSpecEval({
+    model,
+    effort,
+    validation,
+    runTests,
+    sessionId,
+  } = {}) {
     setSpecEvalSending(true);
     try {
       const res = await fetch(
@@ -652,7 +756,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunSpec({ model, effort, sessionId } = {}) {
+  async function handleRunSpec({
+    model,
+    effort,
+    validation,
+    sessionId,
+  } = {}) {
     setSpecSending(true);
     try {
       const res = await fetch(
@@ -666,6 +775,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             body: item.body,
             model,
             effort,
+            validation,
             sessionId: sessionId === "__new__" ? undefined : sessionId,
           }),
         },
@@ -688,65 +798,17 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     unlockAudio();
     setAnswerModal(null);
     try {
-      await fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/answer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answer, sessionId: session, model, effort }),
-      });
-    } catch (_) {}
-    setSelectedSessionId(session);
-    loadWorktreeConfig();
-  }
-
-  // Abre o modal de agentes; carrega a lista uma vez (lazy). model/effort partem
-  // dos defaults do runner e só mudam quando um agente é selecionado.
-  function openAgentModal() {
-    unlockAudio();
-    setAgentModal({ agentId: null, model: "sonnet", effort: "medium", session: "__new__" });
-    if (agents === null) {
-      fetch("/api/agents")
-        .then((r) => r.json())
-        .then((d) => setAgents(d.agents ?? []))
-        .catch(() => setAgents([]));
-    }
-  }
-
-  // Executa o agente selecionado pela pipeline autônoma (/run-agent): roda na
-  // worktree com o prompt do agente (skills + instruções) + a descrição do card,
-  // usando o campo agentStatus para o feedback visual (running/done/error).
-  async function handleRunAgent() {
-    const { agentId, model, effort, session } = agentModal;
-    if (!agentId) return;
-    setAgentSending(true);
-    try {
-      const res = await fetch(
-        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run-agent`,
+      await fetch(
+        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/answer`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            agentId,
-            title: item.title,
-            number: item.number,
-            body: item.body,
-            model,
-            effort,
-            sessionId: session === "__new__" ? undefined : session,
-          }),
+          body: JSON.stringify({ answer, sessionId: session, model, effort }),
         },
       );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      if (data.sessionId) setSelectedSessionId(data.sessionId);
-      setAgentModal(null);
-      loadWorktreeConfig();
-      onWorktreeChange?.();
-    } catch (err) {
-      console.error("[run-agent]", err);
-      setErrorModal(err.message);
-    } finally {
-      setAgentSending(false);
-    }
+    } catch (_) {}
+    setSelectedSessionId(session);
+    loadWorktreeConfig();
   }
 
   const displayLogText = useMemo(() => collapseLogLines(logText), [logText]);
@@ -762,8 +824,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     >
       <DialogContent
         aria-describedby={undefined}
-        onInteractOutside={(e) => { if (anyRunning || childModalOpen || childModalGuardRef.current) e.preventDefault(); }}
-        onEscapeKeyDown={(e) => { if (anyRunning || childModalOpen || childModalGuardRef.current) e.preventDefault(); }}
+        onInteractOutside={(e) => {
+          if (anyRunning || childModalOpen || childModalGuardRef.current)
+            e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (anyRunning || childModalOpen || childModalGuardRef.current)
+            e.preventDefault();
+        }}
         className="w-full sm:max-w-[calc(100%-2rem)] h-[80vh] gap-0 overflow-hidden p-0"
       >
         {runConfirmModal && (
@@ -778,31 +846,49 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
               </div>
               <div className="flex flex-col gap-4 px-5 py-4">
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.session")}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {t("card.session")}
+                  </span>
                   <Select
                     value={runConfirmModal.session}
-                    onValueChange={(v) => setRunConfirmModal((s) => ({ ...s, session: v }))}
+                    onValueChange={(v) =>
+                      setRunConfirmModal((s) => ({ ...s, session: v }))
+                    }
                   >
                     <SelectTrigger size="sm" className="text-xs w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__new__">{t("card.session.new")}</SelectItem>
+                      <SelectItem value="__new__">
+                        {t("card.session.new")}
+                      </SelectItem>
                       {[...(worktreeConfig?.chatSessions ?? [])]
-                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                        .sort(
+                          (a, b) =>
+                            new Date(b.createdAt) - new Date(a.createdAt),
+                        )
                         .map((s) => (
-                          <SelectItem key={s.id} value={s.id} title={s.description}>
-                            [{ORIGIN_LABEL[s.origin] ?? s.origin}] {s.description}
+                          <SelectItem
+                            key={s.id}
+                            value={s.id}
+                            title={s.description}
+                          >
+                            [{ORIGIN_LABEL[s.origin] ?? s.origin}]{" "}
+                            {s.description}
                           </SelectItem>
                         ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.model")}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {t("card.model")}
+                  </span>
                   <Select
                     value={runConfirmModal.model}
-                    onValueChange={(v) => setRunConfirmModal((s) => ({ ...s, model: v }))}
+                    onValueChange={(v) =>
+                      setRunConfirmModal((s) => ({ ...s, model: v }))
+                    }
                   >
                     <SelectTrigger size="sm" className="text-xs">
                       <SelectValue />
@@ -815,10 +901,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.effort")}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {t("card.effort")}
+                  </span>
                   <Select
                     value={runConfirmModal.effort}
-                    onValueChange={(v) => setRunConfirmModal((s) => ({ ...s, effort: v }))}
+                    onValueChange={(v) =>
+                      setRunConfirmModal((s) => ({ ...s, effort: v }))
+                    }
                   >
                     <SelectTrigger size="sm" className="text-xs">
                       <SelectValue />
@@ -841,20 +931,41 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       </span>
                       <div className="grid grid-cols-2 gap-2">
                         {[
-                          { key: "install", label: "Instalação", placeholder: "npm install" },
-                          { key: "build", label: "Build", placeholder: "npm run build" },
-                          { key: "lint", label: "Lint", placeholder: "npm run lint" },
-                          { key: "test", label: "Testes", placeholder: "npm test" },
+                          {
+                            key: "install",
+                            label: "Instalação",
+                            placeholder: "npm install",
+                          },
+                          {
+                            key: "build",
+                            label: "Build",
+                            placeholder: "npm run build",
+                          },
+                          {
+                            key: "lint",
+                            label: "Lint",
+                            placeholder: "npm run lint",
+                          },
+                          {
+                            key: "test",
+                            label: "Testes",
+                            placeholder: "npm test",
+                          },
                         ].map(({ key, label, placeholder }) => (
                           <div key={key} className="flex flex-col gap-1">
-                            <Label className="text-xs text-muted-foreground">{label}</Label>
+                            <Label className="text-xs text-muted-foreground">
+                              {label}
+                            </Label>
                             <Input
                               type="text"
                               value={runConfirmModal.validation?.[key] ?? ""}
                               onChange={(e) =>
                                 setRunConfirmModal((s) => ({
                                   ...s,
-                                  validation: { ...s.validation, [key]: e.target.value },
+                                  validation: {
+                                    ...s.validation,
+                                    [key]: e.target.value,
+                                  },
                                 }))
                               }
                               placeholder={placeholder}
@@ -863,14 +974,19 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                           </div>
                         ))}
                         <div className="col-span-2 flex flex-col gap-1">
-                          <Label className="text-xs text-muted-foreground">Outro</Label>
+                          <Label className="text-xs text-muted-foreground">
+                            Outro
+                          </Label>
                           <Input
                             type="text"
                             value={runConfirmModal.validation?.extra ?? ""}
                             onChange={(e) =>
                               setRunConfirmModal((s) => ({
                                 ...s,
-                                validation: { ...s.validation, extra: e.target.value },
+                                validation: {
+                                  ...s.validation,
+                                  extra: e.target.value,
+                                },
                               }))
                             }
                             placeholder="comando personalizado"
@@ -885,31 +1001,69 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         type="checkbox"
                         checked={runConfirmModal.runTests ?? true}
                         onChange={(e) =>
-                          setRunConfirmModal((s) => ({ ...s, runTests: e.target.checked }))
+                          setRunConfirmModal((s) => ({
+                            ...s,
+                            runTests: e.target.checked,
+                          }))
                         }
                         className="size-3.5 accent-primary"
                       />
-                      <span className="text-xs text-muted-foreground">Rodar e avaliar testes</span>
+                      <span className="text-xs text-muted-foreground">
+                        Rodar e avaliar testes
+                      </span>
                     </label>
                   </>
                 )}
               </div>
               <div className="flex justify-end gap-2 border-t px-5 py-3">
-                <Button variant="ghost" size="sm" onClick={() => setRunConfirmModal(null)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRunConfirmModal(null)}
+                >
                   Cancelar
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => {
                     unlockAudio();
-                    const { action, model, effort, validation, runTests, session } = runConfirmModal;
+                    const {
+                      action,
+                      model,
+                      effort,
+                      validation,
+                      runTests,
+                      session,
+                    } = runConfirmModal;
                     setRunConfirmModal(null);
-                    if (action === "task") handleRunSpec({ model, effort, sessionId: session });
-                    else if (action === "tlc") handleRunTlc({ model, effort, sessionId: session });
-                    else if (action === "spec") handleRunTlcExec({ model, effort, sessionId: session });
-                    else if (action === "eval") handleRunSpecEval({ model, effort, validation, runTests, sessionId: session });
-                    else if (action === "commitPush") handleCommitPush({ model, effort, sessionId: session });
-                    else if (action === "createPR") handleCreatePR({ model, effort, sessionId: session });
+                    if (action === "task")
+                      handleRunSpec({
+                        model,
+                        effort,
+                        validation,
+                        sessionId: session,
+                      });
+                    else if (action === "tlc")
+                      handleRunTlc({ model, effort, sessionId: session });
+                    else if (action === "spec")
+                      handleRunTlcExec({
+                        model,
+                        effort,
+                        validation,
+                        sessionId: session,
+                      });
+                    else if (action === "eval")
+                      handleRunSpecEval({
+                        model,
+                        effort,
+                        validation,
+                        runTests,
+                        sessionId: session,
+                      });
+                    else if (action === "commitPush")
+                      handleCommitPush({ model, effort, sessionId: session });
+                    else if (action === "createPR")
+                      handleCreatePR({ model, effort, sessionId: session });
                   }}
                 >
                   Executar
@@ -933,30 +1087,46 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   </div>
                 )}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.session")}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {t("card.session")}
+                  </span>
                   <Select
                     value={answerModal.session}
-                    onValueChange={(v) => setAnswerModal((s) => ({ ...s, session: v }))}
+                    onValueChange={(v) =>
+                      setAnswerModal((s) => ({ ...s, session: v }))
+                    }
                   >
                     <SelectTrigger size="sm" className="text-xs w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {[...(worktreeConfig?.chatSessions ?? [])]
-                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                        .sort(
+                          (a, b) =>
+                            new Date(b.createdAt) - new Date(a.createdAt),
+                        )
                         .map((s) => (
-                          <SelectItem key={s.id} value={s.id} title={s.description}>
-                            [{ORIGIN_LABEL[s.origin] ?? s.origin}] {s.description}
+                          <SelectItem
+                            key={s.id}
+                            value={s.id}
+                            title={s.description}
+                          >
+                            [{ORIGIN_LABEL[s.origin] ?? s.origin}]{" "}
+                            {s.description}
                           </SelectItem>
                         ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.model")}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {t("card.model")}
+                  </span>
                   <Select
                     value={answerModal.model}
-                    onValueChange={(v) => setAnswerModal((s) => ({ ...s, model: v }))}
+                    onValueChange={(v) =>
+                      setAnswerModal((s) => ({ ...s, model: v }))
+                    }
                   >
                     <SelectTrigger size="sm" className="text-xs">
                       <SelectValue />
@@ -969,10 +1139,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.effort")}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {t("card.effort")}
+                  </span>
                   <Select
                     value={answerModal.effort}
-                    onValueChange={(v) => setAnswerModal((s) => ({ ...s, effort: v }))}
+                    onValueChange={(v) =>
+                      setAnswerModal((s) => ({ ...s, effort: v }))
+                    }
                   >
                     <SelectTrigger size="sm" className="text-xs">
                       <SelectValue />
@@ -990,14 +1164,20 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   <textarea
                     rows={4}
                     value={answerModal.answer}
-                    onChange={(e) => setAnswerModal((s) => ({ ...s, answer: e.target.value }))}
+                    onChange={(e) =>
+                      setAnswerModal((s) => ({ ...s, answer: e.target.value }))
+                    }
                     placeholder={t("card.answer.placeholder")}
                     className="w-full resize-none rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
               </div>
               <div className="flex justify-end gap-2 border-t px-5 py-3">
-                <Button variant="ghost" size="sm" onClick={() => setAnswerModal(null)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAnswerModal(null)}
+                >
                   Cancelar
                 </Button>
                 <Button
@@ -1006,125 +1186,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   onClick={handleAnswer}
                 >
                   {t("card.answer.send")}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-        {agentModal && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="bg-background border rounded-lg shadow-xl w-full max-w-md overflow-hidden mx-4 flex flex-col max-h-[80vh]">
-              <div className="flex items-center border-b px-5 py-4">
-                <span className="text-sm font-semibold flex-1">{t("run.agent")}</span>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                {agents === null ? (
-                  <p className="text-xs text-muted-foreground">…</p>
-                ) : agents.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">{t("card.agent.empty")}</p>
-                ) : (
-                  <ul className="flex flex-col gap-1.5">
-                    {agents.map((a) => {
-                      const selected = agentModal.agentId === a.id;
-                      return (
-                        <li key={a.id}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setAgentModal((s) => ({
-                                ...s,
-                                agentId: a.id,
-                                model: a.model ?? s.model,
-                                effort: a.effort ?? s.effort,
-                              }))
-                            }
-                            className={cn(
-                              "w-full text-left rounded-md border px-3 py-2 transition-colors",
-                              selected ? "border-primary bg-primary/10" : "hover:bg-muted/50",
-                            )}
-                          >
-                            <span className="block text-sm font-medium">{a.name}</span>
-                            <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap">
-                              {a.prompt}
-                            </span>
-                            <span className="mt-1 flex flex-wrap gap-1">
-                              {a.model && <Badge variant="outline">{a.model}</Badge>}
-                              {a.effort && <Badge variant="outline">{a.effort}</Badge>}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-              <div className="flex flex-col gap-4 border-t px-5 py-4">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.session")}</span>
-                  <Select
-                    value={agentModal.session}
-                    onValueChange={(v) => setAgentModal((s) => ({ ...s, session: v }))}
-                  >
-                    <SelectTrigger size="sm" className="text-xs w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__new__">{t("card.session.new")}</SelectItem>
-                      {[...(worktreeConfig?.chatSessions ?? [])]
-                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                        .map((s) => (
-                          <SelectItem key={s.id} value={s.id} title={s.description}>
-                            [{ORIGIN_LABEL[s.origin] ?? s.origin}] {s.description}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.model")}</span>
-                  <Select
-                    value={agentModal.model}
-                    onValueChange={(v) => setAgentModal((s) => ({ ...s, model: v }))}
-                  >
-                    <SelectTrigger size="sm" className="text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="haiku">Haiku</SelectItem>
-                      <SelectItem value="sonnet">Sonnet</SelectItem>
-                      <SelectItem value="opus">Opus</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("card.effort")}</span>
-                  <Select
-                    value={agentModal.effort}
-                    onValueChange={(v) => setAgentModal((s) => ({ ...s, effort: v }))}
-                  >
-                    <SelectTrigger size="sm" className="text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">low</SelectItem>
-                      <SelectItem value="medium">medium</SelectItem>
-                      <SelectItem value="high">high</SelectItem>
-                      <SelectItem value="xhigh">xhigh</SelectItem>
-                      <SelectItem value="max">max</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 border-t px-5 py-3">
-                <Button variant="ghost" size="sm" onClick={() => setAgentModal(null)}>
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={!agentModal.agentId || agentSending}
-                  onClick={handleRunAgent}
-                >
-                  {agentSending ? <Loader2 className="size-3.5 animate-spin" /> : "Executar"}
                 </Button>
               </div>
             </div>
@@ -1147,9 +1208,17 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     <div className="flex items-center -space-x-1.5">
                       {item.assignees.map((a) => {
                         const login = typeof a === "string" ? a : a?.login;
-                        const avatarUrl = typeof a === "string" ? null : a?.avatarUrl;
+                        const avatarUrl =
+                          typeof a === "string" ? null : a?.avatarUrl;
                         if (!login) return null;
-                        return <Assignee key={login} login={login} avatarUrl={avatarUrl} size="size-6" />;
+                        return (
+                          <Assignee
+                            key={login}
+                            login={login}
+                            avatarUrl={avatarUrl}
+                            size="size-6"
+                          />
+                        );
                       })}
                     </div>
                   )}
@@ -1247,12 +1316,22 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__new__">{t("card.session.new")}</SelectItem>
+                      <SelectItem value="__new__">
+                        {t("card.session.new")}
+                      </SelectItem>
                       {[...(worktreeConfig?.chatSessions ?? [])]
-                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                        .sort(
+                          (a, b) =>
+                            new Date(b.createdAt) - new Date(a.createdAt),
+                        )
                         .map((s) => (
-                          <SelectItem key={s.id} value={s.id} title={s.description}>
-                            [{ORIGIN_LABEL[s.origin] ?? s.origin}] {s.description}
+                          <SelectItem
+                            key={s.id}
+                            value={s.id}
+                            title={s.description}
+                          >
+                            [{ORIGIN_LABEL[s.origin] ?? s.origin}]{" "}
+                            {s.description}
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -1278,7 +1357,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       onValueChange={setMessageModel}
                       disabled={anyRunning || messageSending}
                     >
-                      <SelectTrigger size="sm" className="text-xs" title="Model">
+                      <SelectTrigger
+                        size="sm"
+                        className="text-xs"
+                        title="Model"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1292,7 +1375,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       onValueChange={setMessageEffort}
                       disabled={anyRunning || messageSending}
                     >
-                      <SelectTrigger size="sm" className="text-xs" title="Effort">
+                      <SelectTrigger
+                        size="sm"
+                        className="text-xs"
+                        title="Effort"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1305,21 +1392,25 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     </Select>
                   </div>
                   <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground select-none">⌘↵</span>
-                  <Button
-                    size="sm"
-                    type="button"
-                    className="gap-2"
-                    disabled={!messageText.trim() || anyRunning || messageSending}
-                    onClick={handleSendMessage}
-                  >
-                    {messageSending ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Send className="size-3.5" />
-                    )}
-                    <span>{t("action.send")}</span>
-                  </Button>
+                    <span className="text-xs text-muted-foreground select-none">
+                      ⌘↵
+                    </span>
+                    <Button
+                      size="sm"
+                      type="button"
+                      className="gap-2"
+                      disabled={
+                        !messageText.trim() || anyRunning || messageSending
+                      }
+                      onClick={handleSendMessage}
+                    >
+                      {messageSending ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Send className="size-3.5" />
+                      )}
+                      <span>{t("action.send")}</span>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1342,7 +1433,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     className={cn(
                       "flex-1 justify-start gap-2 text-xs",
                       isConfigured &&
-                      "border-state-completed/50 text-state-completed opacity-75",
+                        "border-state-completed/50 text-state-completed opacity-75",
                     )}
                   >
                     <GitBranch className="size-3.5" />
@@ -1357,9 +1448,11 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       onClick={handleResetWorktree}
                       disabled={resetWorktreeSending}
                     >
-                      {resetWorktreeSending
-                        ? <Loader2 className="size-3.5 animate-spin" />
-                        : <RotateCcw className="size-3.5" />}
+                      {resetWorktreeSending ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <RotateCcw className="size-3.5" />
+                      )}
                     </Button>
                   )}
                 </div>
@@ -1375,7 +1468,10 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         className="truncate font-mono text-[11px] text-muted-foreground"
                         title={worktreeConfig.path}
                       >
-                        {worktreeConfig.path.split(/[\\/]/).filter(Boolean).pop()}
+                        {worktreeConfig.path
+                          .split(/[\\/]/)
+                          .filter(Boolean)
+                          .pop()}
                       </span>
                     </div>
                     <CopyCmd cmd={`cd ${worktreeConfig.path}`} />
@@ -1409,33 +1505,52 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       <TabsList className="w-full grid grid-cols-4 h-8">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <TabsTrigger value="exec" className="px-0"><Play className="size-3.5" /></TabsTrigger>
+                            <TabsTrigger value="exec" className="px-0">
+                              <Play className="size-3.5" />
+                            </TabsTrigger>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom">{t("card.run")}</TooltipContent>
+                          <TooltipContent side="bottom">
+                            {t("card.run")}
+                          </TooltipContent>
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <TabsTrigger value="git" className="px-0"><GitBranch className="size-3.5" /></TabsTrigger>
+                            <TabsTrigger value="git" className="px-0">
+                              <GitBranch className="size-3.5" />
+                            </TabsTrigger>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom">{t("card.git")}</TooltipContent>
+                          <TooltipContent side="bottom">
+                            {t("card.git")}
+                          </TooltipContent>
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <TabsTrigger value="files" className="px-0"><FolderOpen className="size-3.5" /></TabsTrigger>
+                            <TabsTrigger value="files" className="px-0">
+                              <FolderOpen className="size-3.5" />
+                            </TabsTrigger>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom">{t("card.files")}</TooltipContent>
+                          <TooltipContent side="bottom">
+                            {t("card.files")}
+                          </TooltipContent>
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <TabsTrigger value="helpers" className="px-0"><Archive className="size-3.5" /></TabsTrigger>
+                            <TabsTrigger value="helpers" className="px-0">
+                              <Archive className="size-3.5" />
+                            </TabsTrigger>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom">{t("card.helpers")}</TooltipContent>
+                          <TooltipContent side="bottom">
+                            {t("card.helpers")}
+                          </TooltipContent>
                         </Tooltip>
                       </TabsList>
                     </TooltipProvider>
 
                     {/* ── Aba 1: Executar ── */}
-                    <TabsContent value="exec" className="flex flex-col gap-1.5 mt-2">
+                    <TabsContent
+                      value="exec"
+                      className="flex flex-col gap-1.5 mt-2"
+                    >
                       {isWaiting && (
                         <Button
                           variant="default"
@@ -1457,57 +1572,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         </Button>
                       )}
                       {(() => {
-                        const agentRunStatus = worktreeConfig?.agentStatus;
-                        const isAgentRunning = agentRunStatus === "running" || agentSending;
-                        const isAgentDone = agentRunStatus === "done";
-                        const isAgentError = agentRunStatus === "error";
-                        return (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              type="button"
-                              disabled={anyRunning}
-                              onClick={openAgentModal}
-                              className={cn(
-                                "w-full justify-start gap-2 text-xs",
-                                isAgentDone &&
-                                "border-state-completed/50 text-state-completed opacity-75",
-                                isAgentError &&
-                                "border-destructive/50 text-destructive opacity-75",
-                              )}
-                            >
-                              <Bot className="size-3.5" />
-                              <span>{t("run.agent")}</span>
-                            </Button>
-                            {isAgentRunning && (
-                              <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
-                                <Loader2 className="size-3 shrink-0 animate-spin" />
-                                {t("card.run.background")}
-                              </span>
-                            )}
-                            {isAgentDone && (
-                              <span className="text-[11px] text-state-completed">
-                                {t("card.run.done.rerun")}
-                              </span>
-                            )}
-                            {isAgentError && worktreeConfig?.agentLastError && (
-                              <button
-                                type="button"
-                                onClick={() => setErrorModal(worktreeConfig.agentLastError)}
-                                className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
-                              >
-                                <AlertTriangle className="size-3 shrink-0" />
-                                <span className="truncate">{worktreeConfig.agentLastError}</span>
-                              </button>
-                            )}
-                          </>
-                        );
-                      })()}
-
-                      {(() => {
                         const runStatus = worktreeConfig?.status;
-                        const isRunning = runStatus === "running" || specSending;
+                        const isRunning =
+                          runStatus === "running" || specSending;
                         const isDone = runStatus === "done";
                         const isError = runStatus === "error";
                         const isTlcRunning =
@@ -1519,13 +1586,20 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               size="sm"
                               type="button"
                               disabled={isRunning || isTlcRunning}
-                              onClick={() => setRunConfirmModal({ action: "task", ...RUN_DEFAULTS.task, session: "__new__" })}
+                              onClick={() =>
+                                setRunConfirmModal({
+                                  action: "task",
+                                  ...RUN_DEFAULTS.task,
+                                  session: "__new__",
+                                  validation: board?.validation ?? null,
+                                })
+                              }
                               className={cn(
                                 "w-full justify-start gap-2 text-xs",
                                 isDone &&
-                                "border-state-completed/50 text-state-completed opacity-75",
+                                  "border-state-completed/50 text-state-completed opacity-75",
                                 isError &&
-                                "border-destructive/50 text-destructive opacity-75",
+                                  "border-destructive/50 text-destructive opacity-75",
                               )}
                             >
                               <Pencil className="size-3.5" />
@@ -1545,11 +1619,15 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                             {isError && worktreeConfig?.lastError && (
                               <button
                                 type="button"
-                                onClick={() => setErrorModal(worktreeConfig.lastError)}
+                                onClick={() =>
+                                  setErrorModal(worktreeConfig.lastError)
+                                }
                                 className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
                               >
                                 <AlertTriangle className="size-3 shrink-0" />
-                                <span className="truncate">{worktreeConfig.lastError}</span>
+                                <span className="truncate">
+                                  {worktreeConfig.lastError}
+                                </span>
                               </button>
                             )}
                           </>
@@ -1558,7 +1636,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
 
                       {(() => {
                         const tlcStatus = worktreeConfig?.tlcStatus;
-                        const isTlcRunning = tlcStatus === "running" || tlcSending;
+                        const isTlcRunning =
+                          tlcStatus === "running" || tlcSending;
                         const isTlcDone = tlcStatus === "done";
                         const isTlcError = tlcStatus === "error";
                         const hasTlcSkill = claudeStatus?.tlcSkill ?? false;
@@ -1570,19 +1649,27 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               variant="outline"
                               size="sm"
                               type="button"
-                              disabled={!hasTlcSkill || isTlcRunning || isRunning}
+                              disabled={
+                                !hasTlcSkill || isTlcRunning || isRunning
+                              }
                               title={
                                 !hasTlcSkill
                                   ? "Skill tlc-spec-driven não instalada — configure nas Configurações"
                                   : undefined
                               }
-                              onClick={() => setRunConfirmModal({ action: "tlc", ...RUN_DEFAULTS.tlc, session: "__new__" })}
+                              onClick={() =>
+                                setRunConfirmModal({
+                                  action: "tlc",
+                                  ...RUN_DEFAULTS.tlc,
+                                  session: "__new__",
+                                })
+                              }
                               className={cn(
                                 "w-full justify-start gap-2 text-xs",
                                 isTlcDone &&
-                                "border-state-completed/50 text-state-completed opacity-75",
+                                  "border-state-completed/50 text-state-completed opacity-75",
                                 isTlcError &&
-                                "border-destructive/50 text-destructive opacity-75",
+                                  "border-destructive/50 text-destructive opacity-75",
                               )}
                             >
                               <Zap className="size-3.5" />
@@ -1597,19 +1684,35 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                             {isTlcError && worktreeConfig?.tlcLastError && (
                               <button
                                 type="button"
-                                onClick={() => setErrorModal(worktreeConfig.tlcLastError)}
+                                onClick={() =>
+                                  setErrorModal(worktreeConfig.tlcLastError)
+                                }
                                 className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
                               >
                                 <AlertTriangle className="size-3 shrink-0" />
-                                <span className="truncate">{worktreeConfig.tlcLastError}</span>
+                                <span className="truncate">
+                                  {worktreeConfig.tlcLastError}
+                                </span>
                               </button>
                             )}
                             {isTlcDone && (
                               <div className="flex gap-1.5">
                                 {[
-                                  { type: "spec", Icon: FileText, label: "Spec" },
-                                  { type: "design", Icon: Palette, label: "Design" },
-                                  { type: "tasks", Icon: ListChecks, label: "Tasks" },
+                                  {
+                                    type: "spec",
+                                    Icon: FileText,
+                                    label: "Spec",
+                                  },
+                                  {
+                                    type: "design",
+                                    Icon: Palette,
+                                    label: "Design",
+                                  },
+                                  {
+                                    type: "tasks",
+                                    Icon: ListChecks,
+                                    label: "Tasks",
+                                  },
                                 ].map(({ type, Icon, label }) => {
                                   const exists = tlcFiles?.[type] ?? false;
                                   return (
@@ -1628,7 +1731,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                       className={cn(
                                         "flex-1 gap-1 text-xs",
                                         exists &&
-                                        "border-state-completed/50 text-state-completed",
+                                          "border-state-completed/50 text-state-completed",
                                       )}
                                     >
                                       <Icon className="size-3.5" />
@@ -1657,13 +1760,20 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                         ? "Execute o TLC antes de executar a Spec"
                                         : undefined
                                     }
-                                    onClick={() => setRunConfirmModal({ action: "spec", ...RUN_DEFAULTS.spec, session: "__new__" })}
+                                    onClick={() =>
+                                      setRunConfirmModal({
+                                        action: "spec",
+                                        ...RUN_DEFAULTS.spec,
+                                        session: "__new__",
+                                        validation: board?.validation ?? null,
+                                      })
+                                    }
                                     className={cn(
                                       "w-full justify-start gap-2 text-xs",
                                       isExecDone &&
-                                      "border-state-completed/50 text-state-completed opacity-75",
+                                        "border-state-completed/50 text-state-completed opacity-75",
                                       isExecError &&
-                                      "border-destructive/50 text-destructive opacity-75",
+                                        "border-destructive/50 text-destructive opacity-75",
                                     )}
                                   >
                                     <Play className="size-3.5" />
@@ -1684,11 +1794,17 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                     worktreeConfig?.tlcExecLastError && (
                                       <button
                                         type="button"
-                                        onClick={() => setErrorModal(worktreeConfig.tlcExecLastError)}
+                                        onClick={() =>
+                                          setErrorModal(
+                                            worktreeConfig.tlcExecLastError,
+                                          )
+                                        }
                                         className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
                                       >
                                         <AlertTriangle className="size-3 shrink-0" />
-                                        <span className="truncate">{worktreeConfig.tlcExecLastError}</span>
+                                        <span className="truncate">
+                                          {worktreeConfig.tlcExecLastError}
+                                        </span>
                                       </button>
                                     )}
                                 </>
@@ -1736,25 +1852,27 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                     ? "Execute a Tarefa ou a Spec antes de avaliar"
                                     : undefined
                               }
-                              onClick={() => setRunConfirmModal({
-                                action: "eval",
-                                ...RUN_DEFAULTS.eval,
-                                session: "__new__",
-                                validation: {
-                                  install: board?.validation?.install ?? "",
-                                  build: board?.validation?.build ?? "",
-                                  lint: board?.validation?.lint ?? "",
-                                  test: board?.validation?.test ?? "",
-                                  extra: board?.validation?.extra ?? "",
-                                },
-                                runTests: true,
-                              })}
+                              onClick={() =>
+                                setRunConfirmModal({
+                                  action: "eval",
+                                  ...RUN_DEFAULTS.eval,
+                                  session: "__new__",
+                                  validation: {
+                                    install: board?.validation?.install ?? "",
+                                    build: board?.validation?.build ?? "",
+                                    lint: board?.validation?.lint ?? "",
+                                    test: board?.validation?.test ?? "",
+                                    extra: board?.validation?.extra ?? "",
+                                  },
+                                  runTests: true,
+                                })
+                              }
                               className={cn(
                                 "w-full justify-start gap-2 text-xs",
                                 isEvalDone &&
-                                "border-state-completed/50 text-state-completed opacity-75",
+                                  "border-state-completed/50 text-state-completed opacity-75",
                                 isEvalError &&
-                                "border-destructive/50 text-destructive opacity-75",
+                                  "border-destructive/50 text-destructive opacity-75",
                               )}
                             >
                               <ListChecks className="size-3.5" />
@@ -1775,11 +1893,17 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                               worktreeConfig?.specEvalLastError && (
                                 <button
                                   type="button"
-                                  onClick={() => setErrorModal(worktreeConfig.specEvalLastError)}
+                                  onClick={() =>
+                                    setErrorModal(
+                                      worktreeConfig.specEvalLastError,
+                                    )
+                                  }
                                   className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
                                 >
                                   <AlertTriangle className="size-3 shrink-0" />
-                                  <span className="truncate">{worktreeConfig.specEvalLastError}</span>
+                                  <span className="truncate">
+                                    {worktreeConfig.specEvalLastError}
+                                  </span>
                                 </button>
                               )}
                           </>
@@ -1788,19 +1912,28 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     </TabsContent>
 
                     {/* ── Aba 2: Git ── */}
-                    <TabsContent value="git" className="flex flex-col gap-1.5 mt-2">
+                    <TabsContent
+                      value="git"
+                      className="flex flex-col gap-1.5 mt-2"
+                    >
                       {/* Pull */}
                       <Button
                         variant="outline"
                         size="sm"
                         type="button"
-                        disabled={pullBehind === null || pullBehind === 0 || pullSending || worktreeConfig?.pullStatus === "running"}
+                        disabled={
+                          pullBehind === null ||
+                          pullBehind === 0 ||
+                          pullSending ||
+                          worktreeConfig?.pullStatus === "running"
+                        }
                         onClick={handlePull}
                         className="w-full justify-start gap-2 text-xs"
                       >
                         <GitPullRequest className="size-3.5" />
                         <span>
-                          {pullSending || worktreeConfig?.pullStatus === "running"
+                          {pullSending ||
+                          worktreeConfig?.pullStatus === "running"
                             ? "Sincronizando…"
                             : pullBehind === null
                               ? "Verificando…"
@@ -1808,13 +1941,15 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 ? `Pull (${pullBehind} commit${pullBehind > 1 ? "s" : ""})`
                                 : "Pull (atualizado)"}
                         </span>
-                        {(pullSending || worktreeConfig?.pullStatus === "running") && (
+                        {(pullSending ||
+                          worktreeConfig?.pullStatus === "running") && (
                           <Loader2 className="ml-auto size-3 animate-spin" />
                         )}
                       </Button>
 
                       {(() => {
-                        const commitPushStatus = worktreeConfig?.commitPushStatus;
+                        const commitPushStatus =
+                          worktreeConfig?.commitPushStatus;
                         const isCommitPushRunning =
                           commitPushStatus === "running" || commitPushSending;
                         const isCommitPushDone = commitPushStatus === "done";
@@ -1822,11 +1957,24 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         const hasFiles = changedFiles?.length > 0;
                         return (
                           <Button
-                            variant={!isCommitPushDone && !isCommitPushError && !isCommitPushRunning && worktreeConfig?.specEvalStatus === "done" ? "default" : "outline"}
+                            variant={
+                              !isCommitPushDone &&
+                              !isCommitPushError &&
+                              !isCommitPushRunning &&
+                              worktreeConfig?.specEvalStatus === "done"
+                                ? "default"
+                                : "outline"
+                            }
                             size="sm"
                             type="button"
                             disabled={isCommitPushRunning || !hasFiles}
-                            onClick={() => setRunConfirmModal({ action: "commitPush", ...RUN_DEFAULTS.commitPush, session: "__new__" })}
+                            onClick={() =>
+                              setRunConfirmModal({
+                                action: "commitPush",
+                                ...RUN_DEFAULTS.commitPush,
+                                session: "__new__",
+                              })
+                            }
                             title={
                               isCommitPushError
                                 ? worktreeConfig?.commitPushLastError
@@ -1838,7 +1986,8 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                                 ? "border-state-completed/50 text-state-completed opacity-75"
                                 : isCommitPushError
                                   ? "border-destructive/50 text-destructive opacity-75"
-                                  : !isCommitPushRunning && "border-primary/60 text-primary",
+                                  : !isCommitPushRunning &&
+                                    "border-primary/60 text-primary",
                             )}
                           >
                             <span>
@@ -1854,67 +2003,102 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         );
                       })()}
                       <div className="flex flex-col gap-1 mt-0.5">
-                        <CopyCmd cmd={`git checkout ${worktreeConfig.branch}`} />
+                        <CopyCmd
+                          cmd={`git checkout ${worktreeConfig.branch}`}
+                        />
                         <CopyCmd cmd={`git fetch origin`} />
                         <CopyCmd cmd="git add ." />
                         <CopyCmd cmd='git commit -m "message"' />
                         <AdvancedGitSection branch={worktreeConfig.branch} />
                       </div>
-                      {worktreeConfig.originBranch && (() => {
-                        const prStatus = worktreeConfig?.prStatus;
-                        const isPrRunning = prStatus === "running" || createPrSending;
-                        const isPrDone = prStatus === "done";
-                        const isPrError = prStatus === "error";
-                        const hasFiles = changedFiles?.length > 0;
-                        return (
-                          <div className="mt-1 flex flex-col gap-1">
-                            <Button
-                              variant={(isPrDone || hasFiles || isPrError) ? "outline" : (!isPrRunning && worktreeConfig?.specEvalStatus === "done") ? "default" : "outline"}
-                              size="sm"
-                              type="button"
-                              disabled={isPrRunning || hasFiles || changedFiles === null}
-                              onClick={() => setRunConfirmModal({ action: "createPR", ...RUN_DEFAULTS.createPR, session: "__new__" })}
-                              title={isPrError ? worktreeConfig?.prLastError : undefined}
-                              className={cn(
-                                "w-full justify-start gap-2 text-xs",
-                                isPrDone
-                                  ? "border-state-completed/50 text-state-completed opacity-75"
-                                  : isPrError
-                                    ? "border-destructive/50 text-destructive opacity-75"
-                                    : !isPrRunning && "border-primary/60 text-primary",
-                              )}
-                            >
-                              {isPrRunning
-                                ? <Loader2 className="size-3.5 animate-spin" />
-                                : <GitMerge className="size-3.5" />}
-                              <span>
-                                {isPrRunning
-                                  ? t("git.pr.creating")
-                                  : isPrError
-                                    ? t("git.pr.retry")
-                                    : isPrDone
-                                      ? t("git.pr.created")
-                                      : `${t("git.pr.create")} → ${worktreeConfig.originBranch}`}
-                              </span>
-                            </Button>
-                            {isPrDone && worktreeConfig?.prUrl && (
-                              <a
-                                href={worktreeConfig.prUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="truncate px-1 text-[11px] text-primary hover:underline"
+                      {worktreeConfig.originBranch &&
+                        (() => {
+                          const prStatus = worktreeConfig?.prStatus;
+                          const isPrRunning =
+                            prStatus === "running" || createPrSending;
+                          const isPrDone = prStatus === "done";
+                          const isPrError = prStatus === "error";
+                          const hasFiles = changedFiles?.length > 0;
+                          return (
+                            <div className="mt-1 flex flex-col gap-1">
+                              <Button
+                                variant={
+                                  isPrDone || hasFiles || isPrError
+                                    ? "outline"
+                                    : !isPrRunning &&
+                                        worktreeConfig?.specEvalStatus ===
+                                          "done"
+                                      ? "default"
+                                      : "outline"
+                                }
+                                size="sm"
+                                type="button"
+                                disabled={
+                                  isPrRunning ||
+                                  hasFiles ||
+                                  changedFiles === null
+                                }
+                                onClick={() =>
+                                  setRunConfirmModal({
+                                    action: "createPR",
+                                    ...RUN_DEFAULTS.createPR,
+                                    session: "__new__",
+                                  })
+                                }
+                                title={
+                                  isPrError
+                                    ? worktreeConfig?.prLastError
+                                    : undefined
+                                }
+                                className={cn(
+                                  "w-full justify-start gap-2 text-xs",
+                                  isPrDone
+                                    ? "border-state-completed/50 text-state-completed opacity-75"
+                                    : isPrError
+                                      ? "border-destructive/50 text-destructive opacity-75"
+                                      : !isPrRunning &&
+                                        "border-primary/60 text-primary",
+                                )}
                               >
-                                {worktreeConfig.prUrl}
-                              </a>
-                            )}
-                          </div>
-                        );
-                      })()}
+                                {isPrRunning ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <GitMerge className="size-3.5" />
+                                )}
+                                <span>
+                                  {isPrRunning
+                                    ? t("git.pr.creating")
+                                    : isPrError
+                                      ? t("git.pr.retry")
+                                      : isPrDone
+                                        ? t("git.pr.created")
+                                        : `${t("git.pr.create")} → ${worktreeConfig.originBranch}`}
+                                </span>
+                              </Button>
+                              {isPrDone && worktreeConfig?.prUrl && (
+                                <a
+                                  href={worktreeConfig.prUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="truncate px-1 text-[11px] text-primary hover:underline"
+                                >
+                                  {worktreeConfig.prUrl}
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })()}
                     </TabsContent>
 
                     {/* ── Aba 3: Arquivos alterados ── */}
-                    <TabsContent value="files" className="flex flex-col gap-1.5 mt-2">
-                      <div className="flex flex-col gap-0.5 overflow-y-auto rounded-md border bg-muted/30 p-1.5" style={{ maxHeight: "calc(80vh - 14rem)" }}>
+                    <TabsContent
+                      value="files"
+                      className="flex flex-col gap-1.5 mt-2"
+                    >
+                      <div
+                        className="flex flex-col gap-0.5 overflow-y-auto rounded-md border bg-muted/30 p-1.5"
+                        style={{ maxHeight: "calc(80vh - 14rem)" }}
+                      >
                         {changedFiles === null ? (
                           <span className="flex items-center gap-1 px-1 text-[11px] italic text-muted-foreground">
                             <Loader2 className="size-3 animate-spin" />
@@ -1928,50 +2112,55 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                           changedFiles.map((file) => {
                             const FileIcon = fileIcon(file.path);
                             return (
-                            <div
-                              key={file.path}
-                              className="group flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted/60"
-                            >
-                              <span
-                                className={cn(
-                                  "w-4 shrink-0 overflow-hidden text-center font-mono text-xs font-semibold",
-                                  statusColor(file.status),
-                                )}
-                                title={statusLabel(file.status)}
+                              <div
+                                key={file.path}
+                                className="group flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted/60"
                               >
-                                {file.status?.trim()[0] ?? "?"}
-                              </span>
-                              {file.isDir ? (
                                 <span
-                                  className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden truncate font-mono text-[11px] text-muted-foreground"
-                                  title={file.path}
+                                  className={cn(
+                                    "w-4 shrink-0 overflow-hidden text-center font-mono text-xs font-semibold",
+                                    statusColor(file.status),
+                                  )}
+                                  title={statusLabel(file.status)}
                                 >
-                                  <FolderOpen className="size-3 shrink-0" />
-                                  {file.path}
+                                  {file.status?.trim()[0] ?? "?"}
                                 </span>
-                              ) : (
+                                {file.isDir ? (
+                                  <span
+                                    className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden truncate font-mono text-[11px] text-muted-foreground"
+                                    title={file.path}
+                                  >
+                                    <FolderOpen className="size-3 shrink-0" />
+                                    {file.path}
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className={cn(
+                                      "flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-left font-mono text-[11px] hover:underline",
+                                      file.status?.trim()[0] === "D" &&
+                                        "line-through opacity-60",
+                                    )}
+                                    title={file.path}
+                                    onClick={() =>
+                                      setFileContentModal(file.path)
+                                    }
+                                  >
+                                    <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                    <span className="truncate">
+                                      {file.path}
+                                    </span>
+                                  </button>
+                                )}
                                 <button
                                   type="button"
-                                  className={cn(
-                                    "flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-left font-mono text-[11px] hover:underline",
-                                    file.status?.trim()[0] === "D" && "line-through opacity-60",
-                                  )}
-                                  title={file.path}
-                                  onClick={() => setFileContentModal(file.path)}
+                                  className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100"
+                                  title="Descartar alterações"
+                                  onClick={() => handleExcludeFile(file.path)}
                                 >
-                                  <FileIcon className="size-3 shrink-0 text-muted-foreground" />
-                                  <span className="truncate">{file.path}</span>
+                                  <X className="size-3" />
                                 </button>
-                              )}
-                              <button
-                                type="button"
-                                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100"
-                                title="Descartar alterações"
-                                onClick={() => handleExcludeFile(file.path)}
-                              >
-                                <X className="size-3" />
-                              </button>
-                            </div>
+                              </div>
                             );
                           })
                         )}
@@ -1979,8 +2168,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     </TabsContent>
 
                     {/* ── Aba 4: Helpers ── */}
-                    <TabsContent value="helpers" className="flex flex-col gap-1.5 mt-2">
-                      <div className="flex flex-col gap-0.5 overflow-y-auto rounded-md border bg-muted/30 p-1.5" style={{ maxHeight: "calc(80vh - 14rem)" }}>
+                    <TabsContent
+                      value="helpers"
+                      className="flex flex-col gap-1.5 mt-2"
+                    >
+                      <div
+                        className="flex flex-col gap-0.5 overflow-y-auto rounded-md border bg-muted/30 p-1.5"
+                        style={{ maxHeight: "calc(80vh - 14rem)" }}
+                      >
                         {helpersFiles === null ? (
                           <span className="flex items-center gap-1 px-1 text-[11px] italic text-muted-foreground">
                             <Loader2 className="size-3 animate-spin" />
@@ -1994,16 +2189,16 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                           helpersFiles.map((file) => {
                             const FileIcon = fileIcon(file);
                             return (
-                            <button
-                              key={file}
-                              type="button"
-                              className="flex min-w-0 w-full items-center gap-1 text-left font-mono text-[11px] px-1 py-0.5 rounded hover:bg-muted/60 hover:underline"
-                              title={file}
-                              onClick={() => setHelpersFileModal(file)}
-                            >
-                              <FileIcon className="size-3 shrink-0 text-muted-foreground" />
-                              <span className="truncate">{file}</span>
-                            </button>
+                              <button
+                                key={file}
+                                type="button"
+                                className="flex min-w-0 w-full items-center gap-1 text-left font-mono text-[11px] px-1 py-0.5 rounded hover:bg-muted/60 hover:underline"
+                                title={file}
+                                onClick={() => setHelpersFileModal(file)}
+                              >
+                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                <span className="truncate">{file}</span>
+                              </button>
                             );
                           })
                         )}
@@ -2041,12 +2236,19 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       onClick={() => setOpenRunId(r.id)}
                       className={cn(
                         "flex items-center gap-2 rounded-lg border bg-card/50 px-2.5 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/40",
-                        r.status === "waiting-input" && "border-amber-400/60 bg-amber-500/[0.06]",
+                        r.status === "waiting-input" &&
+                          "border-amber-400/60 bg-amber-500/[0.06]",
                       )}
                     >
-                      {r.status === "processing" && <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />}
-                      {r.status === "waiting-input" && <MessageCircleQuestion className="size-3.5 shrink-0 text-amber-500" />}
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium">{r.agent_name}</span>
+                      {r.status === "processing" && (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />
+                      )}
+                      {r.status === "waiting-input" && (
+                        <MessageCircleQuestion className="size-3.5 shrink-0 text-amber-500" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                        {r.agent_name}
+                      </span>
                       <span
                         className={cn(
                           "shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
@@ -2079,11 +2281,20 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
           board={board}
           item={item}
           worktree={worktreeConfig}
-          onClose={() => { setShowEnqueueAgent(false); loadCardRuns(); }}
+          onClose={() => {
+            setShowEnqueueAgent(false);
+            loadCardRuns();
+          }}
         />
       )}
       {openRunId && (
-        <RunModal runId={openRunId} onClose={() => { setOpenRunId(null); loadCardRuns(); }} />
+        <RunModal
+          runId={openRunId}
+          onClose={() => {
+            setOpenRunId(null);
+            loadCardRuns();
+          }}
+        />
       )}
       {tlcFileModal && (
         <TlcFileModal
@@ -2108,7 +2319,13 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
         />
       )}
       {errorModal && (
-        <Dialog open modal={false} onOpenChange={(o) => { if (!o) setErrorModal(null); }}>
+        <Dialog
+          open
+          modal={false}
+          onOpenChange={(o) => {
+            if (!o) setErrorModal(null);
+          }}
+        >
           <DialogContent
             aria-describedby={undefined}
             className="w-full sm:max-w-lg max-h-[70vh] flex flex-col gap-0 overflow-hidden p-0"

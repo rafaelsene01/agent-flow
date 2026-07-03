@@ -50,7 +50,6 @@ export const dictionaries = {
     "action.pull": "Pull",
 
     // Run defaults (CardModal)
-    "run.agent": "Executar Agente",
     "run.task": "Executar Tarefa",
     "run.tlc": "Executar TLC",
     "run.spec": "Executar Spec",
@@ -81,7 +80,6 @@ export const dictionaries = {
     "card.description": "Descrição",
     "card.session": "Sessão",
     "card.session.new": "Nova sessão",
-    "card.agent.empty": "Nenhum agente criado.",
     "card.model": "Modelo",
     "card.effort": "Esforço",
     "card.triggers": "Gatilhos",
@@ -320,7 +318,6 @@ export const dictionaries = {
     "action.pull": "Pull",
 
     // Run defaults (CardModal)
-    "run.agent": "Run Agent",
     "run.task": "Run Task",
     "run.tlc": "Run TLC",
     "run.spec": "Run Spec",
@@ -351,7 +348,6 @@ export const dictionaries = {
     "card.description": "Description",
     "card.session": "Session",
     "card.session.new": "New session",
-    "card.agent.empty": "No agents created.",
     "card.model": "Model",
     "card.effort": "Effort",
     "card.triggers": "Triggers",

@@ -4,7 +4,7 @@
   "skills": [
     "card-description-writer"
   ],
-  "model": "opus",
+  "model": "sonnet",
   "effort": "high",
   "skipWorktreeCheck": true
 }

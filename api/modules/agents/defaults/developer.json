@@ -4,6 +4,6 @@
   "skills": [
     "karpathy-guidelines"
   ],
-  "model": "sonnet",
-  "effort": "medium"
+  "model": "opus",
+  "effort": "high"
 }

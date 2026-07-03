@@ -4,6 +4,6 @@
   "skills": [
     ""
   ],
-  "model": "opus",
-  "effort": "high"
+  "model": "sonnet",
+  "effort": "medium"
 }

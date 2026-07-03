@@ -13,13 +13,13 @@ import developer from "./developer.json" with { type: "json" };
 import cardDescriptionWriter from "./card-description-writer.json" with { type: "json" };
 
 const FILES = {
+  "card-description-writer": cardDescriptionWriter,
   developer,
   "feature-planner": featurePlanner,
   implementer,
   "code-reviewer": codeReviewer,
   "commit-push": commitPush,
   "create-pr": createPr,
-  "card-description-writer": cardDescriptionWriter,
 };
 
 // Cada default vira um agent completo com id estável e a flag isDefault, que

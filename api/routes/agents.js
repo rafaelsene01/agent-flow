@@ -1,4 +1,5 @@
 import { listAgents, createAgent, updateAgent, deleteAgent, buildAgentPrompt } from "../modules/agents/agents.service.js";
+import { runCreatorTurn } from "../modules/agents/agent-prompt-creator.js";
 import { sendError } from "../lib/errors.js";
 
 export default function agentsRoutes(app) {
@@ -56,6 +57,28 @@ export default function agentsRoutes(app) {
           ? 404
           : 500;
       sendError(res, status, err.message, status === 500 ? err : null);
+    }
+  });
+
+  // Um turno da conversa de geração do prompt de um agent via Claude (entrevista).
+  // Retorna { type: "question", question, options } ou { type: "complete", content }.
+  app.post("/api/agents/create/message", async (req, res) => {
+    const { sessionId, prompt, started, model, effort } = req.body ?? {};
+    if (typeof sessionId !== "string" || !/^[a-zA-Z0-9-]+$/.test(sessionId))
+      return sendError(res, 400, "sessionId inválido");
+    if (typeof prompt !== "string" || !prompt.trim())
+      return sendError(res, 400, "prompt obrigatório");
+    try {
+      const result = await runCreatorTurn({
+        sessionId,
+        prompt,
+        started: !!started,
+        model,
+        effort,
+      });
+      res.json(result);
+    } catch (err) {
+      sendError(res, 500, err.message, err);
     }
   });
 
