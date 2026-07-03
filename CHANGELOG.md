@@ -1,3 +1,11 @@
+# [1.36.0](https://github.com/rafaelsene01/agent-flow/compare/v1.35.0...v1.36.0) (2026-07-03)
+
+
+### Features
+
+* add skill import/export functionality and new card description writer ([cfd3453](https://github.com/rafaelsene01/agent-flow/commit/cfd345324a5e5c9db31bb48799abe412e6682bae))
+* enhance RunModal with markdown rendering and copy functionality ([a1321a3](https://github.com/rafaelsene01/agent-flow/commit/a1321a3f48aa6bbd047c0d71ffcd81afc6c5886f))
+
 # [1.35.0](https://github.com/rafaelsene01/agent-flow/compare/v1.34.0...v1.35.0) (2026-07-03)
 
 
