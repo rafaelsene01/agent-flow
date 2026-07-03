@@ -12,12 +12,12 @@ import createPr from "./create-pr.json" with { type: "json" };
 import developer from "./developer.json" with { type: "json" };
 
 const FILES = {
-  "code-reviewer": codeReviewer,
+  developer,
   "feature-planner": featurePlanner,
   implementer,
+  "code-reviewer": codeReviewer,
   "commit-push": commitPush,
   "create-pr": createPr,
-  developer,
 };
 
 // Cada default vira um agent completo com id estável e a flag isDefault, que

@@ -6,7 +6,9 @@ import {
   deleteSkill,
 } from "../modules/skills/skills.service.js";
 import { runCreatorTurn, saveSkill } from "../modules/skills/skill-creator.js";
+import { exportSkill, importSkill } from "../modules/skills/transfer.js";
 import { sendError } from "../lib/errors.js";
+import express from "express";
 
 // Nomes de skill são basenames de diretório/arquivo — bloqueia path traversal.
 const NAME_RE = /^[a-zA-Z0-9._-]+$/;
@@ -92,6 +94,43 @@ export default function skillsRoutes(app) {
       sendError(res, /não encontrada/.test(err.message) ? 404 : 500, err.message, err);
     }
   });
+
+  // Exporta uma skill como zip da pasta (SKILL.md vira <name>.skill na raiz).
+  app.get("/api/skills/:name/export", (req, res) => {
+    const { name } = req.params;
+    if (!NAME_RE.test(name)) return sendError(res, 400, "Nome inválido");
+    try {
+      const { filename, buffer } = exportSkill(name);
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (err) {
+      sendError(res, /não encontrada/.test(err.message) ? 404 : 500, err.message, err);
+    }
+  });
+
+  // Importa uma skill a partir de um .skill (arquivo único) ou .zip (pacote da
+  // pasta, com um .skill obrigatório na raiz). O corpo é o binário bruto do
+  // arquivo; o nome original chega em ?filename= para resolver a extensão.
+  app.post(
+    "/api/skills/import",
+    express.raw({ type: () => true, limit: "25mb" }),
+    (req, res) => {
+      const filename = String(req.query.filename ?? "");
+      if (!filename) return sendError(res, 400, "filename obrigatório");
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0)
+        return sendError(res, 400, "Arquivo vazio");
+      try {
+        const saved = importSkill(filename, req.body);
+        res.json({ ok: true, ...saved, skills: getSkills() });
+      } catch (err) {
+        const status = /já existe|inválid|vazio|não suportado|não contém|corrompido/i.test(err.message)
+          ? 400
+          : 500;
+        sendError(res, status, err.message, status === 500 ? err : null);
+      }
+    }
+  );
 
   // Salva a skill gerada em .claude/skills/<name>/SKILL.md e devolve a lista atualizada.
   app.post("/api/skills/create/save", (req, res) => {

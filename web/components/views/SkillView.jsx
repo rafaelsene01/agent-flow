@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Sparkles, Plus, Pencil, Trash2, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Sparkles, Plus, Pencil, Trash2, RefreshCw, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -86,6 +86,8 @@ export default function SkillView() {
   const [editing, setEditing] = useState(null); // skill em edição
   const [confirmDelete, setConfirmDelete] = useState(null); // skill a excluir
   const [deleting, setDeleting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
   function load() {
     fetch("/api/skills")
@@ -109,6 +111,27 @@ export default function SkillView() {
     } catch {
       setSkills((prev) => prev.map((s) => s.name === name ? { ...s, active: !active } : s));
       toast({ title: t("skill.toggleError"), variant: "error" });
+    }
+  };
+
+  // Envia o arquivo bruto (.skill ou .zip) para o backend descompactar/validar.
+  const handleImport = async (file) => {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const res = await fetch(`/api/skills/import?filename=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: file,
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setSkills(data.skills ?? []);
+      toast({ title: `Skill "${data.name}" importada` });
+    } catch (err) {
+      toast({ title: err.message || "Erro ao importar skill", variant: "error" });
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -141,15 +164,37 @@ export default function SkillView() {
             <p className="mt-0.5 text-sm text-muted-foreground">{t("skill.subtitle")}</p>
           </div>
         </div>
-        <Button
-          size="sm"
-          type="button"
-          className="shrink-0"
-          onClick={() => setCreating(true)}
-        >
-          <Plus className="size-4" />
-          Criar skill
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".skill,.zip"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = ""; // permite reimportar o mesmo arquivo
+              handleImport(file);
+            }}
+          />
+          <Button
+            size="sm"
+            type="button"
+            variant="outline"
+            disabled={importing}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="size-4" />
+            {importing ? "Importando…" : "Importar"}
+          </Button>
+          <Button
+            size="sm"
+            type="button"
+            onClick={() => setCreating(true)}
+          >
+            <Plus className="size-4" />
+            Criar skill
+          </Button>
+        </div>
       </div>
 
       {skills === null ? (
@@ -195,6 +240,18 @@ export default function SkillView() {
               </label>
               <div className="flex shrink-0 items-center gap-1">
                 <InstallControl skill={s} onInstalled={load} />
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon-xs"
+                  title="Exportar skill (.zip)"
+                  aria-label="Exportar skill"
+                  className="text-muted-foreground opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                >
+                  <a href={`/api/skills/${encodeURIComponent(s.name)}/export`} download>
+                    <Download className="size-3.5" />
+                  </a>
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon-xs"
