@@ -1,3 +1,10 @@
+# [1.37.0](https://github.com/rafaelsene01/agent-flow/compare/v1.36.0...v1.37.0) (2026-07-03)
+
+
+### Features
+
+* enhance agent run processing and UI components ([4858e94](https://github.com/rafaelsene01/agent-flow/commit/4858e94e730f1fc39f47da397ba43eea795dbfe6))
+
 # [1.36.0](https://github.com/rafaelsene01/agent-flow/compare/v1.35.0...v1.36.0) (2026-07-03)
 
 
