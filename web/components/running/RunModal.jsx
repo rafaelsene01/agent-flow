@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Loader2, ScrollText, ArrowLeft, Send, CornerDownRight, User, Hand, CheckCircle2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github-dark.css";
+import { X, Loader2, ScrollText, ArrowLeft, Send, CornerDownRight, User, Hand, CheckCircle2, Bot, Copy, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -109,9 +113,50 @@ function ExecBlock({ label, status, active, onOpen }) {
   );
 }
 
+// Resposta final do agente (ex.: a descrição gerada), renderizada como markdown.
+// O botão copia o markdown BRUTO — pronto para colar de volta no card.
+function ResultBlock({ text }) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="relative rounded-lg border bg-muted/20 px-3 py-2.5">
+      <button
+        type="button"
+        onClick={handleCopy}
+        className={cn(
+          "absolute right-2 top-2 z-[1] flex items-center gap-1 rounded-md border bg-background/80 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur transition hover:text-foreground",
+          copied && "border-emerald-400/50 text-emerald-600 dark:text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400",
+        )}
+      >
+        {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+        {copied ? t("running.chat.copied") : t("running.chat.copy")}
+      </button>
+      <div className="flex items-start gap-1.5">
+        <Bot className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+        <div className="prose prose-sm dark:prose-invert min-w-0 max-w-none flex-1 break-words">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[[rehypeHighlight, { detect: false }]]}
+          >
+            {text}
+          </ReactMarkdown>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Ponto de parada na pipeline: não roda no Claude, só destrava o próximo passo
 // quando o usuário aprova. Enquanto o passo anterior não conclui, fica na fila.
-function BreakpointCard({ run, index, onApprove, approving }) {
+function BreakpointCard({ run, onApprove, approving }) {
   const { t } = useI18n();
   const isWaiting = run.status === "waiting-approval";
   const isDone = run.status === "done";
@@ -119,9 +164,6 @@ function BreakpointCard({ run, index, onApprove, approving }) {
   return (
     <div className="flex flex-col gap-2.5 rounded-xl border border-dashed border-amber-400/50 bg-amber-50/40 p-3.5 dark:bg-amber-950/10">
       <div className="flex items-center gap-2">
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-          {index + 1}
-        </span>
         <Hand className="size-3.5 shrink-0 text-amber-500" />
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{t("running.launch.breakpoint")}</span>
         <StatusBadge status={run.status} />
@@ -149,15 +191,19 @@ function BreakpointCard({ run, index, onApprove, approving }) {
   );
 }
 
-// Um bloco do chat = uma execução (run) da pipeline, renderizada como uma
-// conversa (timeline de turns: exec / question / answer).
-function RunChatCard({ run, index, onOpenLog, onSend, sending }) {
+// O chat de uma sessão de agente, renderizado como uma conversa
+// (timeline de turns: exec / question / answer / result).
+function RunChatCard({ run, onOpenLog, onSend, sending }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState("");
 
   const isActive = run.status === "processing";
   const isQueued = run.status === "queued";
   const isWaiting = run.status === "waiting-input";
+  // Input liberado sempre que o agente não está processando nem na fila: além de
+  // responder perguntas (waiting-input), o usuário pode pedir ajustes ao resultado
+  // de um run concluído — a mensagem retoma a mesma sessão do Claude.
+  const canSend = !isActive && !isQueued;
 
   const turns = parseTurns(run);
   // Alternativas da última pergunta (para os "chips" que caem no input).
@@ -180,9 +226,7 @@ function RunChatCard({ run, index, onOpenLog, onSend, sending }) {
   return (
     <div className="flex flex-col gap-2.5 rounded-xl border bg-card/50 p-3.5">
       <div className="flex items-center gap-2">
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-          {index + 1}
-        </span>
+        <Bot className="size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{run.agent_name}</span>
         {isActive && <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />}
         <StatusBadge status={run.status} />
@@ -190,7 +234,8 @@ function RunChatCard({ run, index, onOpenLog, onSend, sending }) {
 
       {isQueued && (
         <p className="text-[11px] italic text-muted-foreground">
-          {run.depends_on ? t("running.chat.waitingPrev") : t("running.chat.queued")}
+          {/* Run retomado (resume=1) já rodou antes: está só aguardando vez na fila. */}
+          {run.depends_on && !run.resume ? t("running.chat.waitingPrev") : t("running.chat.queued")}
         </p>
       )}
 
@@ -239,6 +284,9 @@ function RunChatCard({ run, index, onOpenLog, onSend, sending }) {
                 </div>
               );
             }
+            if (tn.type === "result") {
+              return <ResultBlock key={i} text={tn.text} />;
+            }
             return null;
           })}
         </div>
@@ -260,8 +308,9 @@ function RunChatCard({ run, index, onOpenLog, onSend, sending }) {
         </p>
       )}
 
-      {/* Input de resposta (quando aguardando input) + alternativas selecionáveis */}
-      {isWaiting && (
+      {/* Input da sessão: responde a pergunta pendente (waiting-input) ou pede um
+          ajuste ao resultado — disponível sempre que o agente não está processando. */}
+      {canSend && (
         <div className="flex flex-col gap-2">
           {options.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -282,12 +331,12 @@ function RunChatCard({ run, index, onOpenLog, onSend, sending }) {
             <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder={t("running.answerPlaceholder")}
+              placeholder={t(isWaiting ? "running.answerPlaceholder" : "running.messagePlaceholder")}
               className="min-h-14 flex-1 text-sm"
             />
             <Button size="sm" disabled={sending || !draft.trim()} onClick={submit}>
               <Send className="size-3.5" />
-              {t("running.sendContinue")}
+              {t(isWaiting ? "running.sendContinue" : "running.send")}
             </Button>
           </div>
         </div>
@@ -297,23 +346,23 @@ function RunChatCard({ run, index, onOpenLog, onSend, sending }) {
 }
 
 /**
- * Modal de "chat" de uma pipeline: um bloco por execução (run), cada um com uma
- * timeline em camadas (segmentos de log + perguntas + respostas). A resposta é
- * enfileirada (o agente retoma quando estiver livre).
+ * Modal de "chat" de UMA sessão de agente (um run): timeline em camadas
+ * (segmentos de log + perguntas + respostas + resultado em markdown). A mensagem
+ * do usuário é enfileirada e retoma a mesma sessão quando o agente estiver livre.
  */
 export default function RunModal({ runId, onClose }) {
   const { t } = useI18n();
   const { toast } = useToast();
-  const [chain, setChain] = useState(null); // array de runs | null=carregando
+  const [run, setRun] = useState(null); // run | null=carregando
   const [openLog, setOpenLog] = useState(null); // segmento aberto | null
   const [sendingId, setSendingId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
 
   function load() {
-    fetch(`/api/agent-runs/${encodeURIComponent(runId)}/chain`)
+    fetch(`/api/agent-runs/${encodeURIComponent(runId)}`)
       .then((r) => r.json())
-      .then((d) => setChain(d.runs ?? []))
-      .catch(() => setChain((prev) => prev ?? []));
+      .then((d) => setRun(d.run ?? null))
+      .catch(() => setRun((prev) => prev ?? null));
   }
 
   useEffect(() => {
@@ -356,8 +405,6 @@ export default function RunModal({ runId, onClose }) {
     }
   }
 
-  const head = chain?.[0];
-
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent
@@ -368,12 +415,12 @@ export default function RunModal({ runId, onClose }) {
         <div className="flex items-center gap-3 border-b px-5 py-4">
           <div className="min-w-0 flex-1">
             <DialogTitle className="truncate text-sm font-semibold">
-              {head?.card_title || head?.repo || "…"}
+              {run ? `${run.agent_name} · ${run.card_title || run.repo}` : "…"}
             </DialogTitle>
             <p className="truncate text-xs text-muted-foreground">
-              {head?.repo}
-              {head?.card_number != null ? ` · #${head.card_number}` : ""}
-              {head?.target_branch ? ` · ${head.target_branch}` : ""}
+              {run?.repo}
+              {run?.card_number != null ? ` · #${run.card_number}` : ""}
+              {run?.target_branch ? ` · ${run.target_branch}` : ""}
             </p>
           </div>
           <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={onClose} aria-label={t("running.close")}>
@@ -382,33 +429,23 @@ export default function RunModal({ runId, onClose }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-          {chain === null ? (
+          {run === null ? (
             <div className="flex flex-1 items-center justify-center py-10">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
-          ) : chain.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("running.empty")}</p>
+          ) : run.kind === "breakpoint" ? (
+            <BreakpointCard
+              run={run}
+              onApprove={handleApprove}
+              approving={approvingId === run.id}
+            />
           ) : (
-            chain.map((r, i) =>
-              r.kind === "breakpoint" ? (
-                <BreakpointCard
-                  key={r.id}
-                  run={r}
-                  index={i}
-                  onApprove={handleApprove}
-                  approving={approvingId === r.id}
-                />
-              ) : (
-                <RunChatCard
-                  key={r.id}
-                  run={r}
-                  index={i}
-                  onOpenLog={setOpenLog}
-                  onSend={handleSend}
-                  sending={sendingId === r.id}
-                />
-              ),
-            )
+            <RunChatCard
+              run={run}
+              onOpenLog={setOpenLog}
+              onSend={handleSend}
+              sending={sendingId === run.id}
+            />
           )}
         </div>
 

@@ -229,7 +229,8 @@ async function finishStep(
       return;
     }
 
-    const ask = parseAsk(extractFinalText(result.output));
+    const finalText = extractFinalText(result.output);
+    const ask = parseAsk(finalText);
     if (ask) {
       await new Promise((resolve) => logStream.end(resolve));
       updateLastExecTurn(run.id, {
@@ -259,6 +260,8 @@ async function finishStep(
         status: "done",
         finishedAt: new Date().toISOString(),
       });
+      if (finalText.trim())
+        appendTurn(run.id, { type: "result", text: finalText.trim() });
       patchRun(run.id, { status: "done" });
       return;
     }
@@ -302,6 +305,8 @@ async function finishStep(
       status: "done",
       finishedAt: new Date().toISOString(),
     });
+    if (finalText.trim())
+      appendTurn(run.id, { type: "result", text: finalText.trim() });
     patchRun(run.id, { status: "done" });
   } finally {
     unregisterProcess(run.id);

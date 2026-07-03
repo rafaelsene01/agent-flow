@@ -10,6 +10,7 @@ import implementer from "./implementer.json" with { type: "json" };
 import commitPush from "./commit-push.json" with { type: "json" };
 import createPr from "./create-pr.json" with { type: "json" };
 import developer from "./developer.json" with { type: "json" };
+import cardDescriptionWriter from "./card-description-writer.json" with { type: "json" };
 
 const FILES = {
   developer,
@@ -18,6 +19,7 @@ const FILES = {
   "code-reviewer": codeReviewer,
   "commit-push": commitPush,
   "create-pr": createPr,
+  "card-description-writer": cardDescriptionWriter,
 };
 
 // Cada default vira um agent completo com id estável e a flag isDefault, que
