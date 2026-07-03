@@ -1,3 +1,10 @@
+# [1.34.0](https://github.com/rafaelsene01/agent-flow/compare/v1.33.0...v1.34.0) (2026-07-02)
+
+
+### Features
+
+* enhance SkillCreatorModal with AI mode and validation ([bd2bbd6](https://github.com/rafaelsene01/agent-flow/commit/bd2bbd6f83043a24ab3bf96c5146392c4e427155))
+
 # [1.33.0](https://github.com/rafaelsene01/agent-flow/compare/v1.32.0...v1.33.0) (2026-07-02)
 
 
