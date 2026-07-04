@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Board from "@/components/board/Board.jsx";
 import EditBoardModal from "@/components/EditBoardModal.jsx";
+import BoardChatModal from "@/components/BoardChatModal.jsx";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Pencil, BrushCleaning, Search, X, CircleHelp } from "lucide-react";
+import { Pencil, BrushCleaning, Search, X, CircleHelp, MessageSquare } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/lib/i18nContext";
 
@@ -22,6 +23,7 @@ export default function BoardView({ board, onBoardUpdated, onCleanup, refreshSig
   const { t } = useI18n();
   const [filterDraft, setFilterDraft]     = useState(board?.viewFilter ?? "");
   const [boardToEdit, setBoardToEdit]     = useState(null);
+  const [chatOpen, setChatOpen]           = useState(false);
   const [cleanupTarget, setCleanupTarget] = useState(null);
 
   // Mantém o rascunho do filtro alinhado ao board ativo (ex: troca de board).
@@ -92,6 +94,15 @@ export default function BoardView({ board, onBoardUpdated, onCleanup, refreshSig
             variant="ghost"
             size="icon-sm"
             type="button"
+            onClick={() => setChatOpen(true)}
+            title={t("board.chat.title")}
+          >
+            <MessageSquare />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            type="button"
             onClick={() => setBoardToEdit(board)}
             title={t("board.edit.columns")}
           >
@@ -111,6 +122,9 @@ export default function BoardView({ board, onBoardUpdated, onCleanup, refreshSig
       </div>
       <Board board={board} refreshSignal={refreshSignal} />
 
+      {chatOpen && (
+        <BoardChatModal board={board} onClose={() => setChatOpen(false)} />
+      )}
       {boardToEdit && (
         <EditBoardModal
           board={boardToEdit}

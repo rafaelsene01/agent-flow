@@ -68,7 +68,8 @@ function buildPreamble() {
 }
 
 // Extrai o texto final da resposta do Claude a partir do stdout raw (stream-json).
-function extractFinalText(rawOutput) {
+// Exportada: o chat de board (board-chat.service) reusa o mesmo parsing.
+export function extractFinalText(rawOutput) {
   let finalText = "";
   for (const line of (rawOutput ?? "").split("\n")) {
     const s = line.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").trim();

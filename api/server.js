@@ -8,6 +8,7 @@ import usageRoutes from "./routes/usage.js";
 import skillsRoutes from "./routes/skills.js";
 import agentsRoutes from "./routes/agents.js";
 import agentRunsRoutes from "./routes/agent-runs.js";
+import boardChatRoutes from "./routes/board-chat.js";
 import { warmup } from "./modules/status/status.cache.js";
 import { warmItemsCache, startItemsPolling } from "./modules/github/github.items.js";
 import { WEB_DIST_DIR } from "./paths.js";
@@ -63,6 +64,7 @@ export async function startServer({ port, apiOnly = false }) {
   skillsRoutes(app);
   agentsRoutes(app);
   agentRunsRoutes(app);
+  boardChatRoutes(app);
   recoverAndDispatch();
 
   if (!apiOnly) {

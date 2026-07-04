@@ -146,6 +146,53 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
   return { repoDir, worktreeDir, helpersDir, cloned };
 }
 
+// Worktree do chat de board: faz checkout de uma branch EXISTENTE (local ou
+// remota) num diretório derivado do id do board. Difere de setupWorktree por não
+// criar branch nova — e usa -f porque a branch pode já estar em checkout no clone
+// principal (ex: a branch default).
+export async function setupChatWorktree({ owner, repo, branch, boardId }) {
+  const { projectsPath } = getConfig();
+  const cardNumber  = `chat-${boardId}`;
+  const worktreeDir = path.join(projectsPath, `${repo}-${cardNumber}`);
+
+  let repoDir = await findExistingClone(projectsPath, owner, repo);
+  if (!repoDir) {
+    repoDir = path.join(projectsPath, repo);
+    const token    = getToken();
+    const cloneUrl = token
+      ? `https://x-access-token:${token}@github.com/${owner}/${repo}.git`
+      : `https://github.com/${owner}/${repo}.git`;
+    fs.mkdirSync(projectsPath, { recursive: true });
+    await execFileP("git", ["clone", cloneUrl, repoDir], { timeout: 300_000 });
+  }
+
+  await git(repoDir, ["fetch", "--all"]);
+
+  if (fs.existsSync(worktreeDir)) {
+    await execFileP("git", ["worktree", "remove", "--force", worktreeDir], {
+      cwd: repoDir, timeout: 10_000,
+    }).catch(() => {});
+    fs.rmSync(worktreeDir, { recursive: true, force: true });
+  }
+  await execFileP("git", ["worktree", "prune"], { cwd: repoDir, timeout: 10_000 }).catch(() => {});
+
+  if (await refExists(repoDir, branch)) {
+    await git(repoDir, ["worktree", "add", "-f", worktreeDir, branch]);
+  } else if (await refExists(repoDir, `origin/${branch}`)) {
+    await git(repoDir, ["worktree", "add", "--track", "-b", branch, worktreeDir, `origin/${branch}`]);
+  } else {
+    throw new Error(`Branch "${branch}" não encontrada no repositório.`);
+  }
+
+  const entry = registerWorktree({
+    owner, repo, branch, originBranch: branch, cardNumber, repoDir, worktreeDir,
+  });
+
+  applyOverlays(`${owner}/${repo}`, worktreeDir);
+
+  return { repoDir, worktreeDir, worktreeId: entry.id, helpersDir: entry.helpersDir };
+}
+
 function applyOverlays(originRepo, worktreeDir) {
   if (!originRepo) return;
   let overlayDir;
