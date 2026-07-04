@@ -1,3 +1,11 @@
+# [1.38.0](https://github.com/rafaelsene01/agent-flow/compare/v1.37.0...v1.38.0) (2026-07-04)
+
+
+### Features
+
+* add board chat functionality and related enhancements ([a230dbd](https://github.com/rafaelsene01/agent-flow/commit/a230dbd5b5f1e7ed5d6a71b1380bb1f06050a49e))
+* enhance agent run status tracking and UI representation ([58e37c8](https://github.com/rafaelsene01/agent-flow/commit/58e37c8546339b545d0221c51bffa405b5c032ed))
+
 # [1.37.0](https://github.com/rafaelsene01/agent-flow/compare/v1.36.0...v1.37.0) (2026-07-03)
 
 
