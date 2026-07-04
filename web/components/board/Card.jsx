@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Clock, GitBranch, MessageCircleQuestion } from "lucide-react";
+import { Clock, GitBranch, MessageCircleQuestion } from "lucide-react";
 import { useI18n } from "@/lib/i18nContext";
 
 function Assignee({ login, avatarUrl }) {
@@ -51,32 +51,36 @@ export default function Card({ item, onOpen, worktrees = [], runsAttention = {},
   const isRunning = runActive;
   const hasBranch = !!wt;
   const isWaiting = runNeedsAnswer;
+  const hasError = !!runAttention?.error;
+  const allDone = !!runAttention?.allDone;
 
   // Indicador de estado não dependente só de cor (regra color-not-only):
   // além da borda colorida/animada, o card mostra um ícone + rótulo acessível.
-  const status = isRunning
-    ? { Icon: Loader2, spin: true, label: t("status.running"), className: "text-blue-500 dark:text-blue-400" }
-    : isWaiting
-      ? { Icon: Clock, label: t("legend.waiting"), className: "text-amber-500 dark:text-amber-400" }
-      : hasBranch
-        ? { Icon: GitBranch, label: t("legend.branch"), className: "text-muted-foreground" }
-        : null;
+  const status = isWaiting
+    ? { Icon: Clock, label: t("legend.waiting"), className: "text-amber-500 dark:text-amber-400" }
+    : hasBranch
+      ? { Icon: GitBranch, label: t("legend.branch"), className: "text-muted-foreground" }
+      : null;
 
   return (
     <div
       className={cn(
         "rounded-lg",
-        isRunning && "card-running p-[2px]",
-        !isRunning && isWaiting && "card-waiting p-[2px]",
-        !isRunning && !isWaiting && hasBranch && "card-branch-silver p-[2px]"
+        // Prioridade: aguardando entrada/breakpoint (laranja girando) > rodando
+        // (azul girando) > erro (vermelho) > tudo concluído (verde) > branch (prata).
+        isWaiting && "card-waiting p-[2px]",
+        !isWaiting && isRunning && "card-running p-[2px]",
+        !isWaiting && !isRunning && hasError && "card-error p-[2px]",
+        !isWaiting && !isRunning && !hasError && allDone && "card-done p-[2px]",
+        !isWaiting && !isRunning && !hasError && !allDone && hasBranch && "card-branch-silver p-[2px]"
       )}
     >
       <button
         type="button"
         className={cn(
           "cursor-pointer flex flex-col gap-1.5 p-3 rounded-lg",
-          "transition-all duration-200 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:shadow-card-hover hover:-translate-y-0.5 hover:bg-muted/30 text-left w-full",
-          isRunning || hasBranch || isWaiting
+          "text-left w-full",
+          isRunning || hasBranch || isWaiting || hasError || allDone
             ? "bg-card border border-transparent"
             : "bg-card border border-l-[3px] border-l-border shadow-card"
         )}
@@ -90,10 +94,7 @@ export default function Card({ item, onOpen, worktrees = [], runsAttention = {},
                 aria-label={status.label}
                 className={cn("inline-flex shrink-0", status.className)}
               >
-                <status.Icon
-                  className={cn("size-3.5", status.spin && "animate-spin motion-reduce:animate-none")}
-                  strokeWidth={2.25}
-                />
+                <status.Icon className="size-3.5" strokeWidth={2.25} />
               </span>
             )}
             {runNeedsAnswer && (

@@ -199,15 +199,27 @@
   animation: card-spin-border 2s linear infinite;
 }
 
-/* amber pulse border for cards awaiting user input */
-@keyframes card-waiting-pulse {
-  0%, 100% { opacity: 0.45; }
-  50%       { opacity: 1; }
+/* orange spinning border for cards awaiting user input (breakpoint/question) */
+.card-waiting {
+  background: conic-gradient(
+    from var(--spin-angle),
+    transparent 0%,
+    transparent 40%,
+    #f97316 65%,
+    #fbbf24 82%,
+    transparent 100%
+  );
+  animation: card-spin-border 2s linear infinite;
 }
 
-.card-waiting {
-  background: #c8860a;
-  animation: card-waiting-pulse 1.4s ease-in-out infinite;
+/* static red border when a run errored */
+.card-error {
+  background: #dc2626;
+}
+
+/* static green border when all runs finished */
+.card-done {
+  background: #16a34a;
 }
 
 /* silver border for branch-configured cards (no execution yet) */
@@ -247,8 +259,7 @@
   }
   .card-waiting {
     animation: none;
-    background: #c8860a;
-    opacity: 0.8;
+    background: conic-gradient(transparent 0%, #f97316 50%, transparent 100%);
   }
   .animate-pulse {
     animation: none;

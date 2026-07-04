@@ -100,7 +100,10 @@ export function runsAttentionSummary() {
     .prepare(
       `SELECT repo, card_number,
         SUM(CASE WHEN status IN ('waiting-input','waiting-approval') THEN 1 ELSE 0 END) AS waiting,
-        SUM(CASE WHEN status IN ('queued','processing','waiting-approval') THEN 1 ELSE 0 END) AS active
+        SUM(CASE WHEN status IN ('queued','processing','waiting-approval') THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS errors,
+        SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done,
+        COUNT(*) AS total
        FROM agent_runs
        WHERE card_number IS NOT NULL
        GROUP BY repo, card_number`,
@@ -111,6 +114,8 @@ export function runsAttentionSummary() {
     cardNumber: r.card_number,
     waiting: r.waiting > 0,
     active: r.active > 0,
+    error: r.errors > 0,
+    allDone: r.total > 0 && r.done === r.total,
   }));
 }
 

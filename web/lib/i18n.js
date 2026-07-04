@@ -108,6 +108,10 @@ export const dictionaries = {
     "legend.branch": "branch configurado",
     "legend.running": "executando agora",
     "legend.waiting": "Aguardando input",
+    "legend.error": "Erro",
+    "legend.error.desc": "um run falhou",
+    "legend.done": "Verde",
+    "legend.done.desc": "todos os runs finalizados",
 
     // Confirm dialog
     "confirm.destructive": "Esta ação não pode ser desfeita.",
@@ -339,6 +343,10 @@ export const dictionaries = {
     "legend.branch": "branch configured",
     "legend.running": "running now",
     "legend.waiting": "Waiting for input",
+    "legend.error": "Red",
+    "legend.error.desc": "a run failed",
+    "legend.done": "Green",
+    "legend.done.desc": "all runs finished",
 
     // Confirm dialog
     "confirm.destructive": "This action cannot be undone.",
