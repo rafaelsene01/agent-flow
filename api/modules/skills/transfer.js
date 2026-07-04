@@ -1,9 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { zipSync, unzipSync } from "fflate";
+import { PACKAGE_ROOT } from "../../paths.js";
 
-// Skills locais do projeto: <cwd>/.claude/skills (mesma pasta usada por skills.service).
-const SKILLS_DIR = path.join(process.cwd(), ".claude", "skills");
+// Skills locais do projeto: <pacote>/.claude/skills (mesma pasta usada por skills.service).
+const SKILLS_DIR = path.join(PACKAGE_ROOT, ".claude", "skills");
 
 // Nome de skill válido (kebab-case). Também vira o nome da pasta em disco.
 const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;

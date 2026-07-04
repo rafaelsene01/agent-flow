@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import path from "path";
 import { getConfig, setConfig } from "../config/config.service.js";
-import { getActiveSkillNames, getSkillsContent } from "../skills/skills.service.js";
+import { getActiveSkillNames, listSkills } from "../skills/skills.service.js";
 import { DEFAULT_AGENTS, isDefaultAgentId } from "./defaults/index.js";
 
 // Agents persistem em ~/.agent-flow/config.json → agents (default []). Mesmo
@@ -88,19 +88,15 @@ export async function deleteAgent(id) {
   await setConfig({ agents: current.filter((a) => a.id !== id) });
 }
 
-// Remove o bloco de frontmatter (--- ... ---) da SKILL.md: os metadados (name,
-// description, disable-model-invocation etc.) são para o harness, não para o
-// prompt — flags como disable-model-invocation confundiriam o agent.
-function stripFrontmatter(content) {
-  return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
-}
-
 // Monta o prompt final do agent:
 //   1. prompt do agent
-//   2. conteúdo das skills a usar (ativas globais + linkadas ao agent), injetado
-//      direto no prompt. Injetar o conteúdo (em vez de só citar o nome) garante
-//      que o agent siga a skill mesmo sem ela estar instalada na máquina/worktree
-//      e mesmo quando a skill não é invocável pelo modelo (disable-model-invocation).
+//   2. referência às skills a usar (ativas globais + linkadas ao agent): o prompt
+//      aponta o caminho absoluto da SKILL.md em <agent-flow>/.claude/skills e
+//      instrui o agente a lê-la (junto com references/, se existir) antes de
+//      executar. Referenciar o caminho — em vez de injetar o conteúdo inline —
+//      dá ao agente o contexto completo da skill, incluindo os arquivos
+//      auxiliares. Os caminhos são do projeto agent-flow (cwd do servidor), não
+//      das skills globais em ~/.claude, que o usuário pode não ter instalado.
 export function buildAgentPrompt(id) {
   const agent = getAgent(id);
   if (!agent) throw new Error("Agent não encontrado");
@@ -114,13 +110,19 @@ export function buildAgentPrompt(id) {
   }
 
   const sections = [`# Agent: ${agent.name}\n\n${agent.prompt}`];
-  // getSkillsContent ignora nomes desconhecidos e preserva a ordem.
-  for (const skill of getSkillsContent(names)) {
+  const byName = new Map(listSkills().map((s) => [s.name, s]));
+  for (const name of names) {
+    // Nomes desconhecidos são ignorados; a ordem dos nomes é preservada.
+    const skill = byName.get(name);
+    if (!skill) continue;
     const dir = path.dirname(skill.path);
     sections.push(
       `# Skill: ${skill.name}\n\n` +
-        `Siga as instruções desta skill como parte do seu papel. Arquivos auxiliares que ela referencie por caminho relativo (ex.: references/) estão em \`${dir}\`.\n\n` +
-        stripFrontmatter(skill.content).trim(),
+        (skill.description ? `${skill.description}\n\n` : "") +
+        "Esta skill faz parte do seu papel. ANTES de começar a tarefa, leia o " +
+        `arquivo \`${skill.path}\` e siga as instruções dele. Se existir a pasta ` +
+        `\`${path.join(dir, "references")}\` ou outros arquivos que a skill ` +
+        `referencie por caminho relativo, leia-os também — eles estão em \`${dir}\`.`,
     );
   }
   return sections.join("\n\n");

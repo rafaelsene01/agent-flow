@@ -36,9 +36,9 @@ export default function statusRoutes(app) {
   }
 
   // Skill genérica (fora do catálogo, ex.: criada pelo usuário): copia de
-  // <cwd>/.claude/skills/<skill> para o Claude global.
+  // <pacote>/.claude/skills/<skill> para o Claude global.
   function installProjectSkill(skill, dest) {
-    const src = join(process.cwd(), ".claude", "skills", skill);
+    const src = join(PACKAGE_ROOT, ".claude", "skills", skill);
     if (!existsSync(src)) {
       const err = new Error("Skill não encontrada no projeto.");
       err.statusCode = 404;

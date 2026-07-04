@@ -230,7 +230,8 @@ function buildPrompt(run, agentPrompt, { allowGit, allowGitRead, noAsk } = {}) {
     helpersContext +
     "\n\nRegras de execução:\n" +
     fileRule +
-    "- Aja SOMENTE com base nas instruções e skills fornecidas acima neste prompt. " +
+    "- Aja SOMENTE com base nas instruções acima e nas skills referenciadas neste prompt — " +
+    "leia os arquivos delas nos caminhos absolutos indicados antes de executar. " +
     "NÃO acione nenhuma outra skill instalada nem inicie fluxos de spec/design/tasks que não tenham sido pedidos.\n" +
     PROCESS_KILL_RULE +
     askRule +

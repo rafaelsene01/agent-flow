@@ -2,10 +2,13 @@ import fs from "fs";
 import path from "path";
 import { getConfig, setConfig } from "../config/config.service.js";
 import { getInstallState } from "./installable.js";
+import { PACKAGE_ROOT } from "../../paths.js";
 
-// Skills locais do projeto: <cwd>/.claude/skills (onde o agent-flow está rodando),
-// e não as globais em ~/.claude/skills.
-const SKILLS_DIR = path.join(process.cwd(), ".claude", "skills");
+// Skills locais do projeto: <pacote agent-flow>/.claude/skills, e não as globais
+// em ~/.claude/skills. Ancorado em PACKAGE_ROOT (não em process.cwd()) para que
+// a instalação global (npm i -g) ache as skills embarcadas no pacote mesmo
+// quando o comando roda de outra pasta.
+const SKILLS_DIR = path.join(PACKAGE_ROOT, ".claude", "skills");
 
 // Resolve o arquivo de definição de uma skill: subdiretório com SKILL.md ou <nome>.md avulso.
 function skillFilePath(name) {
@@ -38,7 +41,7 @@ function parseDescription(content) {
   return "";
 }
 
-// R1: descobre skills em ~/.claude/skills. Diretório ausente → [] (sem erro).
+// R1: descobre skills em <pacote>/.claude/skills. Diretório ausente → [] (sem erro).
 export function listSkills() {
   let entries;
   try {
@@ -151,22 +154,4 @@ export function getActiveSkills() {
       } catch {}
       return { name: s.name, description: s.description, path: s.path, content };
     });
-}
-
-// Resolve o conteúdo bruto de skills por nome, preservando a ordem dos nomes
-// informados. Nomes desconhecidos são ignorados. Usado para injetar as skills
-// linkadas a um agent no prompt final.
-export function getSkillsContent(names) {
-  const byName = new Map(listSkills().map((s) => [s.name, s]));
-  const out = [];
-  for (const name of names ?? []) {
-    const s = byName.get(name);
-    if (!s) continue;
-    let content = "";
-    try {
-      content = fs.readFileSync(s.path, "utf-8");
-    } catch {}
-    out.push({ name: s.name, description: s.description, path: s.path, content });
-  }
-  return out;
 }

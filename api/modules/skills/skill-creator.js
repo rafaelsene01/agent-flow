@@ -2,9 +2,10 @@ import fs from "fs";
 import path from "path";
 import { runClaude, resumeClaude, failureDetail } from "../claude/claude.runner.js";
 import { getLanguage } from "../config/config.service.js";
+import { PACKAGE_ROOT } from "../../paths.js";
 
-// Skills locais do projeto: <cwd>/.claude/skills (mesma pasta usada por skills.service).
-const SKILLS_DIR = path.join(process.cwd(), ".claude", "skills");
+// Skills locais do projeto: <pacote>/.claude/skills (mesma pasta usada por skills.service).
+const SKILLS_DIR = path.join(PACKAGE_ROOT, ".claude", "skills");
 
 // A conversa de criação de skill não pertence a nenhuma worktree, então não há
 // log persistido — passamos um logStream no-op para runClaude/resumeClaude.

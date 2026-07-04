@@ -40,7 +40,7 @@ function skillTarget(base, name) {
 }
 
 const globalSkillsDir = () => join(homedir(), ".claude", "skills");
-const projectSkillsDir = () => join(process.cwd(), ".claude", "skills");
+const projectSkillsDir = () => join(PACKAGE_ROOT, ".claude", "skills");
 
 // Compara dois caminhos (arquivo ou diretório) byte a byte, recursivamente.
 // Diretórios só são iguais com o mesmo conjunto de nomes e conteúdo idêntico —
@@ -71,8 +71,8 @@ function pathsEqual(a, b) {
 // tipo — senão a skill acusa "atualizar" para sempre:
 //   - git/plugin → origem é remota (repo/CLI), não comparável byte-a-byte
 //     localmente (ex.: caveman traz README.md só no repo). Instalada ⇒ atual.
-//   - local      → origem é o pacote (PACKAGE_ROOT/.claude/skills), não o cwd.
-//   - genérica   → cópia do projeto (<cwd>/.claude/skills/<name>).
+//   - local      → origem é o pacote (PACKAGE_ROOT/.claude/skills).
+//   - genérica   → cópia do projeto (<pacote>/.claude/skills/<name>).
 export function getInstallState(name) {
   const cfg = INSTALLABLE_SKILLS[name];
   const kind = cfg?.kind ?? "Skill";
