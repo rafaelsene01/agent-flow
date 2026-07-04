@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Clock, GitBranch, MessageCircleQuestion } from "lucide-react";
+import { GitBranch, MessageCircleQuestion } from "lucide-react";
 import { useI18n } from "@/lib/i18nContext";
 
 function Assignee({ login, avatarUrl }) {
@@ -56,11 +56,9 @@ export default function Card({ item, onOpen, worktrees = [], runsAttention = {},
 
   // Indicador de estado não dependente só de cor (regra color-not-only):
   // além da borda colorida/animada, o card mostra um ícone + rótulo acessível.
-  const status = isWaiting
-    ? { Icon: Clock, label: t("legend.waiting"), className: "text-amber-500 dark:text-amber-400" }
-    : hasBranch
-      ? { Icon: GitBranch, label: t("legend.branch"), className: "text-muted-foreground" }
-      : null;
+  const status = hasBranch
+    ? { Icon: GitBranch, label: t("legend.branch"), className: "text-muted-foreground" }
+    : null;
 
   return (
     <div

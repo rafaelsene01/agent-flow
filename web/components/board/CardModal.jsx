@@ -74,6 +74,7 @@ const RUN_STATUS_PILL = {
   queued: "border-border text-muted-foreground",
   processing: "border-blue-400/50 text-blue-600 dark:text-blue-400",
   "waiting-input": "border-amber-400/60 text-amber-600 dark:text-amber-400",
+  "waiting-approval": "border-amber-400/60 text-amber-600 dark:text-amber-400",
   done: "border-emerald-400/50 text-emerald-600 dark:text-emerald-400",
   error: "border-destructive/50 text-destructive",
 };
