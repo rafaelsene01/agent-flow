@@ -51,10 +51,6 @@ export const dictionaries = {
     "action.pull": "Pull",
 
     // Run defaults (CardModal)
-    "run.task": "Executar Tarefa",
-    "run.tlc": "Executar TLC",
-    "run.spec": "Executar Spec",
-    "run.eval": "Executar Spec-Eval",
     "run.commitPush": "Commit & Push",
     "run.createPR": "Criar Pull Request",
 
@@ -73,7 +69,6 @@ export const dictionaries = {
     "card.message": "Mensagem",
     "card.message.send": "Enviar mensagem",
     "card.message.placeholder": "Digite uma mensagem para o agente…",
-    "card.run": "Executar",
     "card.logs": "Logs",
     "card.files": "Arquivos",
     "card.helpers": "Helpers",
@@ -85,21 +80,6 @@ export const dictionaries = {
     "card.effort": "Esforço",
     "card.triggers": "Gatilhos",
     "card.type": "Tipo",
-    "card.run.background": "Executando em background…",
-    "card.run.done.rerun": "✓ Concluído · clique para re-executar",
-    "card.answer.title": "Responder pergunta",
-    "card.answer.placeholder": "Digite sua resposta…",
-    "card.answer.send": "Enviar resposta",
-    "card.answer.button": "Responder",
-
-    // Pipeline stages
-    "pipeline.branch": "Branch",
-    "pipeline.task": "Executar Tarefa",
-    "pipeline.tlc": "TLC",
-    "pipeline.spec": "Spec",
-    "pipeline.specEval": "Spec-Eval",
-    "pipeline.commitPush": "Commit & Push",
-    "pipeline.pr": "Pull Request",
 
     // Status
     "status.pending": "Pendente",
@@ -112,10 +92,6 @@ export const dictionaries = {
     "toast.error": "Erro",
     "toast.send.success": "Mensagem enviada",
     "toast.send.error": "Falha ao enviar mensagem",
-    "toast.run.success": "Execução iniciada",
-    "toast.run.error": "Falha ao iniciar execução",
-    "toast.tlc.success": "TLC iniciado",
-    "toast.tlc.error": "Erro ao iniciar TLC",
     "toast.reset.success": "Worktree resetado",
     "toast.reset.error": "Falha ao resetar worktree",
     "toast.pr.success": "PR criado",
@@ -133,10 +109,8 @@ export const dictionaries = {
     // Legend
     "legend.title": "Estados do card",
     "legend.silver": "Prata",
-    "legend.gold": "Ouro",
     "legend.spinning": "Girando",
     "legend.branch": "branch configurado",
-    "legend.done": "execução concluída",
     "legend.running": "executando agora",
     "legend.waiting": "Aguardando input",
 
@@ -320,10 +294,6 @@ export const dictionaries = {
     "action.pull": "Pull",
 
     // Run defaults (CardModal)
-    "run.task": "Run Task",
-    "run.tlc": "Run TLC",
-    "run.spec": "Run Spec",
-    "run.eval": "Run Spec-Eval",
     "run.commitPush": "Commit & Push",
     "run.createPR": "Create Pull Request",
 
@@ -342,7 +312,6 @@ export const dictionaries = {
     "card.message": "Message",
     "card.message.send": "Send message",
     "card.message.placeholder": "Type a message to the agent…",
-    "card.run": "Run",
     "card.logs": "Logs",
     "card.files": "Files",
     "card.helpers": "Helpers",
@@ -354,21 +323,6 @@ export const dictionaries = {
     "card.effort": "Effort",
     "card.triggers": "Triggers",
     "card.type": "Type",
-    "card.run.background": "Running in background…",
-    "card.run.done.rerun": "✓ Done · click to re-run",
-    "card.answer.title": "Answer question",
-    "card.answer.placeholder": "Type your answer…",
-    "card.answer.send": "Send answer",
-    "card.answer.button": "Answer",
-
-    // Pipeline stages
-    "pipeline.branch": "Branch",
-    "pipeline.task": "Run Task",
-    "pipeline.tlc": "TLC",
-    "pipeline.spec": "Spec",
-    "pipeline.specEval": "Spec-Eval",
-    "pipeline.commitPush": "Commit & Push",
-    "pipeline.pr": "Pull Request",
 
     // Status
     "status.pending": "Pending",
@@ -381,10 +335,6 @@ export const dictionaries = {
     "toast.error": "Error",
     "toast.send.success": "Message sent",
     "toast.send.error": "Failed to send message",
-    "toast.run.success": "Run started",
-    "toast.run.error": "Failed to start run",
-    "toast.tlc.success": "TLC started",
-    "toast.tlc.error": "Failed to start TLC",
     "toast.reset.success": "Worktree reset",
     "toast.reset.error": "Failed to reset worktree",
     "toast.pr.success": "PR created",
@@ -402,10 +352,8 @@ export const dictionaries = {
     // Legend
     "legend.title": "Card states",
     "legend.silver": "Silver",
-    "legend.gold": "Gold",
     "legend.spinning": "Spinning",
     "legend.branch": "branch configured",
-    "legend.done": "run completed",
     "legend.running": "running now",
     "legend.waiting": "Waiting for input",
 

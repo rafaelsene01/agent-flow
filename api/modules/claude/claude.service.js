@@ -28,12 +28,10 @@ export async function getStatus() {
       connected: true,
       method: "claude-cli",
       version,
-      tlcSkill: checkSkill("tlc-spec-driven"),
-      specDrivenEvalSkill: checkSkill("spec-driven-eval"),
       karpathyPlugin: checkPlugin("andrej-karpathy-skills@karpathy-skills"),
       cavemanSkill: checkSkill("caveman"),
     };
   } catch {
-    return { connected: false, tlcSkill: false, specDrivenEvalSkill: false, karpathyPlugin: false, cavemanSkill: false };
+    return { connected: false, karpathyPlugin: false, cavemanSkill: false };
   }
 }

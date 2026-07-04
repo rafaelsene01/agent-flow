@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Clock, Check, GitBranch, MessageCircleQuestion } from "lucide-react";
+import { Loader2, Clock, GitBranch, MessageCircleQuestion } from "lucide-react";
 import { useI18n } from "@/lib/i18nContext";
 
 function Assignee({ login, avatarUrl }) {
@@ -49,21 +49,9 @@ export default function Card({ item, onOpen, worktrees = [], runsAttention = {},
   // vive só no SQLite. Trata como "running" para reaproveitar borda e ícone.
   const runActive = !!runAttention?.active;
   const isRunning =
-    runActive ||
-    (wt &&
-      (wt.status === "running" ||
-        wt.tlcStatus === "running" ||
-        wt.tlcExecStatus === "running" ||
-        wt.agentStatus === "running" ||
-        wt.commitPushStatus === "running"));
-  const isFinished =
-    wt && (wt.status === "done" || wt.tlcExecStatus === "done" || wt.agentStatus === "done");
+    runActive || (wt && wt.commitPushStatus === "running");
   const hasBranch = !!wt;
-  const isWaiting =
-    wt &&
-    (wt.status === "waiting-input" ||
-      wt.tlcExecStatus === "waiting-input" ||
-      wt.agentStatus === "waiting-input");
+  const isWaiting = runNeedsAnswer;
 
   // Indicador de estado não dependente só de cor (regra color-not-only):
   // além da borda colorida/animada, o card mostra um ícone + rótulo acessível.
@@ -71,11 +59,9 @@ export default function Card({ item, onOpen, worktrees = [], runsAttention = {},
     ? { Icon: Loader2, spin: true, label: t("status.running"), className: "text-blue-500 dark:text-blue-400" }
     : isWaiting
       ? { Icon: Clock, label: t("legend.waiting"), className: "text-amber-500 dark:text-amber-400" }
-      : isFinished
-        ? { Icon: Check, label: t("legend.done"), className: "text-amber-600 dark:text-amber-400" }
-        : hasBranch
-          ? { Icon: GitBranch, label: t("legend.branch"), className: "text-muted-foreground" }
-          : null;
+      : hasBranch
+        ? { Icon: GitBranch, label: t("legend.branch"), className: "text-muted-foreground" }
+        : null;
 
   return (
     <div
@@ -83,8 +69,7 @@ export default function Card({ item, onOpen, worktrees = [], runsAttention = {},
         "rounded-lg",
         isRunning && "card-running p-[2px]",
         !isRunning && isWaiting && "card-waiting p-[2px]",
-        !isRunning && !isWaiting && isFinished && "card-branch-gold p-[2px]",
-        !isRunning && !isWaiting && !isFinished && hasBranch && "card-branch-silver p-[2px]"
+        !isRunning && !isWaiting && hasBranch && "card-branch-silver p-[2px]"
       )}
     >
       <button
@@ -94,8 +79,7 @@ export default function Card({ item, onOpen, worktrees = [], runsAttention = {},
           "transition-all duration-200 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:shadow-card-hover hover:-translate-y-0.5 hover:bg-muted/30 text-left w-full",
           isRunning || hasBranch || isWaiting
             ? "bg-card border border-transparent"
-            : "bg-card border border-l-[3px] border-l-border shadow-card",
-          !isRunning && !isWaiting && isFinished && "card-branch-gold-inner"
+            : "bg-card border border-l-[3px] border-l-border shadow-card"
         )}
         onClick={() => onOpen(item)}
       >

@@ -62,11 +62,7 @@ export default function Board({ board, refreshSignal = 0 }) {
   // Re-poll while any worktree has a running process
   useEffect(() => {
     const anyRunning = worktrees.some(
-      (w) =>
-        w.status === "running" ||
-        w.tlcStatus === "running" ||
-        w.tlcExecStatus === "running" ||
-        w.commitPushStatus === "running",
+      (w) => w.commitPushStatus === "running",
     );
     if (!anyRunning) return;
     const timer = setInterval(loadWorktrees, 3000);

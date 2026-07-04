@@ -8,35 +8,25 @@ import "highlight.js/styles/github-dark.css";
 import {
   AlertTriangle,
   Archive,
-  FileText,
   FolderOpen,
   GitBranch,
   GitMerge,
   GitPullRequest,
-  ListChecks,
   Loader2,
   MessageCircleQuestion,
-  Palette,
-  Pencil,
-  Play,
   Rocket,
   RotateCcw,
   Send,
   X,
-  Zap,
 } from "lucide-react";
 import CreateBranchModal from "@/components/CreateBranchModal.jsx";
 import EnqueueAgentModal from "@/components/running/EnqueueAgentModal.jsx";
 import RunModal from "@/components/running/RunModal.jsx";
 import CopyCmd from "@/components/board/CopyCmd.jsx";
-import TlcFileModal from "@/components/board/TlcFileModal.jsx";
 import FileContentModal from "@/components/board/FileContentModal.jsx";
 import LogView from "@/components/board/LogView.jsx";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.jsx";
 import { Button } from "@/components/ui/button.jsx";
-import { Badge } from "@/components/ui/badge.jsx";
-import { Input } from "@/components/ui/input.jsx";
-import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
 import { Separator } from "@/components/ui/separator.jsx";
 import {
@@ -64,7 +54,6 @@ import { statusColor, statusLabel, fileIcon } from "@/lib/fileVisuals";
 import { useToast } from "@/lib/toast";
 import { useI18n } from "@/lib/i18nContext";
 import { Collapsible as CollapsiblePrimitive } from "radix-ui";
-import { playDone, playWaiting, unlockAudio } from "@/lib/sound";
 
 const TYPE_LABEL = {
   Issue: "Issue",
@@ -92,30 +81,6 @@ const RUN_STATUS_PILL = {
 };
 
 const RUN_DEFAULTS = {
-  task: {
-    model: "sonnet",
-    effort: "high",
-    label: "Executar Tarefa",
-    labelKey: "run.task",
-  },
-  tlc: {
-    model: "opus",
-    effort: "high",
-    label: "Executar TLC",
-    labelKey: "run.tlc",
-  },
-  spec: {
-    model: "sonnet",
-    effort: "medium",
-    label: "Executar Spec",
-    labelKey: "run.spec",
-  },
-  eval: {
-    model: "sonnet",
-    effort: "high",
-    label: "Executar Spec-Eval",
-    labelKey: "run.eval",
-  },
   commitPush: {
     model: "haiku",
     effort: "low",
@@ -197,7 +162,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [showEnqueueAgent, setShowEnqueueAgent] = useState(false);
   const [cardRuns, setCardRuns] = useState(null); // null=loading, array=loaded (agent-runs deste card)
   const [openRunId, setOpenRunId] = useState(null); // run cujo chat está aberto
-  const [tlcFileModal, setTlcFileModal] = useState(null); // null | "spec" | "design" | "tasks"
   const [worktreeConfig, setWorktreeConfig] = useState(null); // null=loading false=none object=found
 
   const worktreeId =
@@ -246,21 +210,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const isConfigured = !!worktreeConfig;
   const isChecking = worktreeConfig === null && worktreeId !== null;
 
-  const [specSending, setSpecSending] = useState(false);
-  const [tlcSending, setTlcSending] = useState(false);
-  const [tlcExecSending, setTlcExecSending] = useState(false);
-  const [specEvalSending, setSpecEvalSending] = useState(false);
-  const [commitPushSending, setCommitPushSending] = useState(false);
-  const [claudeStatus, setClaudeStatus] = useState(null);
-  const [tlcFiles, setTlcFiles] = useState(null); // { spec, design, tasks } from live scan
   const [changedFiles, setChangedFiles] = useState(null); // null=not loaded, array=loaded
   const [fileContentModal, setFileContentModal] = useState(null); // null | file path string
   const [pullBehind, setPullBehind] = useState(null); // null=not checked, number=count
   const [pullSending, setPullSending] = useState(false);
   const [helpersFiles, setHelpersFiles] = useState(null); // null=not loaded, array=loaded
   const [helpersFileModal, setHelpersFileModal] = useState(null); // null | file path string
-  const [errorModal, setErrorModal] = useState(null); // null | string
-  const [runConfirmModal, setRunConfirmModal] = useState(null); // null | { action, model, effort }
   const [logText, setLogText] = useState("");
   const [mainTab, setMainTab] = useState("desc");
   const [messageText, setMessageText] = useState("");
@@ -268,19 +223,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [messageEffort, setMessageEffort] = useState("medium");
   const [messageSending, setMessageSending] = useState(false);
   const [resetWorktreeSending, setResetWorktreeSending] = useState(false);
-  const [createPrSending, setCreatePrSending] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState("__new__");
-  const [answerModal, setAnswerModal] = useState(null);
   const logRef = useRef(null);
   const prevAnyRunningRef = useRef(null);
-  const prevStatusRef = useRef(null);
-
-  useEffect(() => {
-    fetch("/api/status")
-      .then((r) => r.json())
-      .then((d) => setClaudeStatus(d.claude ?? null))
-      .catch(() => setClaudeStatus(null));
-  }, []);
 
   function loadChangedFiles() {
     if (!worktreeId) return;
@@ -292,21 +237,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       .then((d) => setChangedFiles(d.files ?? []))
       .catch(() => setChangedFiles([]));
   }
-
-  useEffect(() => {
-    const taskDone =
-      worktreeConfig?.status === "done" ||
-      worktreeConfig?.tlcExecStatus === "done" ||
-      worktreeConfig?.commitPushStatus === "done" ||
-      worktreeConfig?.commitPushStatus === "error" ||
-      worktreeConfig?.agentStatus === "done";
-    if (taskDone) loadChangedFiles();
-  }, [
-    worktreeConfig?.status,
-    worktreeConfig?.tlcExecStatus,
-    worktreeConfig?.commitPushStatus,
-    worktreeConfig?.agentStatus,
-  ]);
 
   async function handleExcludeFile(filePath) {
     try {
@@ -377,21 +307,16 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }, [worktreeConfig?.pullStatus]);
 
-  const anyRunning =
-    worktreeConfig?.status === "running" ||
-    worktreeConfig?.tlcStatus === "running" ||
-    worktreeConfig?.tlcExecStatus === "running" ||
-    worktreeConfig?.specEvalStatus === "running" ||
-    worktreeConfig?.commitPushStatus === "running" ||
-    worktreeConfig?.pullStatus === "running" ||
-    worktreeConfig?.messageStatus === "running" ||
-    worktreeConfig?.agentStatus === "running" ||
-    worktreeConfig?.prStatus === "running";
+  // A aba Git é a inicial — carrega o behind-count assim que o card abre
+  // configurado (antes isso acontecia ao clicar na aba).
+  useEffect(() => {
+    if (!isConfigured) return;
+    loadBehindCount();
+  }, [isConfigured]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isWaiting =
-    worktreeConfig?.status === "waiting-input" ||
-    worktreeConfig?.tlcExecStatus === "waiting-input" ||
-    worktreeConfig?.agentStatus === "waiting-input";
+  const anyRunning =
+    worktreeConfig?.pullStatus === "running" ||
+    worktreeConfig?.messageStatus === "running";
 
   // Modais Radix aninhados dentro deste card. Ao fechar qualquer um deles, o
   // FocusScope restaura o foco e dispara um evento de "focus outside" residual
@@ -401,11 +326,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const childModalOpen =
     !!fileContentModal ||
     !!helpersFileModal ||
-    !!tlcFileModal ||
     showCreateBranch ||
     showEnqueueAgent ||
-    !!openRunId ||
-    !!errorModal;
+    !!openRunId;
   const childModalGuardRef = useRef(false);
   useEffect(() => {
     if (childModalOpen) {
@@ -474,59 +397,12 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     if (logText) setMainTab((t) => (t === "desc" ? "logs" : t));
   }, [!!logText]);
 
-  // Scan .specs/features/ whenever TLC is done so buttons reflect real disk state.
-  useEffect(() => {
-    if (worktreeConfig?.tlcStatus !== "done" || !worktreeId) return;
-    fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}/tlc-scan`)
-      .then((r) => r.json())
-      .then((d) => setTlcFiles(d.tlcFiles ?? null))
-      .catch(() => setTlcFiles(null));
-  }, [worktreeConfig?.tlcStatus, worktreeId]);
-
   // Poll while any background job is running
   useEffect(() => {
     if (!anyRunning) return;
     const timer = setInterval(loadWorktreeConfig, 3000);
     return () => clearInterval(timer);
-  }, [
-    worktreeConfig?.status,
-    worktreeConfig?.tlcStatus,
-    worktreeConfig?.tlcExecStatus,
-    worktreeConfig?.specEvalStatus,
-    worktreeConfig?.commitPushStatus,
-    worktreeConfig?.pullStatus,
-    worktreeConfig?.messageStatus,
-    worktreeConfig?.agentStatus,
-    worktreeConfig?.prStatus,
-  ]);
-
-  // Sound on status transition
-  useEffect(() => {
-    const prev = prevStatusRef.current;
-    const cur = {
-      status: worktreeConfig?.status,
-      tlcExecStatus: worktreeConfig?.tlcExecStatus,
-      agentStatus: worktreeConfig?.agentStatus,
-    };
-    if (prev) {
-      const wentDone =
-        (prev.status === "running" && cur.status === "done") ||
-        (prev.tlcExecStatus === "running" && cur.tlcExecStatus === "done") ||
-        (prev.agentStatus === "running" && cur.agentStatus === "done");
-      const wentWaiting =
-        (prev.status === "running" && cur.status === "waiting-input") ||
-        (prev.tlcExecStatus === "running" &&
-          cur.tlcExecStatus === "waiting-input") ||
-        (prev.agentStatus === "running" && cur.agentStatus === "waiting-input");
-      if (wentWaiting) playWaiting();
-      else if (wentDone) playDone();
-    }
-    prevStatusRef.current = cur;
-  }, [
-    worktreeConfig?.status,
-    worktreeConfig?.tlcExecStatus,
-    worktreeConfig?.agentStatus,
-  ]);
+  }, [worktreeConfig?.pullStatus, worktreeConfig?.messageStatus]);
 
   async function handleSendMessage() {
     const text = messageText.trim();
@@ -566,41 +442,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunTlc({ model, effort, sessionId } = {}) {
-    setTlcSending(true);
-    try {
-      const res = await fetch(
-        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run-tlc`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: item.title,
-            number: item.number,
-            body: item.body,
-            model,
-            effort,
-            sessionId: sessionId === "__new__" ? undefined : sessionId,
-          }),
-        },
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      loadWorktreeConfig();
-      onWorktreeChange?.();
-      toast({ title: t("toast.tlc.success"), variant: "success" });
-    } catch (err) {
-      console.error("[run-tlc]", err);
-      toast({
-        title: t("toast.tlc.error"),
-        description: err.message,
-        variant: "error",
-      });
-    } finally {
-      setTlcSending(false);
-    }
-  }
-
   async function handleResetWorktree() {
     if (!worktreeId) return;
     setResetWorktreeSending(true);
@@ -608,7 +449,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       await fetch(`/api/config/worktrees/${encodeURIComponent(worktreeId)}`, {
         method: "DELETE",
       });
-      setTlcFiles(null);
       loadWorktreeConfig();
       onWorktreeChange?.();
       toast({ title: t("toast.reset.success"), variant: "success" });
@@ -658,77 +498,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleRunTlcExec({
-    model,
-    effort,
-    validation,
-    sessionId,
-  } = {}) {
-    setTlcExecSending(true);
-    try {
-      const res = await fetch(
-        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run-tlc-exec`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model,
-            effort,
-            validation,
-            sessionId: sessionId === "__new__" ? undefined : sessionId,
-          }),
-        },
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      loadWorktreeConfig();
-      onWorktreeChange?.();
-    } catch (err) {
-      console.error("[run-tlc-exec]", err);
-      setErrorModal(err.message);
-    } finally {
-      setTlcExecSending(false);
-    }
-  }
-
-  async function handleRunSpecEval({
-    model,
-    effort,
-    validation,
-    runTests,
-    sessionId,
-  } = {}) {
-    setSpecEvalSending(true);
-    try {
-      const res = await fetch(
-        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run-spec-eval`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: item.title,
-            number: item.number,
-            body: item.body,
-            model,
-            effort,
-            validation,
-            runTests,
-            sessionId: sessionId === "__new__" ? undefined : sessionId,
-          }),
-        },
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      loadWorktreeConfig();
-      onWorktreeChange?.();
-    } catch (err) {
-      console.error("[run-spec-eval]", err);
-      setErrorModal(err.message);
-    } finally {
-      setSpecEvalSending(false);
-    }
-  }
-
   async function handleCommitPush({ model, effort, sessionId } = {}) {
     setCommitPushSending(true);
     try {
@@ -754,61 +523,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     } finally {
       setCommitPushSending(false);
     }
-  }
-
-  async function handleRunSpec({
-    model,
-    effort,
-    validation,
-    sessionId,
-  } = {}) {
-    setSpecSending(true);
-    try {
-      const res = await fetch(
-        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/run`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: item.title,
-            number: item.number,
-            body: item.body,
-            model,
-            effort,
-            validation,
-            sessionId: sessionId === "__new__" ? undefined : sessionId,
-          }),
-        },
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      loadWorktreeConfig();
-      onWorktreeChange?.();
-    } catch (err) {
-      console.error("[run-spec]", err);
-      setErrorModal(err.message);
-    } finally {
-      setSpecSending(false);
-    }
-  }
-
-  async function handleAnswer() {
-    const { session, model, effort, answer } = answerModal;
-    if (!answer.trim()) return;
-    unlockAudio();
-    setAnswerModal(null);
-    try {
-      await fetch(
-        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/answer`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answer, sessionId: session, model, effort }),
-        },
-      );
-    } catch (_) {}
-    setSelectedSessionId(session);
-    loadWorktreeConfig();
   }
 
   const displayLogText = useMemo(() => collapseLogLines(logText), [logText]);
@@ -923,97 +637,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                   </Select>
                 </div>
 
-                {runConfirmModal.action === "eval" && (
-                  <>
-                    <div className="border-t pt-3 flex flex-col gap-3">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Comandos de Validação
-                      </span>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          {
-                            key: "install",
-                            label: "Instalação",
-                            placeholder: "npm install",
-                          },
-                          {
-                            key: "build",
-                            label: "Build",
-                            placeholder: "npm run build",
-                          },
-                          {
-                            key: "lint",
-                            label: "Lint",
-                            placeholder: "npm run lint",
-                          },
-                          {
-                            key: "test",
-                            label: "Testes",
-                            placeholder: "npm test",
-                          },
-                        ].map(({ key, label, placeholder }) => (
-                          <div key={key} className="flex flex-col gap-1">
-                            <Label className="text-xs text-muted-foreground">
-                              {label}
-                            </Label>
-                            <Input
-                              type="text"
-                              value={runConfirmModal.validation?.[key] ?? ""}
-                              onChange={(e) =>
-                                setRunConfirmModal((s) => ({
-                                  ...s,
-                                  validation: {
-                                    ...s.validation,
-                                    [key]: e.target.value,
-                                  },
-                                }))
-                              }
-                              placeholder={placeholder}
-                              className="h-7 font-mono text-[11px] px-2"
-                            />
-                          </div>
-                        ))}
-                        <div className="col-span-2 flex flex-col gap-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Outro
-                          </Label>
-                          <Input
-                            type="text"
-                            value={runConfirmModal.validation?.extra ?? ""}
-                            onChange={(e) =>
-                              setRunConfirmModal((s) => ({
-                                ...s,
-                                validation: {
-                                  ...s.validation,
-                                  extra: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="comando personalizado"
-                            className="h-7 font-mono text-[11px] px-2"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={runConfirmModal.runTests ?? true}
-                        onChange={(e) =>
-                          setRunConfirmModal((s) => ({
-                            ...s,
-                            runTests: e.target.checked,
-                          }))
-                        }
-                        className="size-3.5 accent-primary"
-                      />
-                      <span className="text-xs text-muted-foreground">
-                        Rodar e avaliar testes
-                      </span>
-                    </label>
-                  </>
-                )}
               </div>
               <div className="flex justify-end gap-2 border-t px-5 py-3">
                 <Button
@@ -1026,166 +649,15 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                 <Button
                   size="sm"
                   onClick={() => {
-                    unlockAudio();
-                    const {
-                      action,
-                      model,
-                      effort,
-                      validation,
-                      runTests,
-                      session,
-                    } = runConfirmModal;
+                    const { action, model, effort, session } = runConfirmModal;
                     setRunConfirmModal(null);
-                    if (action === "task")
-                      handleRunSpec({
-                        model,
-                        effort,
-                        validation,
-                        sessionId: session,
-                      });
-                    else if (action === "tlc")
-                      handleRunTlc({ model, effort, sessionId: session });
-                    else if (action === "spec")
-                      handleRunTlcExec({
-                        model,
-                        effort,
-                        validation,
-                        sessionId: session,
-                      });
-                    else if (action === "eval")
-                      handleRunSpecEval({
-                        model,
-                        effort,
-                        validation,
-                        runTests,
-                        sessionId: session,
-                      });
-                    else if (action === "commitPush")
+                    if (action === "commitPush")
                       handleCommitPush({ model, effort, sessionId: session });
                     else if (action === "createPR")
                       handleCreatePR({ model, effort, sessionId: session });
                   }}
                 >
                   Executar
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-        {answerModal && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="bg-background border rounded-lg shadow-xl w-full max-w-md overflow-hidden mx-4">
-              <div className="flex items-center border-b px-5 py-4">
-                <span className="text-sm font-semibold flex-1">
-                  {t("card.answer.title")}
-                </span>
-              </div>
-              <div className="flex flex-col gap-4 px-5 py-4">
-                {worktreeConfig?.pendingQuestion && (
-                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap">
-                    {worktreeConfig.pendingQuestion}
-                  </div>
-                )}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {t("card.session")}
-                  </span>
-                  <Select
-                    value={answerModal.session}
-                    onValueChange={(v) =>
-                      setAnswerModal((s) => ({ ...s, session: v }))
-                    }
-                  >
-                    <SelectTrigger size="sm" className="text-xs w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[...(worktreeConfig?.chatSessions ?? [])]
-                        .sort(
-                          (a, b) =>
-                            new Date(b.createdAt) - new Date(a.createdAt),
-                        )
-                        .map((s) => (
-                          <SelectItem
-                            key={s.id}
-                            value={s.id}
-                            title={s.description}
-                          >
-                            [{ORIGIN_LABEL[s.origin] ?? s.origin}]{" "}
-                            {s.description}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {t("card.model")}
-                  </span>
-                  <Select
-                    value={answerModal.model}
-                    onValueChange={(v) =>
-                      setAnswerModal((s) => ({ ...s, model: v }))
-                    }
-                  >
-                    <SelectTrigger size="sm" className="text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="haiku">Haiku</SelectItem>
-                      <SelectItem value="sonnet">Sonnet</SelectItem>
-                      <SelectItem value="opus">Opus</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {t("card.effort")}
-                  </span>
-                  <Select
-                    value={answerModal.effort}
-                    onValueChange={(v) =>
-                      setAnswerModal((s) => ({ ...s, effort: v }))
-                    }
-                  >
-                    <SelectTrigger size="sm" className="text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">low</SelectItem>
-                      <SelectItem value="medium">medium</SelectItem>
-                      <SelectItem value="high">high</SelectItem>
-                      <SelectItem value="xhigh">xhigh</SelectItem>
-                      <SelectItem value="max">max</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <textarea
-                    rows={4}
-                    value={answerModal.answer}
-                    onChange={(e) =>
-                      setAnswerModal((s) => ({ ...s, answer: e.target.value }))
-                    }
-                    placeholder={t("card.answer.placeholder")}
-                    className="w-full resize-none rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 border-t px-5 py-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAnswerModal(null)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={!answerModal.answer.trim()}
-                  onClick={handleAnswer}
-                >
-                  {t("card.answer.send")}
                 </Button>
               </div>
             </div>
@@ -1493,7 +965,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                 {/* ── Abas (só quando configurado) ── */}
                 {isConfigured && (
                   <Tabs
-                    defaultValue="exec"
+                    defaultValue="git"
                     onValueChange={(val) => {
                       if (val === "files") loadChangedFiles();
                       if (val === "git") loadBehindCount();
@@ -1502,17 +974,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     className="w-full mt-1"
                   >
                     <TooltipProvider>
-                      <TabsList className="w-full grid grid-cols-4 h-8">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <TabsTrigger value="exec" className="px-0">
-                              <Play className="size-3.5" />
-                            </TabsTrigger>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            {t("card.run")}
-                          </TooltipContent>
-                        </Tooltip>
+                      <TabsList className="w-full grid grid-cols-3 h-8">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <TabsTrigger value="git" className="px-0">
@@ -1545,371 +1007,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         </Tooltip>
                       </TabsList>
                     </TooltipProvider>
-
-                    {/* ── Aba 1: Executar ── */}
-                    <TabsContent
-                      value="exec"
-                      className="flex flex-col gap-1.5 mt-2"
-                    >
-                      {isWaiting && (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          type="button"
-                          className="w-full justify-start gap-2 text-xs bg-amber-500 hover:bg-amber-600 text-white border-amber-500"
-                          onClick={() => {
-                            unlockAudio();
-                            setAnswerModal({
-                              session: worktreeConfig.pendingSessionId,
-                              model: "sonnet",
-                              effort: "medium",
-                              answer: "",
-                            });
-                          }}
-                        >
-                          <Send className="size-3.5" />
-                          <span>{t("card.answer.button")}</span>
-                        </Button>
-                      )}
-                      {(() => {
-                        const runStatus = worktreeConfig?.status;
-                        const isRunning =
-                          runStatus === "running" || specSending;
-                        const isDone = runStatus === "done";
-                        const isError = runStatus === "error";
-                        const isTlcRunning =
-                          worktreeConfig?.tlcStatus === "running" || tlcSending;
-                        return (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              type="button"
-                              disabled={isRunning || isTlcRunning}
-                              onClick={() =>
-                                setRunConfirmModal({
-                                  action: "task",
-                                  ...RUN_DEFAULTS.task,
-                                  session: "__new__",
-                                  validation: board?.validation ?? null,
-                                })
-                              }
-                              className={cn(
-                                "w-full justify-start gap-2 text-xs",
-                                isDone &&
-                                  "border-state-completed/50 text-state-completed opacity-75",
-                                isError &&
-                                  "border-destructive/50 text-destructive opacity-75",
-                              )}
-                            >
-                              <Pencil className="size-3.5" />
-                              <span>{t("run.task")}</span>
-                            </Button>
-                            {isRunning && (
-                              <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
-                                <Loader2 className="size-3 shrink-0 animate-spin" />
-                                {t("card.run.background")}
-                              </span>
-                            )}
-                            {isDone && (
-                              <span className="text-[11px] text-state-completed">
-                                {t("card.run.done.rerun")}
-                              </span>
-                            )}
-                            {isError && worktreeConfig?.lastError && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setErrorModal(worktreeConfig.lastError)
-                                }
-                                className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
-                              >
-                                <AlertTriangle className="size-3 shrink-0" />
-                                <span className="truncate">
-                                  {worktreeConfig.lastError}
-                                </span>
-                              </button>
-                            )}
-                          </>
-                        );
-                      })()}
-
-                      {(() => {
-                        const tlcStatus = worktreeConfig?.tlcStatus;
-                        const isTlcRunning =
-                          tlcStatus === "running" || tlcSending;
-                        const isTlcDone = tlcStatus === "done";
-                        const isTlcError = tlcStatus === "error";
-                        const hasTlcSkill = claudeStatus?.tlcSkill ?? false;
-                        const isRunning =
-                          worktreeConfig?.status === "running" || specSending;
-                        return (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              type="button"
-                              disabled={
-                                !hasTlcSkill || isTlcRunning || isRunning
-                              }
-                              title={
-                                !hasTlcSkill
-                                  ? "Skill tlc-spec-driven não instalada — configure nas Configurações"
-                                  : undefined
-                              }
-                              onClick={() =>
-                                setRunConfirmModal({
-                                  action: "tlc",
-                                  ...RUN_DEFAULTS.tlc,
-                                  session: "__new__",
-                                })
-                              }
-                              className={cn(
-                                "w-full justify-start gap-2 text-xs",
-                                isTlcDone &&
-                                  "border-state-completed/50 text-state-completed opacity-75",
-                                isTlcError &&
-                                  "border-destructive/50 text-destructive opacity-75",
-                              )}
-                            >
-                              <Zap className="size-3.5" />
-                              <span>{t("run.tlc")}</span>
-                            </Button>
-                            {isTlcRunning && (
-                              <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
-                                <Loader2 className="size-3 shrink-0 animate-spin" />
-                                Criando spec, design e tasks…
-                              </span>
-                            )}
-                            {isTlcError && worktreeConfig?.tlcLastError && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setErrorModal(worktreeConfig.tlcLastError)
-                                }
-                                className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
-                              >
-                                <AlertTriangle className="size-3 shrink-0" />
-                                <span className="truncate">
-                                  {worktreeConfig.tlcLastError}
-                                </span>
-                              </button>
-                            )}
-                            {isTlcDone && (
-                              <div className="flex gap-1.5">
-                                {[
-                                  {
-                                    type: "spec",
-                                    Icon: FileText,
-                                    label: "Spec",
-                                  },
-                                  {
-                                    type: "design",
-                                    Icon: Palette,
-                                    label: "Design",
-                                  },
-                                  {
-                                    type: "tasks",
-                                    Icon: ListChecks,
-                                    label: "Tasks",
-                                  },
-                                ].map(({ type, Icon, label }) => {
-                                  const exists = tlcFiles?.[type] ?? false;
-                                  return (
-                                    <Button
-                                      key={type}
-                                      variant="outline"
-                                      size="sm"
-                                      type="button"
-                                      disabled={!exists}
-                                      title={
-                                        !exists
-                                          ? `${label} não foi gerado`
-                                          : `Abrir ${label}`
-                                      }
-                                      onClick={() => setTlcFileModal(type)}
-                                      className={cn(
-                                        "flex-1 gap-1 text-xs",
-                                        exists &&
-                                          "border-state-completed/50 text-state-completed",
-                                      )}
-                                    >
-                                      <Icon className="size-3.5" />
-                                      <span>{label}</span>
-                                    </Button>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {(() => {
-                              const execStatus = worktreeConfig?.tlcExecStatus;
-                              const isExecRunning =
-                                execStatus === "running" || tlcExecSending;
-                              const isExecDone = execStatus === "done";
-                              const isExecError = execStatus === "error";
-                              return (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    type="button"
-                                    disabled={!isTlcDone || isExecRunning}
-                                    title={
-                                      !isTlcDone
-                                        ? "Execute o TLC antes de executar a Spec"
-                                        : undefined
-                                    }
-                                    onClick={() =>
-                                      setRunConfirmModal({
-                                        action: "spec",
-                                        ...RUN_DEFAULTS.spec,
-                                        session: "__new__",
-                                        validation: board?.validation ?? null,
-                                      })
-                                    }
-                                    className={cn(
-                                      "w-full justify-start gap-2 text-xs",
-                                      isExecDone &&
-                                        "border-state-completed/50 text-state-completed opacity-75",
-                                      isExecError &&
-                                        "border-destructive/50 text-destructive opacity-75",
-                                    )}
-                                  >
-                                    <Play className="size-3.5" />
-                                    <span>{t("run.spec")}</span>
-                                  </Button>
-                                  {isExecRunning && (
-                                    <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
-                                      <Loader2 className="size-3 shrink-0 animate-spin" />
-                                      Implementando, commitando e fazendo push…
-                                    </span>
-                                  )}
-                                  {isExecDone && (
-                                    <span className="text-[11px] text-state-completed">
-                                      {t("card.run.done.rerun")}
-                                    </span>
-                                  )}
-                                  {isExecError &&
-                                    worktreeConfig?.tlcExecLastError && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setErrorModal(
-                                            worktreeConfig.tlcExecLastError,
-                                          )
-                                        }
-                                        className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
-                                      >
-                                        <AlertTriangle className="size-3 shrink-0" />
-                                        <span className="truncate">
-                                          {worktreeConfig.tlcExecLastError}
-                                        </span>
-                                      </button>
-                                    )}
-                                </>
-                              );
-                            })()}
-                          </>
-                        );
-                      })()}
-
-                      {(() => {
-                        const specEvalStatus = worktreeConfig?.specEvalStatus;
-                        const isEvalRunning =
-                          specEvalStatus === "running" || specEvalSending;
-                        const isEvalDone = specEvalStatus === "done";
-                        const isEvalError = specEvalStatus === "error";
-                        const hasEvalSkill =
-                          claudeStatus?.specDrivenEvalSkill ?? false;
-                        // Liberado quando "Executar Tarefa" ou "Executar Spec" concluiu
-                        const ranImpl =
-                          worktreeConfig?.status === "done" ||
-                          worktreeConfig?.tlcExecStatus === "done";
-                        const anyOtherRunning =
-                          worktreeConfig?.status === "running" ||
-                          worktreeConfig?.tlcStatus === "running" ||
-                          worktreeConfig?.tlcExecStatus === "running" ||
-                          specSending ||
-                          tlcSending ||
-                          tlcExecSending;
-                        return (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              type="button"
-                              disabled={
-                                !hasEvalSkill ||
-                                !ranImpl ||
-                                isEvalRunning ||
-                                anyOtherRunning
-                              }
-                              title={
-                                !hasEvalSkill
-                                  ? "Skill spec-driven-eval não instalada — configure nas Configurações"
-                                  : !ranImpl
-                                    ? "Execute a Tarefa ou a Spec antes de avaliar"
-                                    : undefined
-                              }
-                              onClick={() =>
-                                setRunConfirmModal({
-                                  action: "eval",
-                                  ...RUN_DEFAULTS.eval,
-                                  session: "__new__",
-                                  validation: {
-                                    install: board?.validation?.install ?? "",
-                                    build: board?.validation?.build ?? "",
-                                    lint: board?.validation?.lint ?? "",
-                                    test: board?.validation?.test ?? "",
-                                    extra: board?.validation?.extra ?? "",
-                                  },
-                                  runTests: true,
-                                })
-                              }
-                              className={cn(
-                                "w-full justify-start gap-2 text-xs",
-                                isEvalDone &&
-                                  "border-state-completed/50 text-state-completed opacity-75",
-                                isEvalError &&
-                                  "border-destructive/50 text-destructive opacity-75",
-                              )}
-                            >
-                              <ListChecks className="size-3.5" />
-                              <span>{t("run.eval")}</span>
-                            </Button>
-                            {isEvalRunning && (
-                              <span className="flex items-center gap-1 text-[11px] italic text-muted-foreground">
-                                <Loader2 className="size-3 shrink-0 animate-spin" />
-                                Avaliando implementação contra a spec…
-                              </span>
-                            )}
-                            {isEvalDone && (
-                              <span className="text-[11px] text-state-completed">
-                                ✓ Avaliação concluída · clique para re-avaliar
-                              </span>
-                            )}
-                            {isEvalError &&
-                              worktreeConfig?.specEvalLastError && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setErrorModal(
-                                      worktreeConfig.specEvalLastError,
-                                    )
-                                  }
-                                  className="flex items-center gap-1 truncate text-[11px] text-destructive hover:underline text-left"
-                                >
-                                  <AlertTriangle className="size-3 shrink-0" />
-                                  <span className="truncate">
-                                    {worktreeConfig.specEvalLastError}
-                                  </span>
-                                </button>
-                              )}
-                          </>
-                        );
-                      })()}
-                    </TabsContent>
 
                     {/* ── Aba 2: Git ── */}
                     <TabsContent
@@ -1957,14 +1054,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         const hasFiles = changedFiles?.length > 0;
                         return (
                           <Button
-                            variant={
-                              !isCommitPushDone &&
-                              !isCommitPushError &&
-                              !isCommitPushRunning &&
-                              worktreeConfig?.specEvalStatus === "done"
-                                ? "default"
-                                : "outline"
-                            }
+                            variant="outline"
                             size="sm"
                             type="button"
                             disabled={isCommitPushRunning || !hasFiles}
@@ -2022,15 +1112,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                           return (
                             <div className="mt-1 flex flex-col gap-1">
                               <Button
-                                variant={
-                                  isPrDone || hasFiles || isPrError
-                                    ? "outline"
-                                    : !isPrRunning &&
-                                        worktreeConfig?.specEvalStatus ===
-                                          "done"
-                                      ? "default"
-                                      : "outline"
-                                }
+                                variant="outline"
                                 size="sm"
                                 type="button"
                                 disabled={
@@ -2294,13 +1376,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             setOpenRunId(null);
             loadCardRuns();
           }}
-        />
-      )}
-      {tlcFileModal && (
-        <TlcFileModal
-          worktreeId={worktreeId}
-          type={tlcFileModal}
-          onClose={() => setTlcFileModal(null)}
         />
       )}
       {fileContentModal && (

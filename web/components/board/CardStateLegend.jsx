@@ -30,10 +30,6 @@ export default function CardStateLegend() {
               <span className="text-muted-foreground"><strong className="text-foreground">{t("legend.silver")}</strong> — {t("legend.branch")}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="size-3 rounded-full border-2 border-[#c8860a] shrink-0" />
-              <span className="text-muted-foreground"><strong className="text-foreground">{t("legend.gold")}</strong> — {t("legend.done")}</span>
-            </div>
-            <div className="flex items-center gap-2">
               <span className="size-3 rounded-full border-2 border-blue-400 shrink-0 animate-spin" style={{borderTopColor: 'transparent'}} />
               <span className="text-muted-foreground"><strong className="text-foreground">{t("legend.spinning")}</strong> — {t("legend.running")}</span>
             </div>

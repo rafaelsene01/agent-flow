@@ -19,14 +19,9 @@ function recoverInterruptedRuns() {
   // Todos os campos que o runner marca como "running". Se o servidor reinicia ou
   // cai no meio de um run, o processo morre mas o campo fica preso em "running" —
   // o que mantém o card girando "executando" no board para sempre. Reconcilia
-  // qualquer um deles para "error" no boot. Faltava (entre outros) tlcStatus, que
-  // o Card do board observa e fazia o card ficar travado em execução.
+  // qualquer um deles para "error" no boot.
   const RUN_FIELDS = [
-    ["status",           "lastError"],
     ["messageStatus",    "messageLastError"],
-    ["tlcStatus",        "tlcLastError"],
-    ["tlcExecStatus",    "tlcExecLastError"],
-    ["specEvalStatus",   "specEvalLastError"],
     ["commitPushStatus", "commitPushLastError"],
     ["prStatus",         "prLastError"],
     ["pullStatus",       "pullLastError"],
