@@ -38,6 +38,17 @@ Ponto de entrada: `bin/agent-flow.js` → inicia o Express via `api/server.js`.
 
 ---
 
+## Comportamentos intencionais (não tratar como bug)
+
+- **Model/effort por passo sobrepõe a config do agente.** Em `api/routes/agent-runs.js`
+  (`step.model || agent.model`, `step.effort || agent.effort`), o model/effort enviado
+  pela UI ao montar a chain tem precedência sobre o que está no JSON do agente
+  (ex.: rodar o Feature Planner em `haiku`/`low` mesmo com o default `opus`/`high`).
+  É uma escolha deliberada do usuário na tela de configuração do passo — não
+  "corrigir" a precedência nem apontar como erro em reviews.
+
+---
+
 ## Manutenção da doc
 
 - Nova rota → linha na tabela + `docs/routes/<arquivo>.md`
