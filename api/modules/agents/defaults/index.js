@@ -26,13 +26,18 @@ const FILES = {
 // bloqueia edição/exclusão no serviço e esconde os botões na UI. A flag opcional
 // allowGit (ex.: Commit & Push) libera o agente a rodar git no runner; a flag
 // skipWorktreeCheck (ex.: Feature Planner, Code Reviewer) marca agentes que gravam
-// fora da worktree (pasta helpers) e portanto não exigem mudanças na árvore.
+// fora da worktree (pasta helpers) e portanto não exigem mudanças na árvore;
+// allowGitRead (ex.: Code Reviewer) libera git SOMENTE LEITURA (status/diff/log)
+// e injeta o contexto de branches no prompt; noAsk (ex.: Code Reviewer) troca a
+// regra de ASK: pela instrução de entregar tudo na resposta final.
 export const DEFAULT_AGENTS = Object.entries(FILES).map(([slug, data]) => ({
   id: `default:${slug}`,
   ...data,
   skills: Array.isArray(data.skills) ? data.skills : [],
   allowGit: !!data.allowGit,
   skipWorktreeCheck: !!data.skipWorktreeCheck,
+  allowGitRead: !!data.allowGitRead,
+  noAsk: !!data.noAsk,
   isDefault: true,
 }));
 

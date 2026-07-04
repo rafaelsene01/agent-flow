@@ -32,6 +32,27 @@ const ASK_RULES =
   "O usuário ainda poderá digitar texto livre. Sem alternativas, use só a linha `ASK:`. " +
   "Caso contrário, implemente sem perguntar. Emita no máximo um ASK por resposta.";
 
+// Regras reutilizadas no prompt inicial (buildPrompt) e no lembrete de resume
+// (buildResumeReminder): agentes noAsk (ex.: Code Reviewer) entregam o resultado
+// na resposta final e nunca param o run em waiting-input com o marcador ASK:.
+function askRuleFor(noAsk) {
+  return noAsk
+    ? "- Seu entregável é a resposta final desta execução: NÃO pare para perguntar " +
+      "nem emita `ASK:` — registre dúvidas e premissas como pendências no próprio texto. " +
+      "APENAS se o insumo essencial do seu papel estiver ausente ou vago demais para " +
+      "produzir um resultado útil, aborte: emita, como ÚLTIMAS linhas da resposta, " +
+      "`ABORT: <motivo objetivo>`.\n"
+    : ASK_RULES + "\n";
+}
+
+function gitRuleFor(allowGit) {
+  return allowGit
+    ? ""
+    : "- NÃO faça commit e NÃO faça push em hipótese " +
+      "alguma — apenas altere os arquivos. Versionar as mudanças é responsabilidade " +
+      "exclusiva do agente Commit & Push.\n";
+}
+
 function langInstruction() {
   return getLanguage() === "pt"
     ? "Responda em português do Brasil.\n\n"
@@ -117,6 +138,25 @@ function parseAsk(finalText) {
   return { question, options };
 }
 
+// Retorna o motivo a partir do último marcador ABORT:, ou null. Emitido por
+// agentes noAsk (ex.: Code Reviewer) quando o insumo essencial está ausente ou
+// vago demais — o run vira `error` e failDependents derruba os passos seguintes.
+function parseAbort(finalText) {
+  const lines = (finalText ?? "").split("\n");
+  const stripMd = (l) => l.replace(/^[\s>*_#-]+/, "");
+  let lastIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^ABORT:/.test(stripMd(lines[i]))) lastIdx = i;
+  }
+  if (lastIdx === -1) return null;
+  const parts = [stripMd(lines[lastIdx]).replace(/^ABORT:\**\s*/, "").trim()];
+  for (let i = lastIdx + 1; i < lines.length; i++) {
+    if (lines[i].trim()) parts.push(lines[i].trim());
+  }
+  const reason = parts.join("\n").trim();
+  return reason || "sem motivo informado";
+}
+
 function buildCardText(run) {
   return [
     `# ${run.card_title ?? "Card"}`,
@@ -142,25 +182,31 @@ const PROCESS_KILL_RULE =
   "Se precisar parar um servidor/processo que você mesmo iniciou, guarde o PID ao iniciá-lo e " +
   "mate SOMENTE esse PID (ex.: `Stop-Process -Id <pid>`).\n";
 
-function buildPrompt(run, agentPrompt, { allowGit } = {}) {
+function buildPrompt(run, agentPrompt, { allowGit, allowGitRead, noAsk } = {}) {
   // Agentes git-capazes (ex.: Commit & Push) recebem o contexto das branches e
-  // têm liberado o uso de git; os demais são proibidos de tocar em git e devem
-  // alterar arquivos via Write/Edit.
+  // têm liberado o uso de git; agentes allowGitRead (ex.: Code Reviewer) recebem
+  // o mesmo contexto mas só podem LER o repositório (status/diff/log); os demais
+  // são proibidos de tocar em git e devem alterar arquivos via Write/Edit.
   const gitContext = allowGit
     ? "\n\nContexto de git desta worktree:\n" +
       `- Branch de destino do push (branch da worktree): \`${run.target_branch}\`\n` +
       (run.origin_branch
         ? `- Branch de origem/base para diff: \`${run.origin_branch}\`\n`
         : "")
-    : "";
+    : allowGitRead
+      ? "\n\nContexto de git desta worktree (SOMENTE LEITURA):\n" +
+        `- Branch atual da worktree: \`${run.target_branch}\`\n` +
+        (run.origin_branch
+          ? `- Branch de origem/base para diff: \`${run.origin_branch}\`\n`
+          : "") +
+        "- Git liberado apenas para leitura via Bash (status, diff, log, show); " +
+        "NUNCA rode comandos git que alterem arquivos, índice, branches ou histórico.\n"
+      : "";
+  const askRule = askRuleFor(noAsk);
   const fileRule = allowGit
     ? "- Rode diretamente os comandos git necessários (status, diff, log, add, commit, push) via Bash.\n"
     : "- Use as ferramentas Write e Edit para criar/modificar arquivos. NÃO descreva — faça.\n";
-  const gitRule = allowGit
-    ? ""
-    : "- NÃO faça commit e NÃO faça push em hipótese " +
-      "alguma — apenas altere os arquivos. Versionar as mudanças é responsabilidade " +
-      "exclusiva do agente Commit & Push.\n";
+  const gitRule = gitRuleFor(allowGit);
   // Pasta de helpers desta worktree: diretório irmão fora da árvore versionada
   // (`<worktree>-helpers`) onde vive o planejamento TLC (.specs/features/...).
   // Como o cwd do agente é a worktree, injetamos o caminho absoluto para que o
@@ -187,11 +233,32 @@ function buildPrompt(run, agentPrompt, { allowGit } = {}) {
     "- Aja SOMENTE com base nas instruções e skills fornecidas acima neste prompt. " +
     "NÃO acione nenhuma outra skill instalada nem inicie fluxos de spec/design/tasks que não tenham sido pedidos.\n" +
     PROCESS_KILL_RULE +
-    ASK_RULES +
-    "\n" +
+    askRule +
     gitRule +
     "TAREFA (card do board):\n" +
     buildCardText(run)
+  );
+}
+
+// Lembrete reenviado em TODO resume. Sessões retomadas várias vezes perdem
+// aderência ao papel — o Feature Planner já derivou para implementar código na
+// worktree em vez de gravar as specs nos helpers. Reforçamos o papel/entregável
+// do agente (o prompt original dele, sem as skills) e as regras críticas junto
+// com a mensagem do usuário.
+function buildResumeReminder(run, { allowGit, noAsk } = {}) {
+  const rolePrompt = getAgent(run.agent_id)?.prompt ?? "";
+  const roleBlock = rolePrompt
+    ? `Você continua sendo o agente "${run.agent_name}". Papel e entregável NÃO ` +
+      "mudaram nesta continuação — siga o prompt original do agente:\n" +
+      (allowGit ? rolePrompt : stripGitWords(rolePrompt)) +
+      "\n\n"
+    : "";
+  return (
+    roleBlock +
+    "Lembrete de regras (continuam valendo nesta continuação):\n" +
+    PROCESS_KILL_RULE +
+    askRuleFor(noAsk) +
+    gitRuleFor(allowGit)
   );
 }
 
@@ -217,8 +284,8 @@ function isRealChange(line) {
   return !file.endsWith(".log") && !file.startsWith(".specs/");
 }
 
-// Executa o passo comum pós-claude: erro / ASK / squash+verificação de mudanças / done.
-// Sempre chama onSettled ao final, com sucesso ou falha.
+// Executa o passo comum pós-claude: erro / ABORT / ASK / squash+verificação de
+// mudanças / done. Sempre chama onSettled ao final, com sucesso ou falha.
 async function finishStep(
   run,
   logStream,
@@ -241,6 +308,26 @@ async function finishStep(
     }
 
     const finalText = extractFinalText(result.output);
+
+    // ABORT vence ASK: é terminal. O texto final vira turn `result` (o usuário
+    // vê o que o agente apurou antes de abortar) e o run fica `error`, o que
+    // derruba os passos dependentes via failDependents no onRunSettled.
+    const abortReason = parseAbort(finalText);
+    if (abortReason) {
+      await new Promise((resolve) => logStream.end(resolve));
+      updateLastExecTurn(run.id, {
+        status: "error",
+        finishedAt: new Date().toISOString(),
+      });
+      if (finalText.trim())
+        appendTurn(run.id, { type: "result", text: finalText.trim() });
+      patchRun(run.id, {
+        status: "error",
+        last_error: `Abortado pelo agente: ${abortReason}`,
+      });
+      return;
+    }
+
     const ask = parseAsk(finalText);
     if (ask) {
       await new Promise((resolve) => logStream.end(resolve));
@@ -342,6 +429,10 @@ export async function startRun(run, { onSettled } = {}) {
   // Feature Planner e Code Reviewer, não produzem mudanças na árvore versionada —
   // sem essa flag o pós-processamento os marcaria como "nenhum arquivo foi alterado".
   const skipWorktreeCheck = !!getAgent(run.agent_id)?.skipWorktreeCheck;
+  // allowGitRead: agente pode LER o repositório via git (diff contra a branch de
+  // origem); noAsk: agente entrega tudo na resposta final e não usa o marcador ASK:.
+  const allowGitRead = !!getAgent(run.agent_id)?.allowGitRead;
+  const noAsk = !!getAgent(run.agent_id)?.noAsk;
 
   try {
     run = await ensureWorktree(run);
@@ -395,8 +486,7 @@ export async function startRun(run, { onSettled } = {}) {
     if (resumeMessage)
       logStream.write("\n=== Resposta do usuário (resume) ===\n");
     result = await resumeClaude(
-      "Lembrete de regras (continuam valendo nesta continuação):\n" +
-        PROCESS_KILL_RULE +
+      buildResumeReminder(run, { allowGit, noAsk }) +
         "\n" +
         (resumeMessage ?? "continuar"),
       run.worktree_path,
@@ -407,7 +497,7 @@ export async function startRun(run, { onSettled } = {}) {
     );
   } else {
     result = await runClaude(
-      buildPrompt(run, agentPrompt, { allowGit }),
+      buildPrompt(run, agentPrompt, { allowGit, allowGitRead, noAsk }),
       run.worktree_path,
       logStream,
       null,
