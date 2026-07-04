@@ -54,6 +54,10 @@ function RunLogOverlay({ segment, onClose }) {
   const { t } = useI18n();
   const [logText, setLogText] = useState("");
   const loadedStatic = useRef(false);
+  const scrollRef = useRef(null);
+  // Auto-scroll ("seguir o fim"): ativo ao abrir o overlay e enquanto o usuário
+  // estiver no fim do log; scroll para cima desativa, voltar ao fim reativa.
+  const followRef = useRef(true);
   const { runId, isActive, logFile } = segment;
 
   useEffect(() => {
@@ -78,6 +82,21 @@ function RunLogOverlay({ segment, onClose }) {
 
   const display = useMemo(() => collapseLogLines(logText), [logText]);
 
+  // A cada conteúdo novo (carga inicial ou linha do SSE), rola até o fim se o
+  // follow estiver ativo. O scroll programático dispara onScroll, que recalcula
+  // o follow como "no fim" — então ele permanece ativo.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && followRef.current) el.scrollTop = el.scrollHeight;
+  }, [display]);
+
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Margem de 16px: considera "no fim" mesmo com arredondamento subpixel.
+    followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 16;
+  }
+
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-background">
       <div className="flex items-center gap-2 border-b px-4 py-3">
@@ -88,7 +107,7 @@ function RunLogOverlay({ segment, onClose }) {
         {isActive && <Loader2 className="size-4 shrink-0 animate-spin text-blue-500" />}
         {segment.status && <StatusBadge status={segment.status} />}
       </div>
-      <div className="flex-1 overflow-y-auto bg-zinc-950 px-4 py-3">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto bg-zinc-950 px-4 py-3">
         {display ? <LogView text={display} /> : <p className="text-xs text-zinc-500">{t("running.noLog")}</p>}
       </div>
     </div>

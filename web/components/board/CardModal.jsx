@@ -248,6 +248,9 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
   const [resetWorktreeSending, setResetWorktreeSending] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState("__new__");
   const logRef = useRef(null);
+  // Auto-scroll ("seguir o fim") do log: ativo ao abrir e enquanto o usuário
+  // estiver no fim; scroll para cima desativa, voltar ao fim reativa.
+  const logFollowRef = useRef(true);
   const prevAnyRunningRef = useRef(null);
 
   function loadChangedFiles() {
@@ -405,9 +408,20 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     return () => es.close();
   }, [isConfigured, worktreeId, anyRunning]);
 
+  // Rola até o fim quando chega conteúdo novo ou a aba de logs abre, se o follow
+  // estiver ativo. O scroll programático dispara onScroll, que recalcula o
+  // follow como "no fim" — então ele permanece ativo.
   useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [logText]);
+    if (logRef.current && logFollowRef.current)
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [logText, mainTab]);
+
+  function handleLogScroll() {
+    const el = logRef.current;
+    if (!el) return;
+    // Margem de 16px: considera "no fim" mesmo com arredondamento subpixel.
+    logFollowRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 16;
+  }
 
   useEffect(() => {
     if (logText) setMainTab((t) => (t === "desc" ? "logs" : t));
@@ -592,6 +606,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
             {mainTab === "logs" && logText ? (
               <div
                 ref={logRef}
+                onScroll={handleLogScroll}
                 className="min-h-0 flex-1 overflow-y-auto bg-zinc-950 px-4 py-3"
               >
                 <LogView text={displayLogText} />
