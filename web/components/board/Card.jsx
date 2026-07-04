@@ -48,8 +48,7 @@ export default function Card({ item, onOpen, worktrees = [], runsAttention = {},
   // Um agent-run (queued/processing) sinaliza execução mesmo sem worktree — ele
   // vive só no SQLite. Trata como "running" para reaproveitar borda e ícone.
   const runActive = !!runAttention?.active;
-  const isRunning =
-    runActive || (wt && wt.commitPushStatus === "running");
+  const isRunning = runActive;
   const hasBranch = !!wt;
   const isWaiting = runNeedsAnswer;
 

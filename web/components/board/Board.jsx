@@ -59,16 +59,6 @@ export default function Board({ board, refreshSignal = 0 }) {
     if (refreshSignal) loadWorktrees();
   }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-poll while any worktree has a running process
-  useEffect(() => {
-    const anyRunning = worktrees.some(
-      (w) => w.commitPushStatus === "running",
-    );
-    if (!anyRunning) return;
-    const timer = setInterval(loadWorktrees, 3000);
-    return () => clearInterval(timer);
-  }, [worktrees]);
-
   if (rateLimitError) {
     return (
       <div className="flex flex-1 items-center justify-center">

@@ -6,11 +6,9 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
 import {
-  AlertTriangle,
   Archive,
   FolderOpen,
   GitBranch,
-  GitMerge,
   GitPullRequest,
   Loader2,
   MessageCircleQuestion,
@@ -80,21 +78,6 @@ const RUN_STATUS_PILL = {
   error: "border-destructive/50 text-destructive",
 };
 
-const RUN_DEFAULTS = {
-  commitPush: {
-    model: "haiku",
-    effort: "low",
-    label: "Commit & Push",
-    labelKey: "run.commitPush",
-  },
-  createPR: {
-    model: "haiku",
-    effort: "medium",
-    label: "Criar Pull Request",
-    labelKey: "run.createPR",
-  },
-};
-
 function Assignee({ login, avatarUrl, size = "size-6" }) {
   const [imgFailed, setImgFailed] = useState(false);
   return (
@@ -123,6 +106,45 @@ function SidebarLabel({ children }) {
     <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
       {children}
     </span>
+  );
+}
+
+function CardRunsList({ runs, onOpen }) {
+  const { t } = useI18n();
+  if (!Array.isArray(runs) || runs.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      {runs.map((r) => (
+        <button
+          key={r.id}
+          type="button"
+          onClick={() => onOpen(r.id)}
+          className={cn(
+            "flex items-center gap-2 rounded-lg border bg-card/50 px-2.5 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/40",
+            r.status === "waiting-input" &&
+              "border-amber-400/60 bg-amber-500/[0.06]",
+          )}
+        >
+          {r.status === "processing" && (
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />
+          )}
+          {r.status === "waiting-input" && (
+            <MessageCircleQuestion className="size-3.5 shrink-0 text-amber-500" />
+          )}
+          <span className="min-w-0 flex-1 truncate text-xs font-medium">
+            {r.agent_name}
+          </span>
+          <span
+            className={cn(
+              "shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+              RUN_STATUS_PILL[r.status] ?? "text-muted-foreground",
+            )}
+          >
+            {t(`running.status.${r.status}`)}
+          </span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -307,13 +329,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }, [worktreeConfig?.pullStatus]);
 
-  // A aba Git é a inicial — carrega o behind-count assim que o card abre
-  // configurado (antes isso acontecia ao clicar na aba).
-  useEffect(() => {
-    if (!isConfigured) return;
-    loadBehindCount();
-  }, [isConfigured]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const anyRunning =
     worktreeConfig?.pullStatus === "running" ||
     worktreeConfig?.messageStatus === "running";
@@ -464,67 +479,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  async function handleCreatePR({ model, effort, sessionId } = {}) {
-    setCreatePrSending(true);
-    try {
-      const res = await fetch(
-        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/create-pr`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: item.title,
-            number: item.number,
-            model,
-            effort,
-            sessionId: sessionId === "__new__" ? undefined : sessionId,
-          }),
-        },
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      loadWorktreeConfig();
-      onWorktreeChange?.();
-      toast({ title: t("toast.pr.success"), variant: "success" });
-    } catch (err) {
-      console.error("[create-pr]", err);
-      toast({
-        title: t("toast.pr.error"),
-        description: err.message,
-        variant: "error",
-      });
-    } finally {
-      setCreatePrSending(false);
-    }
-  }
-
-  async function handleCommitPush({ model, effort, sessionId } = {}) {
-    setCommitPushSending(true);
-    try {
-      const res = await fetch(
-        `/api/config/worktrees/${encodeURIComponent(worktreeId)}/commit-push`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model,
-            effort,
-            sessionId: sessionId === "__new__" ? undefined : sessionId,
-          }),
-        },
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      loadWorktreeConfig();
-      onWorktreeChange?.();
-    } catch (err) {
-      console.error("[commit-push]", err);
-      setErrorModal(err.message);
-    } finally {
-      setCommitPushSending(false);
-    }
-  }
-
   const displayLogText = useMemo(() => collapseLogLines(logText), [logText]);
 
   return (
@@ -548,121 +502,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
         }}
         className="w-full sm:max-w-[calc(100%-2rem)] h-[80vh] gap-0 overflow-hidden p-0"
       >
-        {runConfirmModal && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="bg-background border rounded-lg shadow-xl w-full max-w-md overflow-hidden mx-4">
-              <div className="flex items-center border-b px-5 py-4">
-                <span className="text-sm font-semibold flex-1">
-                  {RUN_DEFAULTS[runConfirmModal.action]?.labelKey
-                    ? t(RUN_DEFAULTS[runConfirmModal.action].labelKey)
-                    : RUN_DEFAULTS[runConfirmModal.action]?.label}
-                </span>
-              </div>
-              <div className="flex flex-col gap-4 px-5 py-4">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {t("card.session")}
-                  </span>
-                  <Select
-                    value={runConfirmModal.session}
-                    onValueChange={(v) =>
-                      setRunConfirmModal((s) => ({ ...s, session: v }))
-                    }
-                  >
-                    <SelectTrigger size="sm" className="text-xs w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__new__">
-                        {t("card.session.new")}
-                      </SelectItem>
-                      {[...(worktreeConfig?.chatSessions ?? [])]
-                        .sort(
-                          (a, b) =>
-                            new Date(b.createdAt) - new Date(a.createdAt),
-                        )
-                        .map((s) => (
-                          <SelectItem
-                            key={s.id}
-                            value={s.id}
-                            title={s.description}
-                          >
-                            [{ORIGIN_LABEL[s.origin] ?? s.origin}]{" "}
-                            {s.description}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {t("card.model")}
-                  </span>
-                  <Select
-                    value={runConfirmModal.model}
-                    onValueChange={(v) =>
-                      setRunConfirmModal((s) => ({ ...s, model: v }))
-                    }
-                  >
-                    <SelectTrigger size="sm" className="text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="haiku">Haiku</SelectItem>
-                      <SelectItem value="sonnet">Sonnet</SelectItem>
-                      <SelectItem value="opus">Opus</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {t("card.effort")}
-                  </span>
-                  <Select
-                    value={runConfirmModal.effort}
-                    onValueChange={(v) =>
-                      setRunConfirmModal((s) => ({ ...s, effort: v }))
-                    }
-                  >
-                    <SelectTrigger size="sm" className="text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">low</SelectItem>
-                      <SelectItem value="medium">medium</SelectItem>
-                      <SelectItem value="high">high</SelectItem>
-                      <SelectItem value="xhigh">xhigh</SelectItem>
-                      <SelectItem value="max">max</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-              </div>
-              <div className="flex justify-end gap-2 border-t px-5 py-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setRunConfirmModal(null)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    const { action, model, effort, session } = runConfirmModal;
-                    setRunConfirmModal(null);
-                    if (action === "commitPush")
-                      handleCommitPush({ model, effort, sessionId: session });
-                    else if (action === "createPR")
-                      handleCreatePR({ model, effort, sessionId: session });
-                  }}
-                >
-                  Executar
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
         <div className="flex h-full min-h-0">
           {/* ── main ── */}
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -947,25 +786,13 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                       </span>
                     </div>
                     <CopyCmd cmd={`cd ${worktreeConfig.path}`} />
-
-                    {/* ── Executar agente (fila): pipeline de agentes na branch configurada ── */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      type="button"
-                      onClick={() => setShowEnqueueAgent(true)}
-                      className="w-full justify-start gap-2 text-xs"
-                    >
-                      <Rocket className="size-3.5" />
-                      <span>{t("running.launch.button")}</span>
-                    </Button>
                   </>
                 )}
 
                 {/* ── Abas (só quando configurado) ── */}
                 {isConfigured && (
                   <Tabs
-                    defaultValue="git"
+                    defaultValue="exec"
                     onValueChange={(val) => {
                       if (val === "files") loadChangedFiles();
                       if (val === "git") loadBehindCount();
@@ -974,7 +801,17 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                     className="w-full mt-1"
                   >
                     <TooltipProvider>
-                      <TabsList className="w-full grid grid-cols-3 h-8">
+                      <TabsList className="w-full grid grid-cols-4 h-8">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <TabsTrigger value="exec" className="px-0">
+                              <Rocket className="size-3.5" />
+                            </TabsTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            {t("card.executors")}
+                          </TooltipContent>
+                        </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <TabsTrigger value="git" className="px-0">
@@ -1007,6 +844,31 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         </Tooltip>
                       </TabsList>
                     </TooltipProvider>
+
+                    {/* ── Aba 1: Executores (fila de agentes) ── */}
+                    <TabsContent
+                      value="exec"
+                      className="flex flex-col gap-1.5 mt-2"
+                    >
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        onClick={() => setShowEnqueueAgent(true)}
+                        className="w-full justify-start gap-2 text-xs"
+                      >
+                        <Rocket className="size-3.5" />
+                        <span>{t("running.launch.button")}</span>
+                      </Button>
+                      {Array.isArray(cardRuns) && cardRuns.length > 0 && (
+                        <>
+                          <span className="mt-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                            {t("running.card.title")}
+                          </span>
+                          <CardRunsList runs={cardRuns} onOpen={setOpenRunId} />
+                        </>
+                      )}
+                    </TabsContent>
 
                     {/* ── Aba 2: Git ── */}
                     <TabsContent
@@ -1044,54 +906,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         )}
                       </Button>
 
-                      {(() => {
-                        const commitPushStatus =
-                          worktreeConfig?.commitPushStatus;
-                        const isCommitPushRunning =
-                          commitPushStatus === "running" || commitPushSending;
-                        const isCommitPushDone = commitPushStatus === "done";
-                        const isCommitPushError = commitPushStatus === "error";
-                        const hasFiles = changedFiles?.length > 0;
-                        return (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            type="button"
-                            disabled={isCommitPushRunning || !hasFiles}
-                            onClick={() =>
-                              setRunConfirmModal({
-                                action: "commitPush",
-                                ...RUN_DEFAULTS.commitPush,
-                                session: "__new__",
-                              })
-                            }
-                            title={
-                              isCommitPushError
-                                ? worktreeConfig?.commitPushLastError
-                                : undefined
-                            }
-                            className={cn(
-                              "w-full justify-start gap-2 text-xs",
-                              !hasFiles && isCommitPushDone
-                                ? "border-state-completed/50 text-state-completed opacity-75"
-                                : isCommitPushError
-                                  ? "border-destructive/50 text-destructive opacity-75"
-                                  : !isCommitPushRunning &&
-                                    "border-primary/60 text-primary",
-                            )}
-                          >
-                            <span>
-                              {isCommitPushRunning
-                                ? t("git.commitPush.sending")
-                                : isCommitPushError
-                                  ? t("git.commitPush.retry")
-                                  : !hasFiles && isCommitPushDone
-                                    ? t("git.commitPush.sent")
-                                    : t("run.commitPush")}
-                            </span>
-                          </Button>
-                        );
-                      })()}
                       <div className="flex flex-col gap-1 mt-0.5">
                         <CopyCmd
                           cmd={`git checkout ${worktreeConfig.branch}`}
@@ -1101,75 +915,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
                         <CopyCmd cmd='git commit -m "message"' />
                         <AdvancedGitSection branch={worktreeConfig.branch} />
                       </div>
-                      {worktreeConfig.originBranch &&
-                        (() => {
-                          const prStatus = worktreeConfig?.prStatus;
-                          const isPrRunning =
-                            prStatus === "running" || createPrSending;
-                          const isPrDone = prStatus === "done";
-                          const isPrError = prStatus === "error";
-                          const hasFiles = changedFiles?.length > 0;
-                          return (
-                            <div className="mt-1 flex flex-col gap-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                type="button"
-                                disabled={
-                                  isPrRunning ||
-                                  hasFiles ||
-                                  changedFiles === null
-                                }
-                                onClick={() =>
-                                  setRunConfirmModal({
-                                    action: "createPR",
-                                    ...RUN_DEFAULTS.createPR,
-                                    session: "__new__",
-                                  })
-                                }
-                                title={
-                                  isPrError
-                                    ? worktreeConfig?.prLastError
-                                    : undefined
-                                }
-                                className={cn(
-                                  "w-full justify-start gap-2 text-xs",
-                                  isPrDone
-                                    ? "border-state-completed/50 text-state-completed opacity-75"
-                                    : isPrError
-                                      ? "border-destructive/50 text-destructive opacity-75"
-                                      : !isPrRunning &&
-                                        "border-primary/60 text-primary",
-                                )}
-                              >
-                                {isPrRunning ? (
-                                  <Loader2 className="size-3.5 animate-spin" />
-                                ) : (
-                                  <GitMerge className="size-3.5" />
-                                )}
-                                <span>
-                                  {isPrRunning
-                                    ? t("git.pr.creating")
-                                    : isPrError
-                                      ? t("git.pr.retry")
-                                      : isPrDone
-                                        ? t("git.pr.created")
-                                        : `${t("git.pr.create")} → ${worktreeConfig.originBranch}`}
-                                </span>
-                              </Button>
-                              {isPrDone && worktreeConfig?.prUrl && (
-                                <a
-                                  href={worktreeConfig.prUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="truncate px-1 text-[11px] text-primary hover:underline"
-                                >
-                                  {worktreeConfig.prUrl}
-                                </a>
-                              )}
-                            </div>
-                          );
-                        })()}
                     </TabsContent>
 
                     {/* ── Aba 3: Arquivos alterados ── */}
@@ -1306,44 +1051,16 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
               </div>
             )}
 
-            {/* ── Execuções (agent-runs) deste card ── */}
-            {Array.isArray(cardRuns) && cardRuns.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <SidebarLabel>{t("running.card.title")}</SidebarLabel>
-                <div className="flex flex-col gap-1.5">
-                  {cardRuns.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => setOpenRunId(r.id)}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg border bg-card/50 px-2.5 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/40",
-                        r.status === "waiting-input" &&
-                          "border-amber-400/60 bg-amber-500/[0.06]",
-                      )}
-                    >
-                      {r.status === "processing" && (
-                        <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />
-                      )}
-                      {r.status === "waiting-input" && (
-                        <MessageCircleQuestion className="size-3.5 shrink-0 text-amber-500" />
-                      )}
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                        {r.agent_name}
-                      </span>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
-                          RUN_STATUS_PILL[r.status] ?? "text-muted-foreground",
-                        )}
-                      >
-                        {t(`running.status.${r.status}`)}
-                      </span>
-                    </button>
-                  ))}
+            {/* ── Execuções (agent-runs) quando o card não tem branch configurada:
+                 os runs vivem no SQLite e continuam visíveis mesmo sem worktree ── */}
+            {!isConfigured &&
+              Array.isArray(cardRuns) &&
+              cardRuns.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <SidebarLabel>{t("running.card.title")}</SidebarLabel>
+                  <CardRunsList runs={cardRuns} onOpen={setOpenRunId} />
                 </div>
-              </div>
-            )}
+              )}
           </aside>
         </div>
       </DialogContent>
@@ -1392,32 +1109,6 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
           fetchUrl={`/api/config/worktrees/${encodeURIComponent(worktreeId)}/helpers-file?file=${encodeURIComponent(helpersFileModal)}`}
           onClose={() => setHelpersFileModal(null)}
         />
-      )}
-      {errorModal && (
-        <Dialog
-          open
-          modal={false}
-          onOpenChange={(o) => {
-            if (!o) setErrorModal(null);
-          }}
-        >
-          <DialogContent
-            aria-describedby={undefined}
-            className="w-full sm:max-w-lg max-h-[70vh] flex flex-col gap-0 overflow-hidden p-0"
-          >
-            <div className="flex items-center gap-2 border-b px-5 py-4 shrink-0">
-              <AlertTriangle className="size-4 text-destructive shrink-0" />
-              <DialogTitle className="text-sm font-semibold text-destructive">
-                Detalhes do erro
-              </DialogTitle>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-foreground">
-                {errorModal}
-              </pre>
-            </div>
-          </DialogContent>
-        </Dialog>
       )}
     </Dialog>
   );

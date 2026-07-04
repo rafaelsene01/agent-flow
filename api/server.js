@@ -21,10 +21,8 @@ function recoverInterruptedRuns() {
   // o que mantém o card girando "executando" no board para sempre. Reconcilia
   // qualquer um deles para "error" no boot.
   const RUN_FIELDS = [
-    ["messageStatus",    "messageLastError"],
-    ["commitPushStatus", "commitPushLastError"],
-    ["prStatus",         "prLastError"],
-    ["pullStatus",       "pullLastError"],
+    ["messageStatus", "messageLastError"],
+    ["pullStatus",    "pullLastError"],
   ];
   const MSG = "Run interrompido por reinício do servidor";
   for (const wt of getWorktrees()) {

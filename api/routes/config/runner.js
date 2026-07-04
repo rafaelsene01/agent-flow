@@ -9,7 +9,6 @@ import {
   failureDetail,
   registerSseClient,
 } from "../../modules/claude/claude.runner.js";
-import { createPullRequest } from "../../modules/github/github.branches.js";
 import {
   acquireSlot,
   releaseSlot,
@@ -56,13 +55,6 @@ function truncateDesc(text) {
   return t.length <= 200 ? t : t.slice(0, 199) + "…";
 }
 
-function lastTaskOrSpecSession(wt) {
-  const sessions = (wt.chatSessions ?? [])
-    .filter((s) => s.started && (s.origin === "task" || s.origin === "spec"))
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  return sessions[0] ?? null;
-}
-
 async function ensureWorktreeExclude(wtPath) {
   try {
     const { stdout } = await execFileP("git", ["rev-parse", "--git-dir"], {
@@ -86,30 +78,6 @@ function langInstruction() {
   return lang === "pt"
     ? "Responda em português do Brasil.\n\n"
     : "Respond in English.\n\n";
-}
-
-// Extrai o texto final da resposta do Claude a partir do stdout raw (stream-json).
-// Evita o eco do PROMPT no log persistido — que contém o template literal e
-// faria o regex casar com os placeholders em vez da resposta real.
-function extractFinalText(rawOutput) {
-  let finalText = "";
-  for (const line of (rawOutput ?? "").split("\n")) {
-    const s = line.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").trim();
-    if (!s) continue;
-    try {
-      const ev = JSON.parse(s);
-      if (ev.type === "result" && typeof ev.result === "string") {
-        finalText = ev.result;
-      } else if (ev.type === "assistant" && Array.isArray(ev.message?.content)) {
-        for (const block of ev.message.content) {
-          if (block.type === "text" && block.text?.trim()) finalText = block.text;
-        }
-      }
-    } catch {
-      // linha não-JSON (ex: stderr concatenado) — ignora
-    }
-  }
-  return finalText;
 }
 
 export default function runnerRoutes(app) {
@@ -248,7 +216,7 @@ export default function runnerRoutes(app) {
       fs.rmSync(path.join(wt.path, ".specs"), { recursive: true, force: true });
     } catch (_) {}
 
-    updateWorktreeStatus(id, { cleanupDone: true, commitPushStatus: null });
+    updateWorktreeStatus(id, { cleanupDone: true });
     res.json({ ok: true });
   });
 
@@ -367,268 +335,6 @@ export default function runnerRoutes(app) {
     } catch (err) {
       sendError(res, 500, err.message, err);
     }
-  });
-
-  app.post("/api/config/worktrees/:id/commit-push", (req, res) => {
-    const id = decodeURIComponent(req.params.id);
-    const { model, effort, sessionId } = req.body ?? {};
-
-    const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt)
-      return sendError(res, 404, "Worktree não encontrado na configuração.");
-    if (!fs.existsSync(wt.path))
-      return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
-
-    const logFile = makeLogFile("commit-push");
-    const commitSessionId = makeSessionId(wt, "commit-push");
-    appendChatSession(id, {
-      id: commitSessionId,
-      logFile,
-      origin: "chat",
-      description: "Commit & Push",
-      started: false,
-      createdAt: new Date().toISOString(),
-    });
-
-    updateWorktreeStatus(id, {
-      commitPushStatus: "running",
-      commitPushLastRunAt: new Date().toISOString(),
-      commitPushLastError: null,
-    });
-    res.json({ ok: true });
-
-    const logStream = createRunLog(wt, logFile, { append: !!sessionId });
-
-    (async () => {
-      await ensureWorktreeExclude(wt.path);
-
-      logStream.write("=== Step 1: staging all changes ===\n");
-      try {
-        await execFileP("git", ["add", "-A"], {
-          cwd: wt.path,
-          timeout: 30_000,
-        });
-      } catch (err) {
-        await new Promise((resolve) => logStream.end(resolve));
-        updateWorktreeStatus(id, {
-          commitPushStatus: "error",
-          commitPushLastError: `git add falhou: ${err.message}`,
-        });
-        return;
-      }
-
-      const { stdout: statusOut } = await execFileP(
-        "git",
-        ["status", "--porcelain"],
-        { cwd: wt.path, timeout: 10_000 },
-      ).catch(() => ({ stdout: "" }));
-
-      if (statusOut.trim()) {
-        const freshWt = getWorktrees().find((w) => w.id === id);
-        const opts = { model: model || "sonnet", effort: effort || "medium" };
-
-        let targetSessionId, sessionStarted;
-        if (sessionId) {
-          const entry = (freshWt?.chatSessions ?? []).find((s) => s.id === sessionId);
-          if (entry) {
-            targetSessionId = entry.id;
-            sessionStarted = entry.started;
-          }
-        }
-        if (!targetSessionId) {
-          const lastSession = lastTaskOrSpecSession(freshWt ?? wt);
-          targetSessionId = lastSession?.id ?? null;
-          sessionStarted = lastSession?.started ?? false;
-        }
-
-        logStream.write("=== Step 2: creating semantic commit ===\n");
-        let commitResult;
-
-        if (targetSessionId && sessionStarted) {
-          commitResult = await resumeClaude(
-            langInstruction() +
-              "Com base em tudo que foi implementado nesta sessão, crie um commit semântico (conventional commits) " +
-              "com todas as mudanças staged. Use --no-verify. Não faça push.",
-            wt.path,
-            logStream,
-            targetSessionId,
-            null,
-            opts,
-          );
-        } else {
-          const newCommitSessionId = targetSessionId ?? commitSessionId;
-          commitResult = await runClaude(
-            langInstruction() +
-              "Analise as mudanças staged (`git diff --staged`) e crie um commit semântico (conventional commits) " +
-              "com `--no-verify`. Não faça push.",
-            wt.path,
-            logStream,
-            newCommitSessionId,
-            () => updateChatSession(id, newCommitSessionId, { started: true }),
-            opts,
-          );
-        }
-
-        if (commitResult.code !== 0) {
-          await new Promise((resolve) => logStream.end(resolve));
-          updateWorktreeStatus(id, {
-            commitPushStatus: "error",
-            commitPushLastError: `Commit falhou: ${failureDetail(commitResult, logStream.persistPath)}`,
-          });
-          return;
-        }
-      } else {
-        logStream.write("=== Nenhuma alteração staged para commitar ===\n");
-      }
-
-      logStream.write("=== Step 3: pushing to remote ===\n");
-      try {
-        const { stdout: pushOut, stderr: pushErr } = await execFileP(
-          "git",
-          ["push", "--no-verify", "origin", `HEAD:${wt.branch}`],
-          { cwd: wt.path, timeout: 60_000 },
-        );
-        if (pushOut) logStream.write(pushOut);
-        if (pushErr) logStream.write(pushErr);
-      } catch (err) {
-        await new Promise((resolve) => logStream.end(resolve));
-        updateWorktreeStatus(id, {
-          commitPushStatus: "error",
-          commitPushLastError: `Push falhou: ${err.message}`,
-        });
-        return;
-      }
-
-      updateChatSession(id, commitSessionId, { started: true });
-      await new Promise((resolve) => logStream.end(resolve));
-      updateWorktreeStatus(id, { commitPushStatus: "done" });
-    })();
-  });
-
-  app.post("/api/config/worktrees/:id/create-pr", (req, res) => {
-    const id = decodeURIComponent(req.params.id);
-    const { title, number, model, effort, sessionId } = req.body ?? {};
-
-    const wt = getWorktrees().find((w) => w.id === id);
-    if (!wt) return sendError(res, 404, "Worktree não encontrado.");
-    if (!wt.originBranch) return sendError(res, 400, "Branch de origem não configurada. Reconfigure a branch do card.");
-    if (!fs.existsSync(wt.path)) return sendError(res, 400, `Diretório não encontrado: ${wt.path}`);
-
-    const [owner, repo] = (wt.repo ?? "").split("/");
-    if (!owner || !repo) return sendError(res, 400, "Repositório inválido.");
-
-    const logFile = makeLogFile("create-pr");
-    const prSessionId = makeSessionId(wt, "create-pr");
-    appendChatSession(id, {
-      id: prSessionId,
-      logFile,
-      origin: "create-pr",
-      description: `PR: ${title ?? ""}`.trim(),
-      started: false,
-      createdAt: new Date().toISOString(),
-    });
-
-    updateWorktreeStatus(id, { prStatus: "running", prUrl: null, prLastError: null });
-    res.json({ ok: true });
-
-    const logStream = createRunLog(wt, logFile, { append: false });
-
-    (async () => {
-      try {
-        let commitLog = "";
-        let diffStat = "";
-        const base = `origin/${wt.originBranch}`;
-        try {
-          const { stdout: log } = await execFileP(
-            "git",
-            ["log", `${base}..HEAD`, "--oneline", "--no-decorate"],
-            { cwd: wt.path, timeout: 15_000 },
-          );
-          commitLog = log.trim();
-        } catch (e) {
-          logStream.write(`Warning: git log falhou: ${e.message}\n`);
-        }
-        try {
-          const { stdout: stat } = await execFileP(
-            "git",
-            ["diff", "--stat", base],
-            { cwd: wt.path, timeout: 15_000 },
-          );
-          diffStat = stat.trim();
-        } catch (e) {
-          logStream.write(`Warning: git diff --stat falhou: ${e.message}\n`);
-        }
-
-        const cardRef = number != null ? `#${number}` : "";
-        const cardTitle = [cardRef, title].filter(Boolean).join(" ");
-
-        const prompt =
-          langInstruction() +
-          `Você vai gerar o título e a descrição de um Pull Request.\n\n` +
-          `Branch: \`${wt.branch}\` → base: \`${wt.originBranch}\`\n` +
-          `Card: ${cardTitle}\n\n` +
-          (commitLog ? `Commits:\n${commitLog}\n\n` : "") +
-          (diffStat  ? `Arquivos alterados (git diff --stat):\n${diffStat}\n\n` : "") +
-          `Execute \`git diff ${base}\` para ver as mudanças completas e entender o que foi feito.\n\n` +
-          `Regras:\n` +
-          `- O TÍTULO deve ser semântico (conventional commit style, ex: "feat: …", "fix: …") com no máximo 72 chars. Não inclua ${cardRef} no título.\n` +
-          `- O BODY deve OBRIGATORIAMENTE começar com a linha \`${cardRef}\` (referência do card), seguida de uma linha em branco, e então um resumo em markdown do que foi implementado/alterado/removido com base no diff real do código.\n` +
-          `- NÃO inclua estatísticas (contagem de linhas, número de arquivos alterados, insertions/deletions) na descrição. Foque no QUE foi feito, não em métricas.\n` +
-          `- Não modifique arquivos. Não faça commit nem push.\n\n` +
-          `Produza EXATAMENTE este bloco como última saída (sem nada depois):\n` +
-          `PR_TITLE: <título semântico>\n` +
-          `PR_BODY_START\n` +
-          `${cardRef}\n\n` +
-          `<resumo das mudanças em markdown>\n` +
-          `PR_BODY_END`;
-
-        logStream.write("=== Gerando descrição do PR ===\n");
-
-        let targetSessionId = prSessionId;
-        let sessionStarted = false;
-        if (sessionId && sessionId !== "__new__") {
-          const entry = (wt.chatSessions ?? []).find((s) => s.id === sessionId);
-          if (entry) {
-            targetSessionId = entry.id;
-            sessionStarted = entry.started;
-          }
-        }
-
-        const result = await (sessionStarted
-          ? resumeClaude(prompt, wt.path, logStream, targetSessionId, null, { model: model || "sonnet", effort: effort || "medium" })
-          : runClaude(prompt, wt.path, logStream, targetSessionId, () => updateChatSession(id, targetSessionId, { started: true }), { model: model || "sonnet", effort: effort || "medium" }));
-
-        if (result.code !== 0) {
-          await new Promise((resolve) => logStream.end(resolve));
-          updateWorktreeStatus(id, {
-            prStatus: "error",
-            prLastError: `Geração falhou: ${failureDetail(result, logStream.persistPath)}`,
-          });
-          return;
-        }
-
-        const finalText = extractFinalText(result.output);
-        const titleMatch = finalText.match(/PR_TITLE:\s*(.+)/);
-        const bodyMatch  = finalText.match(/PR_BODY_START\r?\n([\s\S]*?)\r?\nPR_BODY_END/);
-
-        const prTitle = (titleMatch?.[1]?.trim()) || cardTitle;
-        const prBody  = (bodyMatch?.[1]?.trim())  || (commitLog ? `${cardRef}\n\n## Commits\n\`\`\`\n${commitLog}\n\`\`\`` : cardRef);
-
-        const pr = await createPullRequest(owner, repo, {
-          head:  wt.branch,
-          base:  wt.originBranch,
-          title: prTitle,
-          body:  prBody,
-        });
-
-        updateChatSession(id, prSessionId, { started: true });
-        await new Promise((resolve) => logStream.end(resolve));
-        updateWorktreeStatus(id, { prStatus: "done", prUrl: pr.html_url });
-      } catch (err) {
-        await new Promise((resolve) => logStream.end(resolve)).catch(() => {});
-        updateWorktreeStatus(id, { prStatus: "error", prLastError: err.message });
-      }
-    })();
   });
 
   app.get("/api/config/worktrees/:id/helpers-files", (req, res) => {

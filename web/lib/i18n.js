@@ -50,10 +50,6 @@ export const dictionaries = {
     "action.reset": "Resetar",
     "action.pull": "Pull",
 
-    // Run defaults (CardModal)
-    "run.commitPush": "Commit & Push",
-    "run.createPR": "Criar Pull Request",
-
     // Origin labels
     "origin.task": "tarefa",
     "origin.spec": "spec",
@@ -70,6 +66,7 @@ export const dictionaries = {
     "card.message.send": "Enviar mensagem",
     "card.message.placeholder": "Digite uma mensagem para o agente…",
     "card.logs": "Logs",
+    "card.executors": "Executores",
     "card.files": "Arquivos",
     "card.helpers": "Helpers",
     "card.git": "Git",
@@ -94,8 +91,6 @@ export const dictionaries = {
     "toast.send.error": "Falha ao enviar mensagem",
     "toast.reset.success": "Worktree resetado",
     "toast.reset.error": "Falha ao resetar worktree",
-    "toast.pr.success": "PR criado",
-    "toast.pr.error": "Falha ao criar PR",
     "toast.pull.success": "Pull realizado",
     "toast.pull.error": "Falha ao realizar pull",
     "toast.exclude.success": "Arquivo excluído",
@@ -127,13 +122,6 @@ export const dictionaries = {
     // Git tab
     "git.advanced": "Avançado",
     "git.advanced.desc": "Ações destrutivas — use com cautela",
-    "git.commitPush.sending": "Enviando…",
-    "git.commitPush.retry": "↺ Tentar",
-    "git.commitPush.sent": "✓ Enviado",
-    "git.pr.creating": "Criando PR…",
-    "git.pr.retry": "↺ Tentar PR",
-    "git.pr.created": "✓ PR Criado",
-    "git.pr.create": "Criar PR",
 
     // Header
     "header.theme.to-light": "Mudar para tema claro",
@@ -293,10 +281,6 @@ export const dictionaries = {
     "action.reset": "Reset",
     "action.pull": "Pull",
 
-    // Run defaults (CardModal)
-    "run.commitPush": "Commit & Push",
-    "run.createPR": "Create Pull Request",
-
     // Origin labels
     "origin.task": "task",
     "origin.spec": "spec",
@@ -313,6 +297,7 @@ export const dictionaries = {
     "card.message.send": "Send message",
     "card.message.placeholder": "Type a message to the agent…",
     "card.logs": "Logs",
+    "card.executors": "Executors",
     "card.files": "Files",
     "card.helpers": "Helpers",
     "card.git": "Git",
@@ -337,8 +322,6 @@ export const dictionaries = {
     "toast.send.error": "Failed to send message",
     "toast.reset.success": "Worktree reset",
     "toast.reset.error": "Failed to reset worktree",
-    "toast.pr.success": "PR created",
-    "toast.pr.error": "Failed to create PR",
     "toast.pull.success": "Pull completed",
     "toast.pull.error": "Failed to pull",
     "toast.exclude.success": "File excluded",
@@ -370,13 +353,6 @@ export const dictionaries = {
     // Git tab
     "git.advanced": "Advanced",
     "git.advanced.desc": "Destructive actions — use with care",
-    "git.commitPush.sending": "Sending…",
-    "git.commitPush.retry": "↺ Retry",
-    "git.commitPush.sent": "✓ Sent",
-    "git.pr.creating": "Creating PR…",
-    "git.pr.retry": "↺ Retry PR",
-    "git.pr.created": "✓ PR Created",
-    "git.pr.create": "Create PR",
 
     // Header
     "header.theme.to-light": "Switch to light theme",
