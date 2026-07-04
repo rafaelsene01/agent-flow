@@ -132,6 +132,16 @@ function buildCardText(run) {
     .join("\n");
 }
 
+// Regra anti-kill: vai no prompt inicial (buildPrompt) e é repetida em todo
+// resume, porque sessões antigas foram criadas antes da regra existir e o
+// resume manda só a mensagem do usuário. O bloqueio duro fica nas deny rules
+// do claude.runner; aqui é a orientação para o agente nem tentar.
+const PROCESS_KILL_RULE =
+  "- NUNCA encerre processos por nome (`Stop-Process`/`Get-Process | Stop-Process`, `taskkill /IM`, " +
+  "`pkill`/`killall`) — isso mata o agent-flow e o seu próprio run, que também rodam em node. " +
+  "Se precisar parar um servidor/processo que você mesmo iniciou, guarde o PID ao iniciá-lo e " +
+  "mate SOMENTE esse PID (ex.: `Stop-Process -Id <pid>`).\n";
+
 function buildPrompt(run, agentPrompt, { allowGit } = {}) {
   // Agentes git-capazes (ex.: Commit & Push) recebem o contexto das branches e
   // têm liberado o uso de git; os demais são proibidos de tocar em git e devem
@@ -176,6 +186,7 @@ function buildPrompt(run, agentPrompt, { allowGit } = {}) {
     fileRule +
     "- Aja SOMENTE com base nas instruções e skills fornecidas acima neste prompt. " +
     "NÃO acione nenhuma outra skill instalada nem inicie fluxos de spec/design/tasks que não tenham sido pedidos.\n" +
+    PROCESS_KILL_RULE +
     ASK_RULES +
     "\n" +
     gitRule +
@@ -384,7 +395,10 @@ export async function startRun(run, { onSettled } = {}) {
     if (resumeMessage)
       logStream.write("\n=== Resposta do usuário (resume) ===\n");
     result = await resumeClaude(
-      resumeMessage ?? "continuar",
+      "Lembrete de regras (continuam valendo nesta continuação):\n" +
+        PROCESS_KILL_RULE +
+        "\n" +
+        (resumeMessage ?? "continuar"),
       run.worktree_path,
       logStream,
       run.session_id,

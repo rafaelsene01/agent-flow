@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
+import path from "path";
 import { getConfig, setConfig } from "../config/config.service.js";
-import { listSkills, getActiveSkillNames } from "../skills/skills.service.js";
+import { getActiveSkillNames, getSkillsContent } from "../skills/skills.service.js";
 import { DEFAULT_AGENTS, isDefaultAgentId } from "./defaults/index.js";
 
 // Agents persistem em ~/.agent-flow/config.json → agents (default []). Mesmo
@@ -87,34 +88,40 @@ export async function deleteAgent(id) {
   await setConfig({ agents: current.filter((a) => a.id !== id) });
 }
 
-// Formata a instrução que aponta as skills a usar, ex.: "Use as skills A, B e C."
-function skillsInstruction(names) {
-  const list =
-    names.length === 1
-      ? names[0]
-      : `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
-  return `Use ${names.length === 1 ? "a skill" : "as skills"} ${list}.`;
+// Remove o bloco de frontmatter (--- ... ---) da SKILL.md: os metadados (name,
+// description, disable-model-invocation etc.) são para o harness, não para o
+// prompt — flags como disable-model-invocation confundiriam o agent.
+function stripFrontmatter(content) {
+  return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
 }
 
 // Monta o prompt final do agent:
 //   1. prompt do agent
-//   2. instrução apontando as skills a usar (ativas globais + linkadas ao agent)
-// As skills não são injetadas por conteúdo: o próprio agent as carrega quando
-// precisar. Assim o prompt/log fica limpo e sem duplicar o conteúdo bruto.
+//   2. conteúdo das skills a usar (ativas globais + linkadas ao agent), injetado
+//      direto no prompt. Injetar o conteúdo (em vez de só citar o nome) garante
+//      que o agent siga a skill mesmo sem ela estar instalada na máquina/worktree
+//      e mesmo quando a skill não é invocável pelo modelo (disable-model-invocation).
 export function buildAgentPrompt(id) {
   const agent = getAgent(id);
   if (!agent) throw new Error("Agent não encontrado");
 
-  const known = new Set(listSkills().map((s) => s.name));
   const names = [];
   const seen = new Set();
   for (const name of [...getActiveSkillNames(), ...(agent.skills ?? [])]) {
-    if (!known.has(name) || seen.has(name)) continue;
+    if (seen.has(name)) continue;
     seen.add(name);
     names.push(name);
   }
 
   const sections = [`# Agent: ${agent.name}\n\n${agent.prompt}`];
-  if (names.length) sections.push(skillsInstruction(names));
+  // getSkillsContent ignora nomes desconhecidos e preserva a ordem.
+  for (const skill of getSkillsContent(names)) {
+    const dir = path.dirname(skill.path);
+    sections.push(
+      `# Skill: ${skill.name}\n\n` +
+        `Siga as instruções desta skill como parte do seu papel. Arquivos auxiliares que ela referencie por caminho relativo (ex.: references/) estão em \`${dir}\`.\n\n` +
+        stripFrontmatter(skill.content).trim(),
+    );
+  }
   return sections.join("\n\n");
 }

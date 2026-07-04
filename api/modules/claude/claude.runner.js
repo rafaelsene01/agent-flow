@@ -7,6 +7,24 @@ import { getConfig, getHelpersDir } from "../config/config.service.js";
 const LOGS_DIR = path.join(os.homedir(), ".agent-flow", "logs");
 const isWin = process.platform === "win32";
 
+// Deny rules do CLI: matar processos por nome derruba o próprio agent-flow e o
+// run (tudo roda em node) — já aconteceu com `Get-Process node | Stop-Process`.
+// São aplicadas pelo harness mesmo com --dangerously-skip-permissions; matar por
+// PID (`Stop-Process -Id`/`kill <pid>`) continua liberado. Padrões sem espaço
+// interno de propósito: com shell:true no Windows os args não são re-quotados.
+const KILL_DENY_RULES = [
+  "Bash(*pkill*)",
+  "Bash(*killall*)",
+  "Bash(*taskkill*)",
+  "Bash(*Get-Process*Stop-Process*)",
+  "Bash(*Stop-Process*-Name*)",
+  "PowerShell(*taskkill*)",
+  "PowerShell(*Get-Process*Stop-Process*)",
+  "PowerShell(*Stop-Process*-Name*)",
+  "PowerShell(*Stop-Process*-ProcessName*)",
+].join(",");
+const denyArgs = ["--disallowedTools", isWin ? `"${KILL_DENY_RULES}"` : KILL_DENY_RULES];
+
 // ── SSE clients ────────────────────────────────────────────────────────────────
 
 // Map<id, Set<Response>>
@@ -251,6 +269,7 @@ export function runClaude(
     const baseArgs = [
       ...(model ? ["--model", model] : []),
       ...(effort ? ["--effort", effort] : []),
+      ...denyArgs,
       "--output-format",
       "stream-json",
       "--verbose",
@@ -340,6 +359,7 @@ export function resumeClaude(
       sessionName,
       ...(model ? ["--model", model] : []),
       ...(effort ? ["--effort", effort] : []),
+      ...denyArgs,
       "--output-format",
       "stream-json",
       "--verbose",
