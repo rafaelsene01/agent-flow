@@ -116,7 +116,11 @@ function parseAsk(finalText) {
   }
   if (lastIdx === -1) return null;
 
-  const askLine = stripMd(lines[lastIdx]).replace(/^ASK:\**\s*/, "").trim();
+  // Remove também a ênfase de fechamento (ex.: `**ASK: pergunta?**` → sobra `?**`).
+  const askLine = stripMd(lines[lastIdx])
+    .replace(/^ASK:\**\s*/, "")
+    .replace(/[*_]+\s*$/, "")
+    .trim();
   const questionParts = [askLine];
   const options = [];
   let collectingOptions = false;

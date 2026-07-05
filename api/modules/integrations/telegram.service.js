@@ -16,6 +16,19 @@ function telegramConfig() {
   return tg;
 }
 
+// Opções da pergunta pendente: vivem no último turn `question` (coluna `turns`,
+// JSON), não em pending_question. Parse local — importar o store criaria import
+// circular (o store importa este módulo).
+function pendingOptions(run) {
+  try {
+    const turns = JSON.parse(run.turns ?? "[]");
+    for (let i = turns.length - 1; i >= 0; i--) {
+      if (turns[i].type === "question") return turns[i].options ?? [];
+    }
+  } catch {}
+  return [];
+}
+
 // Monta a mensagem do evento. A última linha (`ref: …`) é machine-readable:
 // quando o usuário responder no Telegram, é ela que permitirá mapear a resposta
 // de volta ao card/run — retomar com um prompt de entrada ou liberar o breakpoint.
@@ -30,10 +43,14 @@ function buildMessage(run, event) {
     "chain-done": pt ? "✅ Pipeline do card finalizada" : "✅ Card pipeline finished",
   }[event];
 
+  const cardLine = `Card: #${run.card_number ?? "?"} — ${run.card_title ?? ""}`.trim();
+  // Fim de pipeline não espera resposta: mensagem mínima, sem a linha `ref:`.
+  if (event === "chain-done") return [title, "", cardLine].join("\n");
+
   const lines = [
     title,
     "",
-    `${pt ? "Card" : "Card"}: #${run.card_number ?? "?"} — ${run.card_title ?? ""}`.trim(),
+    cardLine,
     `${pt ? "Repositório" : "Repository"}: ${run.repo}`,
     `${pt ? "Agente" : "Agent"}: ${run.agent_name}`,
     `Branch: ${run.target_branch}`,
@@ -43,6 +60,7 @@ function buildMessage(run, event) {
   }
   if (event === "waiting" && run.pending_question) {
     lines.push("", `${pt ? "Pergunta" : "Question"}: ${String(run.pending_question).slice(0, 500)}`);
+    for (const opt of pendingOptions(run)) lines.push(`- ${opt}`);
   }
   lines.push(
     "",

@@ -144,15 +144,19 @@ export function patchRun(id, patch, { silent = false } = {}) {
 }
 
 // Dispara a notificação de integração (Telegram) na transição de status:
-// erro raiz, aguardando entrada/aprovação, ou chain do card 100% concluída.
+// erro raiz, aguardando entrada/aprovação, ou card 100% concluído.
 function notifyStatusChange(run) {
   if (run.status === "error") {
     notifyRunEvent(run, "error");
   } else if (run.status === "waiting-input" || run.status === "waiting-approval") {
     notifyRunEvent(run, "waiting");
   } else if (run.status === "done") {
-    const chain = getChain(run.id);
-    if (chain.length && chain.every((r) => r.status === "done")) {
+    // Escopo do "tudo finalizado" é o card inteiro: levas enfileiradas em
+    // momentos diferentes têm chain_id distintos — checar só a chain deste run
+    // dispararia uma mensagem por leva. Run sem card usa a própria chain.
+    const runs =
+      run.card_number != null ? listRunsForCard(run.repo, run.card_number) : getChain(run.id);
+    if (runs.length && runs.every((r) => r.status === "done")) {
       notifyRunEvent(run, "chain-done");
     }
   }
