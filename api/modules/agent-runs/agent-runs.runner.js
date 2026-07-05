@@ -8,7 +8,7 @@ import {
 } from "../claude/claude.runner.js";
 import { setupWorktree } from "../git/git.worktree.js";
 import { buildAgentPrompt, getAgent } from "../agents/agents.service.js";
-import { getLanguage } from "../config/config.service.js";
+import { getConfig, getLanguage } from "../config/config.service.js";
 import {
   registerProcess,
   unregisterProcess,
@@ -157,6 +157,49 @@ function parseAbort(finalText) {
   return reason || "sem motivo informado";
 }
 
+// Comandos de validação configurados no board (Editar Board → Comandos de
+// Validação). O run não guarda board id, só o repo — casamos com o primeiro
+// board cujo originRepo é o repo do run e que tenha algum comando preenchido.
+const VALIDATION_LABELS = [
+  ["install", "Instalação"],
+  ["build", "Build"],
+  ["lint", "Lint"],
+  ["test", "Testes"],
+  ["extra", "Outro"],
+];
+
+function boardValidationFor(repo) {
+  const boards = getConfig().boards ?? [];
+  const board = boards.find(
+    (b) =>
+      b.originRepo === repo &&
+      Object.values(b.validation ?? {}).some(Boolean),
+  );
+  return board?.validation ?? null;
+}
+
+// Bloco injetado em TODO prompt (inicial e resume). Os comandos são um OVERRIDE:
+// quando o prompt/skill do agente pedir instalação/build/lint/testes, o comando
+// configurado no board substitui o equivalente citado lá. NÃO é permissão para
+// validar por conta própria — sem pedido no prompt/skill, nada disso roda.
+function validationContextFor(repo) {
+  const validation = boardValidationFor(repo);
+  if (!validation) return "";
+  const lines = VALIDATION_LABELS.filter(([key]) => validation[key]).map(
+    ([key, label]) => `- ${label}: \`${validation[key]}\``,
+  );
+  return (
+    "\n\nComandos de validação configurados para este board:\n" +
+    lines.join("\n") +
+    "\n- Use esses comandos SOMENTE se rodar instalação/build/lint/testes/validação " +
+    "for pedido nas instruções ou skills carregadas neste prompt — NÃO rode " +
+    "validação por iniciativa própria.\n" +
+    "- Quando pedido, esta lista é um OVERRIDE: use o comando daqui no lugar do " +
+    "equivalente citado no prompt/skill (ex.: se a skill manda `npm run build` e " +
+    "aqui consta `npm run build:src`, rode `npm run build:src`).\n"
+  );
+}
+
 function buildCardText(run) {
   return [
     `# ${run.card_title ?? "Card"}`,
@@ -228,6 +271,7 @@ function buildPrompt(run, agentPrompt, { allowGit, allowGitRead, noAsk } = {}) {
     effectivePrompt +
     gitContext +
     helpersContext +
+    validationContextFor(run.repo) +
     "\n\nRegras de execução:\n" +
     fileRule +
     "- Aja SOMENTE com base nas instruções acima e nas skills referenciadas neste prompt — " +
@@ -259,7 +303,8 @@ function buildResumeReminder(run, { allowGit, noAsk } = {}) {
     "Lembrete de regras (continuam valendo nesta continuação):\n" +
     PROCESS_KILL_RULE +
     askRuleFor(noAsk) +
-    gitRuleFor(allowGit)
+    gitRuleFor(allowGit) +
+    validationContextFor(run.repo)
   );
 }
 

@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { getDb } from "./agent-runs.db.js";
+import { notifyRunEvent } from "../integrations/telegram.service.js";
 
 const PATCHABLE_COLUMNS = new Set([
   "agent_name",
@@ -123,16 +124,38 @@ export function getRun(id) {
   return getDb().prepare(`SELECT * FROM agent_runs WHERE id = ?`).get(id) ?? null;
 }
 
-export function patchRun(id, patch) {
+// `silent: true` suprime a notificação de integração (usado por failDependents —
+// falhas em cascata não notificam, só o erro raiz).
+export function patchRun(id, patch, { silent = false } = {}) {
   const fields = Object.keys(patch).filter((f) => PATCHABLE_COLUMNS.has(f));
   if (!fields.length) return getRun(id);
+  const prevStatus = patch.status !== undefined ? getRun(id)?.status : undefined;
   const now = new Date().toISOString();
   const setClause = fields.map((f) => `${f} = ?`).join(", ");
   const values = fields.map((f) => patch[f]);
   getDb()
     .prepare(`UPDATE agent_runs SET ${setClause}, updated_at = ? WHERE id = ?`)
     .run(...values, now, id);
-  return getRun(id);
+  const run = getRun(id);
+  if (!silent && patch.status !== undefined && run && run.status !== prevStatus) {
+    notifyStatusChange(run);
+  }
+  return run;
+}
+
+// Dispara a notificação de integração (Telegram) na transição de status:
+// erro raiz, aguardando entrada/aprovação, ou chain do card 100% concluída.
+function notifyStatusChange(run) {
+  if (run.status === "error") {
+    notifyRunEvent(run, "error");
+  } else if (run.status === "waiting-input" || run.status === "waiting-approval") {
+    notifyRunEvent(run, "waiting");
+  } else if (run.status === "done") {
+    const chain = getChain(run.id);
+    if (chain.length && chain.every((r) => r.status === "done")) {
+      notifyRunEvent(run, "chain-done");
+    }
+  }
 }
 
 export function runsProcessingByAgent() {
@@ -220,18 +243,27 @@ export function nextQueuedForFreeAgents(busyAgentIds, busyWorktreeKeys = new Set
 // ainda estão na fila: passam para `waiting-approval`, aguardando o usuário. Não
 // são despachados ao Claude — só destravam o próximo passo quando aprovados.
 export function promoteReadyBreakpoints() {
-  const now = new Date().toISOString();
-  const info = getDb()
+  const db = getDb();
+  // Seleciona antes do UPDATE em massa para notificar cada breakpoint promovido
+  // (o UPDATE direto não passa pelo patchRun, onde vive o hook de notificação).
+  const ready = db
     .prepare(
-      `UPDATE agent_runs SET status = 'waiting-approval', updated_at = ?
+      `SELECT * FROM agent_runs
        WHERE kind = 'breakpoint' AND status = 'queued'
          AND (
            depends_on IS NULL
            OR EXISTS (SELECT 1 FROM agent_runs d WHERE d.id = agent_runs.depends_on AND d.status = 'done')
          )`,
     )
-    .run(now);
-  return info.changes > 0;
+    .all();
+  if (!ready.length) return false;
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`UPDATE agent_runs SET status = 'waiting-approval', updated_at = ? WHERE id = ?`);
+  for (const run of ready) {
+    stmt.run(now, run.id);
+    notifyRunEvent({ ...run, status: "waiting-approval" }, "waiting");
+  }
+  return true;
 }
 
 // Aprova um ponto de parada aguardando: marca `done` para destravar o próximo
@@ -250,7 +282,7 @@ export function failDependents(runId, reason) {
     .prepare(`SELECT id FROM agent_runs WHERE depends_on = ? AND status = 'queued'`)
     .all(runId);
   for (const d of deps) {
-    patchRun(d.id, { status: "error", last_error: reason });
+    patchRun(d.id, { status: "error", last_error: reason }, { silent: true });
     failDependents(d.id, reason);
   }
 }
