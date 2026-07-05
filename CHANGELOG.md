@@ -1,3 +1,17 @@
+# [1.39.0](https://github.com/rafaelsene01/agent-flow/compare/v1.38.0...v1.39.0) (2026-07-05)
+
+
+### Features
+
+* add integrations section to sidebar and update internationalization ([96c5323](https://github.com/rafaelsene01/agent-flow/commit/96c532333d3d70eb96d7fb774f31a4582da2947c))
+* enhance agent run parsing and notification logic ([37d7154](https://github.com/rafaelsene01/agent-flow/commit/37d715444c5fed72834530dbca2c905ff923db3f))
+* enhance agent run rules and Code Reviewer functionality ([f1b5dbc](https://github.com/rafaelsene01/agent-flow/commit/f1b5dbc02c1b5b3bddf4e08a7f54411aa1c5ecbf))
+* enhance agent run rules and git handling in agent runs ([d94b8e4](https://github.com/rafaelsene01/agent-flow/commit/d94b8e4f4bc47de42783b11045708e9c06b383f2))
+* implement auto-scroll functionality in RunLogOverlay ([9ce9d0f](https://github.com/rafaelsene01/agent-flow/commit/9ce9d0f15706222793b940c3e483d727187da679))
+* implement usage tracking and statistics for agent executions ([6f96b53](https://github.com/rafaelsene01/agent-flow/commit/6f96b534831c9154779481b5ded86365ff28de25))
+* integrate Telegram notifications and enhance agent run validation ([5f6d73b](https://github.com/rafaelsene01/agent-flow/commit/5f6d73b93bb9011b25bb234c9fde35683fd209ba))
+* update dialog component widths for improved responsiveness ([6496dfb](https://github.com/rafaelsene01/agent-flow/commit/6496dfbf0b80c2785f5c3a782d27c05a72aed632))
+
 # [1.38.0](https://github.com/rafaelsene01/agent-flow/compare/v1.37.0...v1.38.0) (2026-07-04)
 
 
