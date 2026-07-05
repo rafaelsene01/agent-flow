@@ -8,19 +8,13 @@ import { PACKAGE_ROOT } from "../../paths.js";
 // comparação — senão skills locais acusariam "atualizar" para sempre.
 const RUNTIME_META = ".skill-meta.json";
 
-// Skills/plugins que o agent-flow sabe instalar globalmente (~/.claude).
+// Skills que o agent-flow sabe instalar globalmente (~/.claude).
 // type: "local" copia de dentro do projeto; "git" clona um repo remoto e copia
-// o subdiretório indicado; "plugin" instala via CLI do Claude Code
-// (marketplace + plugin), ficando disponível em todos os projetos.
+// o subdiretório indicado.
 export const INSTALLABLE_SKILLS = {
   "tlc-spec-driven":  { type: "local", kind: "Skill" },
   "spec-driven-eval": { type: "local", kind: "Skill" },
-  "karpathy-guidelines": {
-    type: "plugin",
-    kind: "Plugin",
-    marketplace: "forrestchang/andrej-karpathy-skills",
-    plugin: "andrej-karpathy-skills@karpathy-skills",
-  },
+  "karpathy-guidelines": { type: "local", kind: "Skill" },
   "caveman": {
     type: "git",
     kind: "Skill",
@@ -69,8 +63,8 @@ function pathsEqual(a, b) {
 //   - presente e idêntico  → installed:true, upToDate:true  → "Atualizar" (desabilitado)
 // A origem da comparação deve ser a MESMA que o instalador (status.js) usa por
 // tipo — senão a skill acusa "atualizar" para sempre:
-//   - git/plugin → origem é remota (repo/CLI), não comparável byte-a-byte
-//     localmente (ex.: caveman traz README.md só no repo). Instalada ⇒ atual.
+//   - git    → origem é remota (repo), não comparável byte-a-byte localmente
+//     (ex.: caveman traz README.md só no repo). Instalada ⇒ atual.
 //   - local      → origem é o pacote (PACKAGE_ROOT/.claude/skills).
 //   - genérica   → cópia do projeto (<pacote>/.claude/skills/<name>).
 export function getInstallState(name) {
@@ -83,7 +77,7 @@ export function getInstallState(name) {
   }
 
   // Sem origem local comparável: presença global já significa instalada e atual.
-  if (cfg?.type === "git" || cfg?.type === "plugin") {
+  if (cfg?.type === "git") {
     return { installable: true, installed: true, upToDate: true, kind };
   }
 

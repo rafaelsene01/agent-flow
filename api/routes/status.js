@@ -65,21 +65,6 @@ export default function statusRoutes(app) {
     }
   }
 
-  function installPlugin(cfg) {
-    // marketplace add é idempotente do ponto de vista do usuário, mas o CLI
-    // retorna erro se já estiver registrado — por isso ignoramos a falha aqui.
-    try {
-      execSync(`claude plugin marketplace add ${cfg.marketplace}`, {
-        stdio: "pipe", timeout: 120000,
-      });
-    } catch {
-      // marketplace provavelmente já adicionado
-    }
-    execSync(`claude plugin install ${cfg.plugin}`, {
-      stdio: "pipe", timeout: 120000,
-    });
-  }
-
   app.post("/api/status/install-skill", async (req, res) => {
     const skill = req.body?.skill ?? "tlc-spec-driven";
     const force = req.body?.force === true;
@@ -90,18 +75,13 @@ export default function statusRoutes(app) {
     const cfg = INSTALLABLE_SKILLS[skill];
 
     try {
-      if (cfg?.type === "plugin") {
-        // `claude plugin install` é idempotente e atualiza para a versão atual.
-        installPlugin(cfg);
-      } else {
-        const dest = join(homedir(), ".claude", "skills", skill);
-        // "Atualizar" (force) remove a cópia global antes de reinstalar.
-        if (force && existsSync(dest)) rmSync(dest, { recursive: true, force: true });
-        if (!existsSync(dest)) {
-          if (cfg?.type === "git") installGit(cfg, dest);
-          else if (cfg?.type === "local") installLocal(skill, dest);
-          else installProjectSkill(skill, dest); // genérica: copia do projeto
-        }
+      const dest = join(homedir(), ".claude", "skills", skill);
+      // "Atualizar" (force) remove a cópia global antes de reinstalar.
+      if (force && existsSync(dest)) rmSync(dest, { recursive: true, force: true });
+      if (!existsSync(dest)) {
+        if (cfg?.type === "git") installGit(cfg, dest);
+        else if (cfg?.type === "local") installLocal(skill, dest);
+        else installProjectSkill(skill, dest); // genérica: copia do projeto
       }
       const data = await refresh();
       res.json(data);
