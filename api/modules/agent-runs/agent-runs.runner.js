@@ -14,10 +14,12 @@ import {
   unregisterProcess,
 } from "../claude/claude.concurrency.js";
 import {
+  getRun,
   patchRun,
   appendTurn,
   updateLastExecTurn,
 } from "./agent-runs.store.js";
+import { recordUsage } from "../usage/usage.store.js";
 
 const execFileP = promisify(execFile);
 
@@ -100,6 +102,61 @@ function extractFinalText(rawOutput) {
     }
   }
   return finalText;
+}
+
+// Métricas do evento `result` do stream-json (o mesmo que gera a linha
+// [RESULTADO] no log): turns, duração, custo e tokens. Tokens de entrada somam
+// os de cache (creation/read) — é o total que entrou no contexto. Retorna {}
+// quando não há evento result (timeout, crash, spawn error).
+function extractResultMeta(rawOutput) {
+  for (const line of (rawOutput ?? "").split("\n")) {
+    const s = line.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").trim();
+    if (!s) continue;
+    try {
+      const ev = JSON.parse(s);
+      if (ev.type !== "result") continue;
+      const u = ev.usage ?? {};
+      return {
+        turns: ev.num_turns ?? null,
+        durationMs: ev.duration_ms ?? null,
+        costUsd: ev.total_cost_usd ?? null,
+        inputTokens:
+          u.input_tokens != null
+            ? u.input_tokens +
+              (u.cache_creation_input_tokens ?? 0) +
+              (u.cache_read_input_tokens ?? 0)
+            : null,
+        outputTokens: u.output_tokens ?? null,
+      };
+    } catch {
+      // linha não-JSON — ignora
+    }
+  }
+  return {};
+}
+
+// Grava o registro de uso da execução que acabou (tela "/usage"). O status é o
+// que o finishStep acabou de definir no run (done/error/waiting-input). Nunca
+// pode derrubar o fluxo do run — qualquer falha aqui é só logada.
+function recordExecUsage(run, result) {
+  try {
+    const meta = extractResultMeta(result?.output);
+    recordUsage({
+      agentName: run.agent_name,
+      cardNumber: run.card_number,
+      repo: run.repo,
+      durationMs:
+        meta.durationMs ??
+        (run._execStartedMs ? Date.now() - run._execStartedMs : 0),
+      status: getRun(run.id)?.status ?? "error",
+      inputTokens: meta.inputTokens,
+      outputTokens: meta.outputTokens,
+      turns: meta.turns,
+      costUsd: meta.costUsd,
+    });
+  } catch (err) {
+    console.error("[usage] falha ao registrar uso:", err.message);
+  }
 }
 
 // Retorna { question, options } a partir do último marcador ASK:, ou null.
@@ -457,6 +514,7 @@ async function finishStep(
       appendTurn(run.id, { type: "result", text: finalText.trim() });
     patchRun(run.id, { status: "done" });
   } finally {
+    recordExecUsage(run, result);
     unregisterProcess(run.id);
     onSettled?.();
   }
@@ -531,6 +589,9 @@ export async function startRun(run, { onSettled } = {}) {
 
   const opts = { model: run.model, effort: run.effort };
   const onSpawn = (child) => registerProcess(run.id, child);
+  // Fallback de duração para o registro de uso quando o evento result não vem
+  // (timeout/crash) — ver recordExecUsage.
+  run._execStartedMs = Date.now();
   let result;
   if (wasResume) {
     if (resumeMessage)

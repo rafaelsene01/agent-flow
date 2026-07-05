@@ -196,8 +196,17 @@ function formatStreamEvent(event) {
       event.total_cost_usd != null
         ? `$${event.total_cost_usd.toFixed(4)}`
         : "?";
+    // Tokens de entrada somam os de cache (creation/read): é o total que entrou
+    // no contexto — mesmo critério da tela /usage.
+    const u = event.usage ?? {};
+    const fmtTok = (n) =>
+      n < 1_000 ? String(n) : n < 1_000_000 ? `${(n / 1_000).toFixed(1)}K` : `${(n / 1_000_000).toFixed(1)}M`;
+    const tokens =
+      u.input_tokens != null
+        ? ` | ↑${fmtTok(u.input_tokens + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0))} ↓${fmtTok(u.output_tokens ?? 0)} tokens`
+        : "";
     parts.push(
-      `\n┌─[RESULTADO] ${status} | ${event.num_turns ?? "?"} turns | ${secs}s | ${cost}`,
+      `\n┌─[RESULTADO] ${status} | ${event.num_turns ?? "?"} turns | ${secs}s | ${cost}${tokens}`,
     );
     if (event.result?.trim()) parts.push(event.result.trim().slice(0, 500));
     parts.push(`└${SEP}`);

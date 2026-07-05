@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Sparkles, Activity, Plug, Settings, Sun, Moon, Plus, X } from "lucide-react";
+import { Bot, Sparkles, Activity, ChartColumn, Plug, Settings, Sun, Moon, Plus, X } from "lucide-react";
 import { boardSlug } from "@/lib/boardSlug.js";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18nContext";
@@ -73,6 +73,12 @@ function SidebarContent({
             label={t("sidebar.running")}
             active={activePath === "/running"}
             onClick={() => onNavigate("/running")}
+          />
+          <NavItem
+            icon={ChartColumn}
+            label={t("sidebar.usage")}
+            active={activePath === "/usage"}
+            onClick={() => onNavigate("/usage")}
           />
           <NavItem
             icon={Plug}

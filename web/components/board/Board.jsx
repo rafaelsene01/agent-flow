@@ -11,7 +11,7 @@ function normalizeColumns(raw) {
   );
 }
 
-export default function Board({ board, refreshSignal = 0 }) {
+export default function Board({ board, refreshSignal = 0, assigneeFilter = null, onColumnAssignees }) {
   const { t } = useI18n();
   const columns = normalizeColumns(board?.columns);
   const [activeCard, setActiveCard] = useState(null);
@@ -88,6 +88,8 @@ export default function Board({ board, refreshSignal = 0 }) {
             columnName={col.name}
             columnColor={col.color ?? null}
             viewFilter={board.viewFilter ?? null}
+            assigneeFilter={assigneeFilter}
+            onColumnAssignees={onColumnAssignees}
             onCardOpen={setActiveCard}
             worktrees={worktrees}
             runsAttention={runsAttention}

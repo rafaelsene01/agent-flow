@@ -12,7 +12,8 @@ import { useI18n } from "@/lib/i18nContext";
 
 // Intervalo do auto-refresh silencioso. Com o stale-while-revalidate do backend,
 // rebuscar periodicamente faz mudanças feitas no GitHub aparecerem sozinhas.
-const AUTO_REFRESH_MS = 60_000;
+// O refresh manual por coluna cobre atualizações imediatas, então 5min basta.
+const AUTO_REFRESH_MS = 300_000;
 
 function ColumnLoader() {
   return (
@@ -30,6 +31,8 @@ export default function Column({
   columnName,
   columnColor,
   viewFilter,
+  assigneeFilter,
+  onColumnAssignees,
   onCardOpen,
   worktrees,
   runsAttention,
@@ -40,6 +43,33 @@ export default function Column({
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+
+  // Reporta ao BoardView os assignees presentes nos cards carregados, para a
+  // fileira de avatares ao lado do filtro. Aceita string ou {login, avatarUrl}
+  // (mesma tolerância do Card.jsx).
+  useEffect(() => {
+    if (!onColumnAssignees) return;
+    const map = new Map();
+    for (const item of items) {
+      for (const a of item.assignees ?? []) {
+        const login = typeof a === "string" ? a : a?.login;
+        if (login && !map.has(login)) {
+          map.set(login, { login, avatarUrl: typeof a === "string" ? null : (a?.avatarUrl ?? null) });
+        }
+      }
+    }
+    onColumnAssignees(String(columnId ?? columnName), [...map.values()]);
+  }, [items, onColumnAssignees, columnId, columnName]);
+
+  // Filtro por assignee é só visual: os itens continuam carregados (e contando
+  // para o auto-refresh), de modo que os avatares dos demais não somem.
+  const visibleItems = assigneeFilter
+    ? items.filter((item) =>
+        (item.assignees ?? []).some(
+          (a) => (typeof a === "string" ? a : a?.login) === assigneeFilter,
+        ),
+      )
+    : items;
 
   const fetchingRef = useRef(false);
   const pageRef = useRef({ hasNextPage: false, cursor: null });
@@ -155,7 +185,7 @@ export default function Column({
               borderColor: `${accentColor}40`,
             }}
           >
-            {items.length}{hasNextPage ? "+" : ""}
+            {visibleItems.length}{hasNextPage ? "+" : ""}
           </Badge>
         )}
         <Button
@@ -192,14 +222,14 @@ export default function Column({
             </Button>
           </div>
         )}
-        {!loading && !error && items.length === 0 && (
+        {!loading && !error && visibleItems.length === 0 && (
           <div className="flex flex-col items-center gap-1.5 py-6 text-center text-muted-foreground">
             <Inbox className="size-5 opacity-60" />
             <p className="text-xs">{t("column.empty")}</p>
           </div>
         )}
         {!loading &&
-          items.map((item) => (
+          visibleItems.map((item) => (
             <Card
               key={item.id}
               item={item}

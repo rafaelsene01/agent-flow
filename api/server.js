@@ -5,6 +5,7 @@ import statusRoutes from "./routes/status.js";
 import configRoutes from "./routes/config.js";
 import githubRoutes from "./routes/github.js";
 import usageRoutes from "./routes/usage.js";
+import usageStatsRoutes from "./routes/usage-stats.js";
 import skillsRoutes from "./routes/skills.js";
 import agentsRoutes from "./routes/agents.js";
 import agentRunsRoutes from "./routes/agent-runs.js";
@@ -56,6 +57,7 @@ export async function startServer({ port, apiOnly = false }) {
   configRoutes(app);
   githubRoutes(app);
   usageRoutes(app);
+  usageStatsRoutes(app);
   skillsRoutes(app);
   agentsRoutes(app);
   agentRunsRoutes(app);
