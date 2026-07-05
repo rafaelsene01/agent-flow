@@ -1,89 +1,73 @@
 # Rotas — /api/github
 
-Fonte: `api/routes/github.js`
+Fonte: `api/routes/github.js` — lógica em [modules/github.md](../modules/github.md); worktree em [modules/git.md](../modules/git.md).
+
+`viewFilter` (items e column-counts): texto no formato da view do GitHub — `repo:owner/repo label:nome texto-livre` — decomposto server-side em `{ repoName, labels, text }`.
 
 ---
 
 ## GET /api/github/repos
 
-Lista repositórios do usuário autenticado.
+Repositórios do usuário autenticado.
 
-**Resposta:**
 ```json
 [{ "name": "repo", "fullName": "user/repo", "private": false, "description": "...", "updatedAt": "...", "sshUrl": "...", "cloneUrl": "..." }]
 ```
 
-Retorna `[]` se sem auth. Erro: `500 { "error": "mensagem" }`
-
----
+Retorna `[]` se sem auth.
 
 ## GET /api/github/boards
 
-Lista GitHub Projects V2 (pessoais + organizações).
+GitHub Projects V2 (pessoais + organizações).
 
-**Resposta:**
 ```json
 [{ "id": "PVT_xxx", "title": "Nome", "number": 1, "url": "...", "org": null, "repos": [{ "name": "repo", "fullName": "user/repo", "cloneUrl": "..." }] }]
 ```
 
-`org` é `null` para projetos pessoais.
-
-Erro de escopo: `500 { "error": "MISSING_SCOPE:read:project" }` — gh CLI sem permissão `read:project`.
-
----
+Erro de escopo: `500 { "error": "MISSING_SCOPE:read:project" }` — gh CLI sem `read:project`.
 
 ## GET /api/github/boards/:id/items
 
-Busca itens do projeto. Sem `columnId`/`columnName` → retorna todos. Com coluna → filtra por status.
-
-**Query params:**
+Itens do board (cache em memória). Sem `columnId`/`columnName` → todos; com coluna → filtra por status.
 
 | Param | Descrição |
 |-------|-----------|
-| `first` | Itens por página (max 100, padrão 20) |
+| `first` | Itens por página (máx 500 — cache local, fatia barata; padrão 20) |
 | `after` | Cursor de paginação |
 | `columnId` | ID da opção de single-select (preferido) |
-| `columnName` | Nome da coluna (fallback) |
-| `viewFilter` | Texto com filtros: `repo:owner/repo label:nome` |
+| `columnName` / `column` | Nome da coluna (fallback) |
+| `viewFilter` | Ver acima |
 
-**Resposta:**
 ```json
 {
-  "items": [{
-    "id": "PVTI_xxx",
-    "type": "Issue",
-    "itemType": null,
-    "title": "Título",
-    "number": 42,
-    "body": "# Markdown\nDescrição...",
-    "assignees": ["login"],
-    "labels": [{ "name": "bug", "color": "d73a4a" }]
-  }],
+  "items": [{ "id": "PVTI_xxx", "type": "Issue", "itemType": null, "title": "...", "number": 42, "body": "markdown", "assignees": ["login"], "labels": [{ "name": "bug", "color": "d73a4a" }] }],
   "hasNextPage": true,
   "endCursor": "cursor"
 }
 ```
 
-`itemType` — valor do campo "Type"/"Issue Type" do projeto (single-select). `null` se não existir.
+## GET /api/github/boards/:id/column-counts
 
----
+Contagem de itens por coluna (respeita `viewFilter`).
 
 ## GET /api/github/boards/:id/views
 
-Lista views do projeto.
-
-**Resposta:**
-```json
-[{ "id": "...", "name": "Board view", "number": 1 }]
-```
-
----
+`[{ id, name, number }]`
 
 ## GET /api/github/boards/:id/columns
 
-Lista colunas (opções do campo Status) do projeto.
+Opções do campo Status: `[{ id, name, color }]`
 
-**Resposta:**
-```json
-[{ "id": "...", "name": "In Progress", "color": "BLUE" }]
-```
+## GET /api/github/boards/:id/repos
+
+Repos vinculados ao board.
+
+## GET /api/github/repos/:owner/:repo/branches
+
+Branches do repo; `?q=` filtra por texto.
+
+## POST /api/github/repos/:owner/:repo/branches
+
+**Body:** `{ newBranch, originBranch, cardNumber? }` (os dois primeiros obrigatórios — `400`).
+
+Com `cardNumber` → `setupWorktree()` ([modules/git.md](../modules/git.md)): clona/reusa o repo, cria a branch e a worktree do card → `{ ok, worktreeDir, helpersDir, cloned }`. Sem `cardNumber` → só `{ ok: true }`.

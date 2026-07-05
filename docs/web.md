@@ -2,6 +2,8 @@
 
 Stack: **Next.js 15 (App Router) · React 19 · JSX · CSS global**
 
+Build estático (`next export` → `web/out/`), servido pelo Express em produção.
+
 ---
 
 ## Estrutura
@@ -11,8 +13,14 @@ web/
 ├── app/
 │   ├── layout.jsx        ← root layout (server component)
 │   ├── page.jsx          ← home (client component)
+│   ├── board/[slug]/     ← board (slug resolvido no cliente; servidor serve board/_.html)
+│   ├── agent/            ← gestão de agents
+│   ├── running/          ← runs em andamento
+│   ├── skill/            ← gestão de skills
+│   ├── usage/            ← estatísticas de execução
+│   ├── integrations/     ← integrações (Telegram)
 │   └── globals.css       ← único CSS global
-├── components/           ← componentes reutilizáveis (PascalCase.jsx)
+├── components/           ← componentes reutilizáveis (PascalCase.jsx; subpastas por área: board/, running/, sidebar/, skill/, views/, ui/)
 ├── hooks/                ← custom hooks (useNome.js)
 ├── lib/                  ← utilitários, fetch wrappers
 ├── jsconfig.json         ← path alias @/
@@ -43,3 +51,5 @@ import Header from "@/components/Header.jsx";
 npm run dev     # API (5522) + Next.js (3001), hot reload, proxy /api/* → 5522
 npm start       # build + serve via Express (produção)
 ```
+
+SSE em dev conecta direto na 5522 (evita buffering do proxy do next dev).

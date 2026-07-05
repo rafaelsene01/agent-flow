@@ -8,93 +8,57 @@ Fonte: `api/modules/github/`
 
 | Arquivo | Exporta |
 |---------|---------|
-| `github.client.js` | `validateToken`, `getRepositories`, `graphQL`, `getToken` |
+| `github.client.js` | `getToken`, `clearTokenCache`, `validateToken`, `getRepositories`, `graphQL` |
 | `github.service.js` | `getStatus()` |
 | `github.repos.js` | `listRepos()` |
-| `github.boards.js` | `listBoards()`, `listViews()`, `listColumns()` |
-| `github.items.js` | `listItems()`, `listAllItems()`, `listItemsByColumn()` |
+| `github.boards.js` | `listBoards()`, `listViews()`, `listColumns()`, `listBoardRepos()` |
+| `github.branches.js` | `listBranches()`, `createBranch()` |
+| `github.items.js` | `listItems()`, `listAllItems()`, `listItemsByColumn()`, `listColumnCounts()`, cache: `warmItemsCache()`, `startItemsPolling()`, `stopItemsPolling()`, `clearItemsCache()` |
 
 ---
 
 ## github.client.js
 
-Todas as requisições usam `Bearer` token e `X-GitHub-Api-Version: 2022-11-28`.
+Requisições com `Bearer` token e `X-GitHub-Api-Version: 2022-11-28`.
 
-- `validateToken(token)` — `GET /user`, valida token
-- `getRepositories(token)` — `GET /user/repos?per_page=100&sort=updated`
-- `graphQL(query, token, variables)` — `POST /graphql`, retorna resposta bruta
 - `getToken()` — lê `GH_TOKEN` | `GITHUB_TOKEN` | `GITHUB_KEY` do env
+- `validateToken(token)` — `GET /user`
+- `getRepositories(token)` — `GET /user/repos?per_page=100&sort=updated`
+- `graphQL(query, token, variables)` — `POST /graphql`, resposta bruta
 
----
+## github.service.js — `getStatus()`
 
-## github.service.js
-
-### `getStatus()`
-
-Detecta auth em ordem:
-1. Token de ambiente → `validateToken()`
-2. `gh api user` via CLI (tokens removidos do env antes de chamar)
-
-Salva `githubMethod` (`"env"` | `"gh-cli"`) em config.
+Detecta auth em ordem: token de ambiente → `gh api user` via CLI (tokens removidos do env antes). Salva `githubMethod` (`"env"` | `"gh-cli"`) na config.
 
 ```js
 { connected: true,  method: "env"|"gh-cli", user: "login", name: "Nome" }
 { connected: false, error: "mensagem" }
 ```
 
----
+## github.repos.js — `listRepos()`
 
-## github.repos.js
-
-### `listRepos()`
-
-Tenta em ordem: token de ambiente → `getRepositories()`, depois `gh repo list`. Retorna `[]` se ambos falharem.
-
-```js
-[{ name, fullName, private, description, updatedAt, sshUrl, cloneUrl }]
-```
-
----
+Token de ambiente → `getRepositories()`, senão `gh repo list`. `[]` se ambos falharem.
 
 ## github.boards.js
 
-### `listBoards()`
+- `listBoards()` — Projects V2 (pessoais + orgs, até 50 por dono, máx 30 orgs). Método via `config.githubMethod`. Lança `"MISSING_SCOPE:read:project"` se o gh CLI não tiver a permissão.
+- `listViews(projectId)` → `[{ id, name, number }]`
+- `listColumns(projectId)` → opções do campo Status `[{ id, name, color }]`
+- `listBoardRepos(projectId)` → repos vinculados ao board
 
-Lista Projects V2 (pessoais + orgs). Método via `config.githubMethod` — `"env"` usa token, `"gh-cli"` usa CLI. Busca até 50 por pessoa/org (máx 30 orgs).
+## github.branches.js
 
-Lança `"MISSING_SCOPE:read:project"` se gh CLI não tiver permissão `read:project`.
-
-```js
-[{ id, title, number, url, org, repos: [{ name, fullName, cloneUrl }] }]
-```
-
-### `listViews(projectId)` / `listColumns(projectId)`
-
-```js
-// views
-[{ id, name, number }]
-
-// columns — opções do campo Status
-[{ id, name, color }]
-```
-
----
+- `listBranches(owner, repo, query)` — branches, filtro por texto
+- `createBranch(owner, repo, newBranch, originBranch)`
 
 ## github.items.js
 
-### `listAllItems(projectId, opts)`
+Cache de itens em memória por board:
 
-Busca todas as páginas (até 10 / 1000 itens), filtra por `repoName` e `labels`. Retorna itens com coluna (`columnName`, `columnId`).
+- `warmItemsCache(projectId)` — pré-aquece no boot
+- `startItemsPolling(getBoardIds)` — revalida todos os boards a cada 60s em background (lê a lista a cada tick para pegar boards novos)
+- `listAllItems(projectId, opts)` — todas as páginas, filtra `repoName`/`labels`/`text`; itens com `columnName`/`columnId`
+- `listItemsByColumn(projectId, { columnId, columnName }, opts)` — paginação por coluna; cursor composto `"<githubCursor>|<skip>"` evita re-buscar do início
+- `listColumnCounts(projectId, opts)` — contagem por coluna com os mesmos filtros
 
-### `listItemsByColumn(projectId, { columnId, columnName }, opts)`
-
-Paginação eficiente por coluna. Cursor composto `"<githubCursor>|<skip>"` evita re-buscar do início ao paginar.
-
-**Item retornado:**
-```js
-{ id, type, itemType, title, number, body, assignees, labels }
-```
-
-- `type` — `"Issue"` | `"PullRequest"` | `"DraftIssue"`
-- `itemType` — valor do campo "Type"/"Issue Type" (single-select). `null` se não existir.
-- `body` — markdown da descrição. `null` se vazio.
+**Item:** `{ id, type, itemType, title, number, body, assignees, labels }` — `type`: `"Issue"` | `"PullRequest"` | `"DraftIssue"`; `itemType`: valor do campo "Type"/"Issue Type" (`null` se não existir); `body`: markdown (`null` se vazio).

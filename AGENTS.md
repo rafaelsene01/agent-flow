@@ -1,42 +1,31 @@
-# Agent Flow — Referência da API
+# Agent Flow — Índice para agentes
 
-Ponto de entrada: `bin/agent-flow.js` → inicia o Express via `api/server.js`.
+Orquestrador de agentes Claude sobre boards do GitHub Projects. API Express (`api/`) + frontend Next.js (`web/`). Ponto de entrada: `bin/agent-flow.js` → `api/server.js`.
 
-> Leia [docs/architecture.md](docs/architecture.md) antes de adicionar módulos.
+> Este arquivo é só um índice — não descreve nada em detalhe. Abra a doc do domínio que a tarefa tocar; cada uma tem endpoints, params, respostas e comportamentos. Antes de criar/alterar módulos, leia [docs/architecture.md](docs/architecture.md).
 
----
+## Domínios
 
-## Rotas
+| Domínio | Prefixo | Rotas | Módulos |
+|---------|---------|-------|---------|
+| Status/instalação | `/api/status*` | [routes/status.md](docs/routes/status.md) | [status](docs/modules/status.md) |
+| Config, worktrees, overlay | `/api/config*` | [routes/config.md](docs/routes/config.md) | [config](docs/modules/config.md) |
+| GitHub (repos, boards, branches) | `/api/github/*` | [routes/github.md](docs/routes/github.md) | [github](docs/modules/github.md), [git](docs/modules/git.md) |
+| Agents (CRUD, criador de prompt) | `/api/agents*` | [routes/agents.md](docs/routes/agents.md) | [agents](docs/modules/agents.md) |
+| Runs de agentes (fila, pipeline) | `/api/agent-runs*` | [routes/agent-runs.md](docs/routes/agent-runs.md) | [agent-runs](docs/modules/agent-runs.md) |
+| Chat do board | `/api/board-chat/*` | [routes/board-chat.md](docs/routes/board-chat.md) | [board-chat](docs/modules/board-chat.md) |
+| Skills | `/api/skills*` | [routes/skills.md](docs/routes/skills.md) | [skills](docs/modules/skills.md) |
+| Uso (limites do plano + estatísticas) | `/api/usage`, `/api/usage-stats` | [routes/usage.md](docs/routes/usage.md) | [usage](docs/modules/usage.md) |
+| Integrações (Telegram) | `/api/integrations/*` | [routes/integrations.md](docs/routes/integrations.md) | [integrations](docs/modules/integrations.md) |
 
-| Método | Caminho | Documentação |
-|--------|---------|--------------|
-| `GET` | `/api/status` | [docs/routes/status.md](docs/routes/status.md) |
-| `GET` | `/api/config` | [docs/routes/config.md](docs/routes/config.md) |
-| `POST` | `/api/config` | [docs/routes/config.md](docs/routes/config.md) |
-| `POST` | `/api/config/browse` | [docs/routes/config.md](docs/routes/config.md) |
-| `GET` | `/api/github/repos` | [docs/routes/github.md](docs/routes/github.md) |
-| `GET` | `/api/github/boards` | [docs/routes/github.md](docs/routes/github.md) |
-| `GET` | `/api/github/boards/:id/items` | [docs/routes/github.md](docs/routes/github.md) |
-| `GET` | `/api/github/boards/:id/views` | [docs/routes/github.md](docs/routes/github.md) |
-| `GET` | `/api/github/boards/:id/columns` | [docs/routes/github.md](docs/routes/github.md) |
+## Infra compartilhada
 
-## Módulos
-
-| Módulo | Caminho | Documentação |
-|--------|---------|--------------|
-| GitHub | `api/modules/github/` | [docs/modules/github.md](docs/modules/github.md) |
-| Claude | `api/modules/claude/` | [docs/modules/claude.md](docs/modules/claude.md) |
-| Config | `api/modules/config/` | [docs/modules/config.md](docs/modules/config.md) |
-
-## Core
-
-| Arquivo | Documentação |
-|---------|--------------|
-| `api/server.js` | [docs/server.md](docs/server.md) |
-| `web/` | [docs/web.md](docs/web.md) |
-| Arquitetura | [docs/architecture.md](docs/architecture.md) |
-
----
+| O quê | Onde | Doc |
+|-------|------|-----|
+| Servidor Express (boot, static, timeouts) | `api/server.js` | [docs/server.md](docs/server.md) |
+| Runner do Claude CLI (spawn, SSE, concorrência) | `api/modules/claude/` | [docs/modules/claude.md](docs/modules/claude.md) |
+| Frontend Next.js | `web/` | [docs/web.md](docs/web.md) |
+| Arquitetura e regras de módulos | — | [docs/architecture.md](docs/architecture.md) |
 
 ## Comportamentos intencionais (não tratar como bug)
 
@@ -47,10 +36,9 @@ Ponto de entrada: `bin/agent-flow.js` → inicia o Express via `api/server.js`.
   É uma escolha deliberada do usuário na tela de configuração do passo — não
   "corrigir" a precedência nem apontar como erro em reviews.
 
----
-
 ## Manutenção da doc
 
-- Nova rota → linha na tabela + `docs/routes/<arquivo>.md`
-- Novo módulo → linha na tabela + `docs/modules/<modulo>.md`
-- Mudança em módulo/rota → atualizar o `.md` correspondente
+- Novo endpoint → seção no `docs/routes/<domínio>.md` existente.
+- Novo domínio → linha na tabela acima + `docs/routes/<domínio>.md` + `docs/modules/<modulo>.md`.
+- Mudança em módulo/rota → atualizar o `.md` correspondente.
+- Este índice fica enxuto: só tabelas e links, sem detalhe de endpoint.
