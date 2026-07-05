@@ -129,7 +129,7 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
-        className="max-w-[560px] p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden"
+        className="sm:max-w-[1400px] p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden"
         showCloseButton={false}
         onInteractOutside={(e) => e.preventDefault()}
       >

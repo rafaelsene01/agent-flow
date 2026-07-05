@@ -263,7 +263,7 @@ export default function AgentsView() {
       />
 
       <Dialog open={!!promptView} onOpenChange={(o) => { if (!o) setPromptView(null); }}>
-        <DialogContent className="max-w-[640px] max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogContent className="sm:max-w-[1400px] max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <FileText className="size-4 shrink-0" />
@@ -410,7 +410,7 @@ function AgentDialog({ agent, onClose, onSaved }) {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-[560px] max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="sm:max-w-[1400px] max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader className={mode === "ai" ? "flex-row items-center gap-2 space-y-0" : undefined}>
           {mode === "ai" ? (
             <Button
