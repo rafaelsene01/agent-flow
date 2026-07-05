@@ -13,6 +13,7 @@ import {
   Send,
   User,
   ArrowLeft,
+  Eye,
 } from "lucide-react";
 import {
   Dialog,
@@ -184,42 +185,56 @@ export default function AgentsView() {
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                    {!a.isDefault && (
+                    {a.isDefault ? (
+                      // Default: abre o mesmo dialog dos agents criados, em modo
+                      // somente-leitura (campos desabilitados), em vez do prompt cru.
                       <Button
                         type="button"
                         size="icon-xs"
                         variant="ghost"
                         onClick={() => setEditing(a)}
-                        title={t("agents.edit")}
-                        aria-label={t("agents.edit")}
+                        title={t("agents.view")}
+                        aria-label={t("agents.view")}
                         className="text-muted-foreground"
                       >
-                        <Pencil className="size-3.5" />
+                        <Eye className="size-3.5" />
                       </Button>
-                    )}
-                    <Button
-                      type="button"
-                      size="icon-xs"
-                      variant="ghost"
-                      onClick={() => viewPrompt(a)}
-                      title={t("agents.viewPrompt")}
-                      aria-label={t("agents.viewPrompt")}
-                      className="text-muted-foreground"
-                    >
-                      <FileText className="size-3.5" />
-                    </Button>
-                    {!a.isDefault && (
-                      <Button
-                        type="button"
-                        size="icon-xs"
-                        variant="ghost"
-                        onClick={() => setConfirmDelete(a)}
-                        title={t("agents.delete")}
-                        aria-label={t("agents.delete")}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          size="icon-xs"
+                          variant="ghost"
+                          onClick={() => setEditing(a)}
+                          title={t("agents.edit")}
+                          aria-label={t("agents.edit")}
+                          className="text-muted-foreground"
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon-xs"
+                          variant="ghost"
+                          onClick={() => viewPrompt(a)}
+                          title={t("agents.viewPrompt")}
+                          aria-label={t("agents.viewPrompt")}
+                          className="text-muted-foreground"
+                        >
+                          <FileText className="size-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon-xs"
+                          variant="ghost"
+                          onClick={() => setConfirmDelete(a)}
+                          title={t("agents.delete")}
+                          aria-label={t("agents.delete")}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -298,6 +313,9 @@ function AgentDialog({ agent, onClose, onSaved }) {
   const { t } = useI18n();
   const { toast } = useToast();
   const isEdit = !!agent;
+  // Agents default não podem ser modificados: o dialog vira visualização, com
+  // todos os campos (nome, prompt, modelo, esforço, skills) desabilitados e sem salvar.
+  const readOnly = !!agent?.isDefault;
   const [name, setName] = useState(agent?.name ?? "");
   const [prompt, setPrompt] = useState(agent?.prompt ?? "");
   const [model, setModel] = useState(agent?.model ?? "sonnet");
@@ -430,7 +448,9 @@ function AgentDialog({ agent, onClose, onSaved }) {
             ) : (
               <Bot className="size-4 shrink-0" />
             )}
-            {mode === "ai" ? "Gerar prompt com IA" : t(isEdit ? "agents.editTitle" : "agents.new")}
+            {mode === "ai"
+              ? "Gerar prompt com IA"
+              : t(readOnly ? "agents.viewTitle" : isEdit ? "agents.editTitle" : "agents.new")}
           </DialogTitle>
         </DialogHeader>
 
@@ -444,22 +464,25 @@ function AgentDialog({ agent, onClose, onSaved }) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={t("agents.namePlaceholder")}
+                  disabled={readOnly}
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor="agent-prompt">{t("agents.prompt")}</Label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    type="button"
-                    onClick={() => { setMode("ai"); setAiError(null); }}
-                    className="h-6 gap-1 px-2 text-xs"
-                  >
-                    <Sparkles className="size-3" />
-                    Gerar com IA
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      onClick={() => { setMode("ai"); setAiError(null); }}
+                      className="h-6 gap-1 px-2 text-xs"
+                    >
+                      <Sparkles className="size-3" />
+                      Gerar com IA
+                    </Button>
+                  )}
                 </div>
                 <Textarea
                   id="agent-prompt"
@@ -467,13 +490,14 @@ function AgentDialog({ agent, onClose, onSaved }) {
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder={t("agents.promptPlaceholder")}
                   className="min-h-32"
+                  disabled={readOnly}
                 />
               </div>
 
               <div className="flex gap-3">
                 <div className="flex flex-1 flex-col gap-1.5">
                   <Label>{t("card.model")}</Label>
-                  <Select value={model} onValueChange={setModel}>
+                  <Select value={model} onValueChange={setModel} disabled={readOnly}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -486,7 +510,7 @@ function AgentDialog({ agent, onClose, onSaved }) {
                 </div>
                 <div className="flex flex-1 flex-col gap-1.5">
                   <Label>{t("card.effort")}</Label>
-                  <Select value={effort} onValueChange={setEffort}>
+                  <Select value={effort} onValueChange={setEffort} disabled={readOnly}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -516,6 +540,7 @@ function AgentDialog({ agent, onClose, onSaved }) {
                           checked={selected.has(s.name)}
                           onCheckedChange={(v) => toggle(s.name, v === true)}
                           className="mt-0.5"
+                          disabled={readOnly}
                         />
                         <label htmlFor={`agent-skill-${s.name}`} className="min-w-0 flex-1 cursor-pointer">
                           <span className="block text-sm font-medium">{s.name}</span>
@@ -534,17 +559,19 @@ function AgentDialog({ agent, onClose, onSaved }) {
 
             <DialogFooter className="gap-2 sm:justify-end">
               <Button variant="secondary" type="button" onClick={onClose}>
-                {t("action.cancel")}
+                {t(readOnly ? "action.close" : "action.cancel")}
               </Button>
-              <Button
-                type="button"
-                disabled={!name.trim() || !prompt.trim() || saving}
-                onClick={save}
-              >
-                {saving
-                  ? t(isEdit ? "agents.saving" : "agents.creating")
-                  : t(isEdit ? "agents.save" : "agents.create")}
-              </Button>
+              {!readOnly && (
+                <Button
+                  type="button"
+                  disabled={!name.trim() || !prompt.trim() || saving}
+                  onClick={save}
+                >
+                  {saving
+                    ? t(isEdit ? "agents.saving" : "agents.creating")
+                    : t(isEdit ? "agents.save" : "agents.create")}
+                </Button>
+              )}
             </DialogFooter>
           </>
         ) : (

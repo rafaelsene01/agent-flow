@@ -118,7 +118,6 @@ export function buildAgentPrompt(id) {
     const dir = path.dirname(skill.path);
     sections.push(
       `# Skill: ${skill.name}\n\n` +
-        (skill.description ? `${skill.description}\n\n` : "") +
         "Esta skill faz parte do seu papel. ANTES de começar a tarefa, leia o " +
         `arquivo \`${skill.path}\` e siga as instruções dele. Se existir a pasta ` +
         `\`${path.join(dir, "references")}\` ou outros arquivos que a skill ` +
