@@ -1,3 +1,10 @@
+# [1.40.0](https://github.com/rafaelsene01/agent-flow/compare/v1.39.0...v1.40.0) (2026-07-05)
+
+
+### Features
+
+* enhance agent view and dialog functionality ([bf6ed14](https://github.com/rafaelsene01/agent-flow/commit/bf6ed14abb755fb4522e89049b8963cf56d62fe9))
+
 # [1.39.0](https://github.com/rafaelsene01/agent-flow/compare/v1.38.0...v1.39.0) (2026-07-05)
 
 
