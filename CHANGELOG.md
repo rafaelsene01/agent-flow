@@ -1,3 +1,10 @@
+# [1.41.0](https://github.com/rafaelsene01/agent-flow/compare/v1.40.0...v1.41.0) (2026-07-06)
+
+
+### Features
+
+* implement orphan dependency handling in agent runs ([26a0fd0](https://github.com/rafaelsene01/agent-flow/commit/26a0fd0d9a1f403a0c62628ad45e18d7dba05c68))
+
 # [1.40.0](https://github.com/rafaelsene01/agent-flow/compare/v1.39.0...v1.40.0) (2026-07-05)
 
 
