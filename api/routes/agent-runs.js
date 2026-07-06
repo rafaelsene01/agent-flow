@@ -218,6 +218,9 @@ export default function agentRunsRoutes(app) {
     if (!run) return sendError(res, 404, "Run não encontrado.");
     if (run.status === "processing") cancelProcess(run.id);
     deleteRun(run.id);
+    // O re-vínculo em deleteRun pode ter destravado o próximo passo da pipeline
+    // (dependia do run removido) — re-despacha na hora.
+    tick();
     res.json({ ok: true });
   });
 

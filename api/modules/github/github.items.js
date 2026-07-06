@@ -165,7 +165,10 @@ function refreshInBackground(projectId) {
 // Retorna todos os itens do projeto. Serve cache fresco direto; cache vencido
 // (memória ou disco) é servido na hora com revalidação em background; só bloqueia
 // quando não há cache algum.
-async function getAllProjectItems(projectId) {
+// Com `force`, ignora o cache e bloqueia aguardando uma varredura fresca no
+// GitHub (usado pelo refresh manual da coluna, que quer revalidar na API).
+async function getAllProjectItems(projectId, { force = false } = {}) {
+  if (force) return refreshInBackground(projectId);
   let entry = _cache.get(projectId);
   if (!entry) {
     const disk = await loadDisk(projectId);
@@ -279,8 +282,8 @@ export async function listItems(projectId, { first = 30, after = null, repoName 
   return { items: slice.map(toClientItem), hasNextPage, endCursor };
 }
 
-export async function listAllItems(projectId, { first = 50, after = null, repoName = null, labels = null, text = null } = {}) {
-  const all     = await getAllProjectItems(projectId);
+export async function listAllItems(projectId, { first = 50, after = null, repoName = null, labels = null, text = null, force = false } = {}) {
+  const all     = await getAllProjectItems(projectId, { force });
   const matched = all.filter((i) => matchesFilters(i, { repoName, labels, text }));
   const { slice, hasNextPage, endCursor } = paginate(matched, after, first);
   return { items: slice.map(toClientItemWithColumn), hasNextPage, endCursor };
@@ -309,8 +312,8 @@ export async function listColumnCounts(projectId, { repoName = null, labels = nu
   return { byId, byName };
 }
 
-export async function listItemsByColumn(projectId, { columnId, columnName }, { first = 20, after = null, repoName = null, labels = null, text = null } = {}) {
-  const all = await getAllProjectItems(projectId);
+export async function listItemsByColumn(projectId, { columnId, columnName }, { first = 20, after = null, repoName = null, labels = null, text = null, force = false } = {}) {
+  const all = await getAllProjectItems(projectId, { force });
   const matched = all.filter((item) => {
     if (!matchesFilters(item, { repoName, labels, text })) return false;
     const matchById   = columnId   && item._statusOptionId === columnId;

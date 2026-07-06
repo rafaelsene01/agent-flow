@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { getConfig } from "../config/config.service.js";
-import { createRun, getRun, patchRun, runsProcessingByAgent, worktreeKey, worktreesOccupied, nextQueuedForFreeAgents, failDependents, resetProcessingToQueued, promoteReadyBreakpoints, approveBreakpoint as approveBreakpointStore } from "./agent-runs.store.js";
+import { createRun, getRun, patchRun, runsProcessingByAgent, worktreeKey, worktreesOccupied, nextQueuedForFreeAgents, failDependents, resetProcessingToQueued, healOrphanDependencies, promoteReadyBreakpoints, approveBreakpoint as approveBreakpointStore } from "./agent-runs.store.js";
 import { startRun } from "./agent-runs.runner.js";
 
 // Lock em memória por agent_id, além do estado no DB — evita corrida entre
@@ -90,6 +90,9 @@ export function approveBreakpoint(id) {
 }
 
 export function recoverAndDispatch() {
+  // Conserta chains que ficaram com dependência órfã (passo intermediário removido
+  // sem re-vínculo) antes de re-despachar — senão os passos seguintes ficam presos.
+  healOrphanDependencies();
   resetProcessingToQueued();
   tick();
 }

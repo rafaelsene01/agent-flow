@@ -77,7 +77,7 @@ export default function Column({
   useEffect(() => { countRef.current = items.length; }, [items.length]);
 
   const fetchItems = useCallback(
-    async (cursor = null) => {
+    async (cursor = null, { force = false } = {}) => {
       if (fetchingRef.current) return;
       fetchingRef.current = true;
       const isFirst = cursor === null;
@@ -91,6 +91,8 @@ export default function Column({
         else qs.set("columnName", columnName);
         if (viewFilter) qs.set("viewFilter", viewFilter);
         if (cursor) qs.set("after", cursor);
+        // Refresh manual: força o backend a revalidar na API do GitHub (ignora cache).
+        if (force) qs.set("refresh", "1");
 
         const res = await fetch(
           `/api/github/boards/${encodeURIComponent(boardId)}/items?${qs}`,
@@ -196,7 +198,7 @@ export default function Column({
           onClick={() => {
             setItems([]);
             pageRef.current = { hasNextPage: false, cursor: null };
-            fetchItems(null);
+            fetchItems(null, { force: true });
           }}
         >
           <RefreshCw className={cn("size-3", loading && "animate-spin")} />
@@ -214,7 +216,7 @@ export default function Column({
               onClick={() => {
                 setItems([]);
                 pageRef.current = { hasNextPage: false, cursor: null };
-                fetchItems(null);
+                fetchItems(null, { force: true });
               }}
             >
               <RefreshCw className="size-3" />

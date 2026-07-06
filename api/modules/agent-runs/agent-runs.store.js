@@ -328,9 +328,49 @@ export function updateLastExecTurn(id, patch) {
 }
 
 // Remove um run do banco. Usado só pela tela "/running" (limpeza manual).
+// Antes de apagar, re-vincula os passos que dependiam deste ao ANTECESSOR dele
+// (o próprio `depends_on` do removido): remover o passo 3 de uma chain 1→2→3→4
+// faz o 4 passar a depender do 2. Sem isso, o 4 ficaria com `depends_on`
+// apontando para um run inexistente e nunca despacharia (o EXISTS de
+// nextQueuedForFreeAgents daria falso para sempre).
 export function deleteRun(id) {
-  const info = getDb().prepare(`DELETE FROM agent_runs WHERE id = ?`).run(id);
+  const db = getDb();
+  const run = getRun(id);
+  if (!run) return false;
+  const now = new Date().toISOString();
+  db.prepare(`UPDATE agent_runs SET depends_on = ?, updated_at = ? WHERE depends_on = ?`)
+    .run(run.depends_on ?? null, now, id);
+  const info = db.prepare(`DELETE FROM agent_runs WHERE id = ?`).run(id);
   return info.changes > 0;
+}
+
+// Rede de segurança: re-vincula runs cujo `depends_on` aponta para um run que não
+// existe mais (chains que ficaram órfãs antes do re-link em deleteRun). Reconstrói
+// o link pela ordem da chain — aponta o órfão para o passo existente imediatamente
+// anterior (mesma chain, criado antes); se não houver, vira primeiro passo (null).
+// Chamada no boot (recoverAndDispatch) para destravar pipelines já quebradas.
+export function healOrphanDependencies() {
+  const db = getDb();
+  const orphans = db
+    .prepare(
+      `SELECT * FROM agent_runs r
+       WHERE r.depends_on IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM agent_runs d WHERE d.id = r.depends_on)`,
+    )
+    .all();
+  if (!orphans.length) return false;
+  const now = new Date().toISOString();
+  const findPrev = db.prepare(
+    `SELECT id FROM agent_runs
+     WHERE chain_id = ? AND id != ? AND created_at < ?
+     ORDER BY created_at DESC LIMIT 1`,
+  );
+  const upd = db.prepare(`UPDATE agent_runs SET depends_on = ?, updated_at = ? WHERE id = ?`);
+  for (const o of orphans) {
+    const prev = o.chain_id ? findPrev.get(o.chain_id, o.id, o.created_at) : null;
+    upd.run(prev?.id ?? null, now, o.id);
+  }
+  return true;
 }
 
 // Apaga todos os runs do banco. Retorna a quantidade removida.

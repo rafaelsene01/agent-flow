@@ -37,6 +37,7 @@ Itens do board (cache em memória). Sem `columnId`/`columnName` → todos; com c
 | `columnId` | ID da opção de single-select (preferido) |
 | `columnName` / `column` | Nome da coluna (fallback) |
 | `viewFilter` | Ver acima |
+| `refresh` | `1`/`true` → ignora o cache e bloqueia aguardando varredura fresca no GitHub (refresh manual da coluna) |
 
 ```json
 {

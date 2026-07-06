@@ -47,10 +47,13 @@ export default function githubRoutes(app) {
       const after      = req.query.after      || null;
       const columnId   = req.query.columnId   || null;
       const columnName = req.query.columnName || req.query.column || null;
+      // `refresh=1` (refresh manual da coluna) ignora o cache e bloqueia
+      // aguardando uma varredura fresca no GitHub, revalidando os dados na API.
+      const force      = req.query.refresh === "1" || req.query.refresh === "true";
       const { repoName, labels, text } = parseViewFilter(req.query.viewFilter || null);
       const result = (columnId || columnName)
-        ? await listItemsByColumn(req.params.id, { columnId, columnName }, { first, after, repoName, labels, text })
-        : await listAllItems(req.params.id, { after, repoName, labels, text });
+        ? await listItemsByColumn(req.params.id, { columnId, columnName }, { first, after, repoName, labels, text, force })
+        : await listAllItems(req.params.id, { after, repoName, labels, text, force });
       res.json(result);
     } catch (err) {
       console.error("[items]", err);

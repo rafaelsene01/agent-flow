@@ -27,7 +27,7 @@ Run: `{ id, session_id, kind: 'agent'|'breakpoint', agent_id, status, turns, res
 - `tick()` — despacha respeitando: **um run por agente** e **um run por worktree** (`nextQueuedForFreeAgents(busyAgentIds, busyWorktreeKeys)`), além dos slots globais do módulo claude.
 - `approveBreakpoint(id)` — aprova ponto de parada e destrava o próximo passo.
 - `onRunSettled(...)` — callback de fim de run; re-tick.
-- `recoverAndDispatch()` — no boot: `resetProcessingToQueued()` (runs órfãos de restart) e re-despacha.
+- `recoverAndDispatch()` — no boot: `healOrphanDependencies()` (conserta chains com dependência órfã) + `resetProcessingToQueued()` (runs órfãos de restart) e re-despacha.
 
 ## agent-runs.store.js (principais)
 
@@ -35,6 +35,8 @@ Run: `{ id, session_id, kind: 'agent'|'breakpoint', agent_id, status, turns, res
 - `runsAttentionSummary()` — resumo waiting/active por card (badge no board)
 - `appendTurn(id, turn)` / `updateLastExecTurn(id, patch)`
 - `promoteReadyBreakpoints()` / `approveBreakpoint(id)` / `failDependents(runId, reason)` — passo falhou → dependentes da chain falham juntos
+- `deleteRun(id)` — antes de apagar, re-vincula os dependentes ao antecessor do removido (`depends_on` do próprio), preservando a cadeia (remover o passo 3 de 1→2→3→4 faz o 4 depender do 2). A rota `DELETE` chama `tick()` em seguida.
+- `healOrphanDependencies()` — rede de segurança no boot (`recoverAndDispatch`): re-vincula runs cujo `depends_on` aponta para um run inexistente (chains órfãs de deletes antigos), reconstruindo o link pela ordem da chain (`created_at`). Sem isso, os passos seguintes ficariam presos na fila para sempre.
 - `worktreeKey(repo, targetBranch)` / `worktreesOccupied()` / `runsProcessingByAgent()`
 
 ## agent-runs.runner.js
