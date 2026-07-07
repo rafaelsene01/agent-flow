@@ -1,3 +1,10 @@
+## [1.44.1](https://github.com/rafaelsene01/agent-flow/compare/v1.44.0...v1.44.1) (2026-07-07)
+
+
+### Bug Fixes
+
+* enhance dialog component to prevent overflow ([192feb3](https://github.com/rafaelsene01/agent-flow/commit/192feb35ea7b12d2051c18325a9482f6f6732e43))
+
 # [1.44.0](https://github.com/rafaelsene01/agent-flow/compare/v1.43.1...v1.44.0) (2026-07-07)
 
 
