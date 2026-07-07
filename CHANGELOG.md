@@ -1,3 +1,10 @@
+# [1.46.0](https://github.com/rafaelsene01/agent-flow/compare/v1.45.0...v1.46.0) (2026-07-07)
+
+
+### Features
+
+* enhance update process with automatic page reload ([4c23223](https://github.com/rafaelsene01/agent-flow/commit/4c232235a35b51b8dbe58c0d8fefcf548e979210))
+
 # [1.45.0](https://github.com/rafaelsene01/agent-flow/compare/v1.44.1...v1.45.0) (2026-07-07)
 
 
