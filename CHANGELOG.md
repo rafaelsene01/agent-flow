@@ -1,3 +1,10 @@
+# [1.45.0](https://github.com/rafaelsene01/agent-flow/compare/v1.44.1...v1.45.0) (2026-07-07)
+
+
+### Features
+
+* permitir bind configurável do servidor via --host / AGENT_FLOW_HOST ([ecab196](https://github.com/rafaelsene01/agent-flow/commit/ecab196c5f14d6525d8597b69165886412d7900b))
+
 ## [1.44.1](https://github.com/rafaelsene01/agent-flow/compare/v1.44.0...v1.44.1) (2026-07-07)
 
 
