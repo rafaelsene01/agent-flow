@@ -63,7 +63,17 @@ fi
 
 if [ -d "$APP_DIR/.git" ]; then
   echo "repo já existe em $APP_DIR — atualizando"
-  git -C "$APP_DIR" pull --ff-only || echo "aviso: git pull falhou, seguindo com a versão local"
+  if git -C "$APP_DIR" fetch origin; then
+    before="$(git -C "$APP_DIR" rev-parse HEAD)"
+    # Clone dedicado do daemon: descarta qualquer mudança local para o update nunca travar
+    git -C "$APP_DIR" reset --hard '@{u}' > /dev/null
+    if [ "$(git -C "$APP_DIR" rev-parse HEAD)" != "$before" ]; then
+      # dist é da versão antiga — remove para o supervisor rebuildar no boot
+      rm -rf "$APP_DIR/dist"
+    fi
+  else
+    echo "aviso: git fetch falhou, seguindo com a versão local"
+  fi
 else
   git clone --depth 1 "$REPO" "$APP_DIR"
 fi

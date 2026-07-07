@@ -29,7 +29,9 @@ RestartSec=10
 WantedBy=default.target
 EOF
     systemctl --user daemon-reload
-    systemctl --user enable --now "$SERVICE.service"
+    systemctl --user enable "$SERVICE.service"
+    # restart (e não start): reinstalação sobre daemon rodando recarrega tudo
+    systemctl --user restart "$SERVICE.service"
     # linger: serviços de usuário sobem no boot mesmo sem login
     loginctl enable-linger "$USER" 2>/dev/null || true
     echo "Daemon '$SERVICE' instalado e iniciado (porta $PORT)."

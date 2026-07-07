@@ -35,8 +35,18 @@ if (-not (Test-NodeOk)) {
 
 if (Test-Path (Join-Path $AppDir ".git")) {
   Write-Host "repo já existe em $AppDir - atualizando"
-  git -C $AppDir pull --ff-only
-  if ($LASTEXITCODE -ne 0) { Write-Host "aviso: git pull falhou, seguindo com a versão local" }
+  git -C $AppDir fetch origin
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "aviso: git fetch falhou, seguindo com a versão local"
+  } else {
+    $before = git -C $AppDir rev-parse HEAD
+    # Clone dedicado do daemon: descarta qualquer mudança local para o update nunca travar
+    git -C $AppDir reset --hard '@{u}' | Out-Null
+    if ((git -C $AppDir rev-parse HEAD) -ne $before) {
+      # dist é da versão antiga — remove para o supervisor rebuildar no boot
+      Remove-Item -Recurse -Force (Join-Path $AppDir "dist") -ErrorAction SilentlyContinue
+    }
+  }
 } else {
   git clone --depth 1 $Repo $AppDir
   if ($LASTEXITCODE -ne 0) { throw "git clone falhou" }

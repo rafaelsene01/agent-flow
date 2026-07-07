@@ -38,7 +38,9 @@ ensure_install() {
     npm install >> "$LOG" 2>&1 || { log "npm install falhou (exit $?)"; return 1; }
   fi
   if [ ! -f dist/agent-flow.js ]; then
-    log "dist ausente - rodando npm run build"
+    # dist ausente também acontece após update (get.sh remove) — garante deps novas
+    log "dist ausente - rodando npm install + build"
+    npm install >> "$LOG" 2>&1 || { log "npm install falhou (exit $?)"; return 1; }
     npm run build >> "$LOG" 2>&1 || { log "npm run build falhou (exit $?)"; return 1; }
   fi
 }

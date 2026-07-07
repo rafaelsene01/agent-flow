@@ -19,6 +19,10 @@ $settings = New-ScheduledTaskSettingsSet `
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
   -Settings $settings -Force | Out-Null
+# Reinstalação sobre daemon rodando: derruba o supervisor antigo e os processos
+# dele antes de subir o novo, senão o servidor velho segura a porta.
+Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "kill-all.ps1") | Out-Null
 Start-ScheduledTask -TaskName $TaskName
 
 Write-Host "Daemon '$TaskName' instalado e iniciado (porta $Port)."

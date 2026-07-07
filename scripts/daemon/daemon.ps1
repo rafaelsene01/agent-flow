@@ -40,7 +40,10 @@ function Ensure-Install {
       if ($LASTEXITCODE -ne 0) { throw "npm install falhou (exit $LASTEXITCODE)" }
     }
     if (-not (Test-Path "dist\agent-flow.js")) {
-      Log "dist ausente - rodando npm run build"
+      # dist ausente também acontece após update (get.ps1 remove) — garante deps novas
+      Log "dist ausente - rodando npm install + build"
+      cmd /c "npm install >> ""$LogFile"" 2>&1"
+      if ($LASTEXITCODE -ne 0) { throw "npm install falhou (exit $LASTEXITCODE)" }
       cmd /c "npm run build >> ""$LogFile"" 2>&1"
       if ($LASTEXITCODE -ne 0) { throw "npm run build falhou (exit $LASTEXITCODE)" }
     }
