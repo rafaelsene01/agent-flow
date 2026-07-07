@@ -1,3 +1,10 @@
+# [1.43.0](https://github.com/rafaelsene01/agent-flow/compare/v1.42.0...v1.43.0) (2026-07-07)
+
+
+### Features
+
+* implement user-authorized update mechanism for server ([aa3e99a](https://github.com/rafaelsene01/agent-flow/commit/aa3e99a9486d159926b96953974f699bcbe20e80))
+
 # [1.42.0](https://github.com/rafaelsene01/agent-flow/compare/v1.41.0...v1.42.0) (2026-07-07)
 
 
