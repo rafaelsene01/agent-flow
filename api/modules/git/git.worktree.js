@@ -89,6 +89,11 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
   // (covers the "missing but already registered" error).
   await execFileP("git", ["worktree", "prune"], { cwd: repoDir, timeout: 10_000 }).catch(() => {});
 
+  // newBranch === originBranch → modo checkout-only: nenhuma branch nova é
+  // criada; o worktree apenas faz checkout da branch de origem. Usa -f porque
+  // ela pode já estar em checkout no clone principal (ex: a branch default).
+  const checkoutOnly = newBranch === originBranch;
+
   // Checkout strategy:
   // 1. branch exists locally   → worktree add <path> <branch>
   // 2. branch exists on remote → worktree add --track -b <branch> <path> origin/<branch>
@@ -107,7 +112,7 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
   }
 
   if (await refExists(repoDir, newBranch)) {
-    await addWorktree([], newBranch);
+    await addWorktree(checkoutOnly ? ["-f"] : [], newBranch);
   } else if (await refExists(repoDir, `origin/${newBranch}`)) {
     await addWorktree(["--track", "-b", newBranch], `origin/${newBranch}`);
   } else {
@@ -119,9 +124,12 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
 
   // Safety: if worktree ended up on the origin branch instead of the feature branch,
   // create and checkout the feature branch now so commits/pushes go to the right place.
-  const currentBranch = await git(worktreeDir, ["branch", "--show-current"]);
-  if (currentBranch === originBranch) {
-    await git(worktreeDir, ["checkout", "-b", newBranch]);
+  // Não se aplica no modo checkout-only, onde ficar na branch de origem é o esperado.
+  if (!checkoutOnly) {
+    const currentBranch = await git(worktreeDir, ["branch", "--show-current"]);
+    if (currentBranch === originBranch) {
+      await git(worktreeDir, ["checkout", "-b", newBranch]);
+    }
   }
 
   // Write per-worktree excludes (not committed) so internal files never appear as changed

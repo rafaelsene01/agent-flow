@@ -121,9 +121,13 @@ export default function CreateBranchModal({ board, item, onClose }) {
   }
 
   async function handleCreate() {
-    const err = validateBranchName(newBranch);
-    if (err) { setNameError(err); return; }
     if (!originBranch) return;
+    // Em branco → usa a própria branch de origem (checkout sem criar branch nova).
+    const effectiveBranch = newBranch.trim() || originBranch;
+    if (newBranch) {
+      const err = validateBranchName(newBranch);
+      if (err) { setNameError(err); return; }
+    }
 
     setCreating(true);
     setCreateError(null);
@@ -131,11 +135,11 @@ export default function CreateBranchModal({ board, item, onClose }) {
       const res  = await fetch(`/api/github/repos/${owner}/${repo}/branches`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ newBranch, originBranch, cardNumber }),
+        body:    JSON.stringify({ newBranch: effectiveBranch, originBranch, cardNumber }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setLastCreated(newBranch);
+      setLastCreated(effectiveBranch);
       setWorktreeDir(data.worktreeDir ?? null);
       setHelpersDir(data.helpersDir ?? null);
       setNewBranch("");
@@ -149,7 +153,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
   }
 
   const validationError = newBranch ? validateBranchName(newBranch) : null;
-  const canCreate = owner && repo && originBranch && newBranch && !validationError && !creating;
+  const canCreate = owner && repo && originBranch && !validationError && !creating;
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -293,6 +297,11 @@ export default function CreateBranchModal({ board, item, onClose }) {
               )}
               {!nameError && newBranch && (
                 <span className="text-xs text-state-completed">Nome válido ✓</span>
+              )}
+              {!newBranch && (
+                <span className="text-xs text-muted-foreground">
+                  Em branco: usa a própria branch de origem (checkout sem criar branch nova)
+                </span>
               )}
             </div>
           )}

@@ -53,6 +53,9 @@ export default function BoardChatModal({ board, onClose }) {
   const [thread, setThread] = useState([]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
+  // polling: chat retomado com turno ainda em processamento no backend —
+  // consulta o GET até o status sair de "running" para exibir a resposta.
+  const [polling, setPolling] = useState(false);
   const [error, setError] = useState(null);
 
   const [model, setModel] = useState("sonnet");
@@ -110,6 +113,29 @@ export default function BoardChatModal({ board, onClose }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [thread, pending]);
 
+  // Acompanha um turno que já estava em processamento quando o modal reabriu.
+  useEffect(() => {
+    if (!polling) return;
+    let active = true;
+    const id = setInterval(() => {
+      fetch(`/api/board-chat/${encodeURIComponent(boardId)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (!active) return;
+          if (!data.chat || data.chat.status !== "running") {
+            if (data.chat) {
+              setThread(data.chat.thread ?? []);
+              if (data.chat.status === "error" && data.chat.error) setError(data.chat.error);
+            }
+            setPending(false);
+            setPolling(false);
+          }
+        })
+        .catch(() => { /* tenta de novo no próximo tick */ });
+    }, 3000);
+    return () => { active = false; clearInterval(id); };
+  }, [polling, boardId]);
+
   function continueChat() {
     setThread(existing.thread ?? []);
     setModel(existing.model ?? "sonnet");
@@ -117,6 +143,14 @@ export default function BoardChatModal({ board, onClose }) {
     setBranch(existing.branch ?? "");
     setStarted(true);
     setPhase("chat");
+    if (existing.status === "running") {
+      // Turno ainda em processamento no backend: mostra o spinner e acompanha
+      // via polling até a resposta chegar.
+      setPending(true);
+      setPolling(true);
+    } else if (existing.status === "error" && existing.error) {
+      setError(existing.error);
+    }
   }
 
   function newChat() {
@@ -215,12 +249,24 @@ export default function BoardChatModal({ board, onClose }) {
               )}
               .
             </p>
+            {existing?.status === "running" && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" />
+                Uma resposta ainda está sendo processada — continue para acompanhar.
+              </p>
+            )}
             <div className="flex items-center gap-3">
               <Button type="button" onClick={continueChat} className="gap-1.5">
                 <Play className="size-4" />
                 Continuar chat
               </Button>
-              <Button type="button" variant="outline" onClick={newChat} className="gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={newChat}
+                disabled={existing?.status === "running"}
+                className="gap-1.5"
+              >
                 <RotateCcw className="size-4" />
                 Iniciar novo chat
               </Button>
