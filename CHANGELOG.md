@@ -1,3 +1,10 @@
+## [1.43.1](https://github.com/rafaelsene01/agent-flow/compare/v1.43.0...v1.43.1) (2026-07-07)
+
+
+### Bug Fixes
+
+* improve daemon update process and installation scripts ([3b4e5cb](https://github.com/rafaelsene01/agent-flow/commit/3b4e5cb6861598ed65da495b0fb2caafd19a66aa))
+
 # [1.43.0](https://github.com/rafaelsene01/agent-flow/compare/v1.42.0...v1.43.0) (2026-07-07)
 
 
