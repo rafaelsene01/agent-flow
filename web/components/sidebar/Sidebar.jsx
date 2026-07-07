@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import UsageBadge from "@/components/UsageBadge.jsx";
 import UpdateBadge from "@/components/UpdateBadge.jsx";
+import AppVersion from "@/components/AppVersion.jsx";
 import CardStateLegend from "@/components/board/CardStateLegend.jsx";
 import SidebarBoardItem from "@/components/sidebar/SidebarBoardItem.jsx";
 
@@ -48,6 +49,7 @@ function SidebarContent({
       >
         <FlowerMark className="size-4 shrink-0" />
         <h1 className="text-base font-semibold leading-none">Agent Flow</h1>
+        <AppVersion />
       </button>
 
       {/* Navegação */}
