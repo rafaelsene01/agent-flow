@@ -12,12 +12,16 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 // campo `current`). Quando há versão nova no remoto, o ícone aparece pulsando
 // e o clique abre a confirmação — que avisa se runs do Claude ativos serão
 // encerrados. Só a confirmação dispara o POST /api/update (grava a flag que o
-// daemon observa); nada atualiza sozinho.
+// daemon observa); nada atualiza sozinho. Depois do aceite, a página recarrega
+// automaticamente quando a API voltar na versão nova.
 export default function UpdateBadge() {
   const { t } = useI18n();
   const { toast } = useToast();
   const [info, setInfo] = useState(null);
   const [confirming, setConfirming] = useState(false);
+  // Versão instalada no momento do aceite; quando setada, ativa a sondagem
+  // que recarrega a página assim que a API voltar na versão nova
+  const [acceptedFrom, setAcceptedFrom] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -38,6 +42,25 @@ export default function UpdateBadge() {
       clearInterval(id);
     };
   }, []);
+
+  // Só após o usuário aceitar a atualização: sonda a API (que cai enquanto o
+  // daemon reinicia) e recarrega a página quando ela voltar respondendo com
+  // versão diferente da aceita. Queda da API fora desse fluxo nunca recarrega
+  // nada — o daemon se restarta sozinho e o reload fica a cargo do usuário.
+  useEffect(() => {
+    if (!acceptedFrom) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch("/api/update", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.current && data.current !== acceptedFrom) window.location.reload();
+      } catch {
+        // API fora do ar durante o restart — esperado, segue sondando
+      }
+    }, 3_000);
+    return () => clearInterval(id);
+  }, [acceptedFrom]);
 
   if (!info?.current) return null;
 
@@ -66,6 +89,7 @@ export default function UpdateBadge() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? t("update.error"));
       setInfo(data);
+      setAcceptedFrom(data.current);
       toast({ title: t("update.requested"), description: t("update.requested.desc") });
     } catch (err) {
       toast({ title: t("update.error"), description: err.message, variant: "destructive" });

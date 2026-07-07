@@ -29,3 +29,5 @@ Compara a `version` do `package.json` local com a do upstream (`git fetch`, cach
 Autoriza a atualização: grava a flag `~/.agent-flow/update-requested`, que o supervisor do daemon (`scripts/daemon/daemon.*`) observa — ele faz `git pull` + build, mata o servidor (e claudes derivados) e reinicia na versão nova. A confirmação do usuário (incluindo o aviso de runs ativos) acontece na UI antes do POST.
 
 Responde o mesmo shape do GET com `updateRequested: true`. Erros: `409` se não há atualização disponível.
+
+Após o aceite, a UI (`web/components/UpdateBadge.jsx`) sonda `GET /api/update` a cada 3s e recarrega a página quando a API voltar respondendo com `current` diferente da versão aceita. Fora desse fluxo, queda da API nunca recarrega a página.

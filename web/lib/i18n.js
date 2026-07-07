@@ -321,7 +321,7 @@ export const dictionaries = {
     "update.confirm.desc": "O daemon vai baixar a nova versão e reiniciar o servidor.",
     "update.confirm.kill": "Atenção: {n} execução(ões) do Claude em andamento serão encerradas.",
     "update.requested": "Atualização iniciada",
-    "update.requested.desc": "O daemon vai aplicar e reiniciar o servidor em instantes.",
+    "update.requested.desc": "O daemon vai aplicar e reiniciar o servidor em instantes. A página recarrega sozinha quando ele voltar.",
     "update.error": "Falha ao solicitar atualização",
   },
 
@@ -645,7 +645,7 @@ export const dictionaries = {
     "update.confirm.desc": "The daemon will download the new version and restart the server.",
     "update.confirm.kill": "Warning: {n} running Claude execution(s) will be killed.",
     "update.requested": "Update started",
-    "update.requested.desc": "The daemon will apply it and restart the server shortly.",
+    "update.requested.desc": "The daemon will apply it and restart the server shortly. The page reloads automatically once it's back.",
     "update.error": "Failed to request update",
   },
 }
