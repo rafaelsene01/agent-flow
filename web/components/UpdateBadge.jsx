@@ -8,11 +8,11 @@ import { useToast } from "@/lib/toast";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-// Badge de atualização: aparece quando o servidor reporta versão nova no
-// remoto (GET /api/update). A atualização nunca é automática — só acontece
-// quando o usuário clica e confirma (POST /api/update grava a flag que o
-// daemon observa). Se houver runs do Claude ativos, o diálogo avisa que
-// eles serão encerrados.
+// Versão instalada, exibida discreta ao lado da marca (GET /api/update,
+// campo `current`). Quando há versão nova no remoto, o ícone aparece pulsando
+// e o clique abre a confirmação — que avisa se runs do Claude ativos serão
+// encerrados. Só a confirmação dispara o POST /api/update (grava a flag que o
+// daemon observa); nada atualiza sozinho.
 export default function UpdateBadge() {
   const { t } = useI18n();
   const { toast } = useToast();
@@ -39,7 +39,16 @@ export default function UpdateBadge() {
     };
   }, []);
 
-  if (!info?.updateAvailable) return null;
+  if (!info?.current) return null;
+
+  // Sem atualização: só a versão, estática e discreta
+  if (!info.updateAvailable) {
+    return (
+      <span className="ml-auto self-center text-[10px] font-normal tabular-nums text-muted-foreground/70">
+        v{info.current}
+      </span>
+    );
+  }
 
   async function openConfirm() {
     // Recarrega para ter o número de runs ativos do momento do clique
@@ -76,17 +85,17 @@ export default function UpdateBadge() {
             onClick={openConfirm}
             disabled={info.updateRequested}
             className={cn(
-              "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              "ml-auto inline-flex items-center gap-1 self-center rounded-md px-1 py-0.5 text-[10px] font-normal tabular-nums transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
               info.updateRequested
                 ? "cursor-default text-muted-foreground"
                 : "text-primary hover:bg-muted"
             )}
           >
-            <ArrowUpCircle className={cn("size-3.5 shrink-0", !info.updateRequested && "animate-pulse")} />
-            <span className="tabular-nums">v{info.latest}</span>
+            <ArrowUpCircle className={cn("size-3 shrink-0", !info.updateRequested && "animate-pulse")} />
+            v{info.current}
           </button>
         </TooltipTrigger>
-        <TooltipContent side="top">
+        <TooltipContent side="bottom">
           {info.updateRequested
             ? t("update.inProgress")
             : t("update.available").replace("{v}", info.latest)}
