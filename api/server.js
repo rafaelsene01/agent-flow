@@ -41,7 +41,7 @@ function recoverInterruptedRuns() {
   }
 }
 
-export async function startServer({ port, apiOnly = false }) {
+export async function startServer({ port, host, apiOnly = false }) {
   if (!apiOnly && !fs.existsSync(WEB_DIST_DIR)) {
     throw new Error(
       `Frontend não encontrado em ${WEB_DIST_DIR}\n` +
@@ -95,9 +95,11 @@ export async function startServer({ port, apiOnly = false }) {
     res.status(500).json({ error: err?.message ?? String(err) });
   });
 
-  const host = "localhost";
+  // Default localhost (só a própria máquina). Para expor na rede (ex.: acessar
+  // de outra máquina), passe host="0.0.0.0" via --host ou AGENT_FLOW_HOST.
+  const bindHost = host || process.env.AGENT_FLOW_HOST || "localhost";
   const server = await new Promise((resolve, reject) => {
-    const s = app.listen(port, host, () => resolve(s));
+    const s = app.listen(port, bindHost, () => resolve(s));
     s.on("error", (err) => {
       reject(err.code === "EADDRINUSE"
         ? new Error(`Porta ${port} já está em uso. Use --port para escolher outra.`)
@@ -118,5 +120,5 @@ export async function startServer({ port, apiOnly = false }) {
   // mesmo sem ninguém acessando. Lê a config a cada tick para pegar boards novos.
   startItemsPolling(() => (getConfig().boards ?? []).map((b) => b.id));
 
-  return { app, server, url: `http://${host}:${port}` };
+  return { app, server, url: `http://${bindHost}:${port}` };
 }
