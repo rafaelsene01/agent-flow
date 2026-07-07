@@ -1,3 +1,11 @@
+# [1.42.0](https://github.com/rafaelsene01/agent-flow/compare/v1.41.0...v1.42.0) (2026-07-07)
+
+
+### Features
+
+* add daemon functionality for background server management ([b987231](https://github.com/rafaelsene01/agent-flow/commit/b987231b45cadcf032896c0077b09d37d6bd67bb))
+* enhance board chat functionality with status tracking ([0b29cfe](https://github.com/rafaelsene01/agent-flow/commit/0b29cfe79445cc261904ef369be01f56cb0d001f))
+
 # [1.41.0](https://github.com/rafaelsene01/agent-flow/compare/v1.40.0...v1.41.0) (2026-07-06)
 
 
