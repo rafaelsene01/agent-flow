@@ -1,3 +1,10 @@
+# [1.44.0](https://github.com/rafaelsene01/agent-flow/compare/v1.43.1...v1.44.0) (2026-07-07)
+
+
+### Features
+
+* add AppVersion component to sidebar ([389b452](https://github.com/rafaelsene01/agent-flow/commit/389b45207ca8280858e0a36dd00ef71c667d276e))
+
 ## [1.43.1](https://github.com/rafaelsene01/agent-flow/compare/v1.43.0...v1.43.1) (2026-07-07)
 
 
