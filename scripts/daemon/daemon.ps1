@@ -2,14 +2,14 @@
 # sobe o servidor e monitora via GET /api/status. Se o processo morrer ou o
 # health check falhar seguidas vezes, roda o kill-all.ps1 (mata o servidor e
 # todos os claudes que ele disparou) e reinicia com backoff.
-# Auto-update: periodicamente compara a version do package.json local com a do
-# remoto (git fetch); se diferir, git pull + build e reinicia na versão nova.
+# Update: quando o usuário autoriza pela UI, o servidor grava a flag
+# ~/.agent-flow/update-requested (rota POST /api/update); o supervisor detecta,
+# faz git pull + build e reinicia na versão nova. Nunca atualiza sozinho.
 # Instalado como Scheduled Task pelo install.ps1 — não rodar na mão, exceto para debug.
 param(
   [int]$Port = 5522,
   [int]$HealthIntervalSec = 15,
-  [int]$MaxHealthFailures = 4,
-  [int]$UpdateIntervalSec = 600
+  [int]$MaxHealthFailures = 4
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,6 +19,7 @@ $LogFile    = Join-Path $StateDir "daemon.log"
 $PidFile    = Join-Path $StateDir "daemon.pid"
 $OutLog     = Join-Path $StateDir "server.out.log"
 $ErrLog     = Join-Path $StateDir "server.err.log"
+$UpdateFlag = Join-Path $StateDir "update-requested"
 $KillScript = Join-Path $PSScriptRoot "kill-all.ps1"
 
 New-Item -ItemType Directory -Force -Path $StateDir | Out-Null
@@ -49,20 +50,10 @@ function Ensure-Install {
 }
 
 # Retorna $true se atualizou (precisa reiniciar o servidor)
-function Check-Update {
+function Apply-Update {
   Push-Location $ProjectDir
   try {
-    if (-not (Test-Path ".git")) { return $false }
-    git fetch --quiet origin 2>&1 | Add-Content $LogFile
-    if ($LASTEXITCODE -ne 0) { return $false }
-    $upstream = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
-    if (-not $upstream) { return $false }
-    $localV = (Get-Content package.json -Raw | ConvertFrom-Json).version
-    $remoteRaw = (git show "${upstream}:package.json" 2>$null) -join "`n"
-    if (-not $remoteRaw) { return $false }
-    $remoteV = ($remoteRaw | ConvertFrom-Json).version
-    if (-not $localV -or -not $remoteV -or $localV -eq $remoteV) { return $false }
-    Log "nova versao disponivel ($localV -> $remoteV) - atualizando"
+    if (-not (Test-Path ".git")) { Log "nao e um clone git - update indisponivel"; return $false }
     cmd /c "git pull --ff-only >> ""$LogFile"" 2>&1"
     if ($LASTEXITCODE -ne 0) { Log "git pull falhou"; return $false }
     cmd /c "npm install >> ""$LogFile"" 2>&1"
@@ -71,7 +62,7 @@ function Check-Update {
     if ($LASTEXITCODE -ne 0) { Log "build da atualizacao falhou"; return $false }
     return $true
   } catch {
-    Log "check de update falhou: $($_.Exception.Message)"
+    Log "update falhou: $($_.Exception.Message)"
     return $false
   } finally {
     Pop-Location
@@ -92,7 +83,6 @@ while ($true) {
 
     $failures = 0
     $startedAt = Get-Date
-    $lastUpdate = Get-Date
     while ($true) {
       Start-Sleep -Seconds $HealthIntervalSec
       if ($proc.HasExited) {
@@ -100,7 +90,8 @@ while ($true) {
         break
       }
       try {
-        Invoke-WebRequest -Uri "http://127.0.0.1:$Port/api/status" `
+        # localhost, não 127.0.0.1: o servidor pode escutar só em IPv6 ([::1])
+        Invoke-WebRequest -Uri "http://localhost:$Port/api/status" `
           -UseBasicParsing -TimeoutSec 10 | Out-Null
         $failures = 0
         # 5 min saudável zera o backoff de restart
@@ -110,9 +101,10 @@ while ($true) {
         Log "health check falhou ($failures/$MaxHealthFailures): $($_.Exception.Message)"
         if ($failures -ge $MaxHealthFailures) { break }
       }
-      if (((Get-Date) - $lastUpdate).TotalSeconds -ge $UpdateIntervalSec) {
-        $lastUpdate = Get-Date
-        if (Check-Update) {
+      if (Test-Path $UpdateFlag) {
+        Remove-Item $UpdateFlag -Force -ErrorAction SilentlyContinue
+        Log "atualizacao autorizada pelo usuario - aplicando"
+        if (Apply-Update) {
           Log "reiniciando para aplicar atualizacao"
           break
         }

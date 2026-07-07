@@ -8,6 +8,7 @@ import { FlowerMark } from "@/components/ui/flower-mark";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import UsageBadge from "@/components/UsageBadge.jsx";
+import UpdateBadge from "@/components/UpdateBadge.jsx";
 import CardStateLegend from "@/components/board/CardStateLegend.jsx";
 import SidebarBoardItem from "@/components/sidebar/SidebarBoardItem.jsx";
 
@@ -136,6 +137,7 @@ function SidebarContent({
       {/* Rodapé */}
       <div className="flex items-center gap-1 border-t px-2 py-2">
         <UsageBadge />
+        <UpdateBadge />
         <div className="flex-1" />
         <CardStateLegend />
         <Tooltip>

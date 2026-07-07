@@ -11,6 +11,7 @@ import agentsRoutes from "./routes/agents.js";
 import agentRunsRoutes from "./routes/agent-runs.js";
 import boardChatRoutes from "./routes/board-chat.js";
 import integrationsRoutes from "./routes/integrations.js";
+import updateRoutes from "./routes/update.js";
 import { warmup } from "./modules/status/status.cache.js";
 import { warmItemsCache, startItemsPolling } from "./modules/github/github.items.js";
 import { WEB_DIST_DIR } from "./paths.js";
@@ -63,6 +64,7 @@ export async function startServer({ port, apiOnly = false }) {
   agentRunsRoutes(app);
   boardChatRoutes(app);
   integrationsRoutes(app);
+  updateRoutes(app);
   recoverAndDispatch();
   // Escuta respostas do usuário no Telegram (reply às notificações de card).
   startTelegramPolling();

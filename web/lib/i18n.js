@@ -313,6 +313,16 @@ export const dictionaries = {
     // InitBoardModal
     "board.add": "Adicionar Board",
     "board.saving": "Salvando…",
+
+    // UpdateBadge
+    "update.available": "Nova versão {v} disponível — clique para atualizar",
+    "update.inProgress": "Atualizando… o servidor vai reiniciar",
+    "update.confirm.title": "Atualizar para a versão {v}?",
+    "update.confirm.desc": "O daemon vai baixar a nova versão e reiniciar o servidor.",
+    "update.confirm.kill": "Atenção: {n} execução(ões) do Claude em andamento serão encerradas.",
+    "update.requested": "Atualização iniciada",
+    "update.requested.desc": "O daemon vai aplicar e reiniciar o servidor em instantes.",
+    "update.error": "Falha ao solicitar atualização",
   },
 
   en: {
@@ -627,5 +637,15 @@ export const dictionaries = {
     // InitBoardModal
     "board.add": "Add Board",
     "board.saving": "Saving…",
+
+    // UpdateBadge
+    "update.available": "New version {v} available — click to update",
+    "update.inProgress": "Updating… the server will restart",
+    "update.confirm.title": "Update to version {v}?",
+    "update.confirm.desc": "The daemon will download the new version and restart the server.",
+    "update.confirm.kill": "Warning: {n} running Claude execution(s) will be killed.",
+    "update.requested": "Update started",
+    "update.requested.desc": "The daemon will apply it and restart the server shortly.",
+    "update.error": "Failed to request update",
   },
 }

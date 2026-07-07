@@ -3,15 +3,15 @@
 # install/build), sobe o servidor e monitora via GET /api/status. Se o processo
 # morrer ou o health check falhar seguidas vezes, roda o kill-all.sh (mata o
 # servidor e todos os claudes que ele disparou) e reinicia com backoff.
-# Auto-update: periodicamente compara a version do package.json local com a do
-# remoto (git fetch); se diferir, git pull + build e reinicia na versão nova.
+# Update: quando o usuário autoriza pela UI, o servidor grava a flag
+# ~/.agent-flow/update-requested (rota POST /api/update); o supervisor detecta,
+# faz git pull + build e reinicia na versão nova. Nunca atualiza sozinho.
 # Instalado como serviço (systemd no Linux, launchd no macOS) pelo install.sh —
 # não rodar na mão, exceto para debug.
 
 PORT="${1:-5522}"
 HEALTH_INTERVAL=15
 MAX_FAILURES=4
-UPDATE_INTERVAL=600
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -20,6 +20,7 @@ LOG="$STATE_DIR/daemon.log"
 PIDFILE="$STATE_DIR/daemon.pid"
 OUT="$STATE_DIR/server.out.log"
 ERR="$STATE_DIR/server.err.log"
+UPDATE_FLAG="$STATE_DIR/update-requested"
 
 mkdir -p "$STATE_DIR"
 
@@ -42,18 +43,10 @@ ensure_install() {
   fi
 }
 
-# Retorna 0 se atualizou (precisa reiniciar o servidor); 1 se não há nada a fazer
-check_update() {
+# Retorna 0 se atualizou (precisa reiniciar o servidor); 1 se falhou
+apply_update() {
   cd "$PROJECT_DIR" || return 1
-  git rev-parse --git-dir > /dev/null 2>&1 || return 1
-  git fetch --quiet origin >> "$LOG" 2>&1 || return 1
-  upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"
-  [ -n "$upstream" ] || return 1
-  local_v="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -n 1)"
-  remote_v="$(git show "$upstream:package.json" 2>/dev/null \
-    | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)"
-  [ -n "$local_v" ] && [ -n "$remote_v" ] && [ "$local_v" != "$remote_v" ] || return 1
-  log "nova versão disponível ($local_v -> $remote_v) — atualizando"
+  git rev-parse --git-dir > /dev/null 2>&1 || { log "não é um clone git — update indisponível"; return 1; }
   git pull --ff-only >> "$LOG" 2>&1 || { log "git pull falhou"; return 1; }
   npm install >> "$LOG" 2>&1 || { log "npm install da atualização falhou"; return 1; }
   npm run build >> "$LOG" 2>&1 || { log "build da atualização falhou"; return 1; }
@@ -72,14 +65,14 @@ while true; do
 
     failures=0
     started=$(date +%s)
-    last_update=$(date +%s)
     while true; do
       sleep "$HEALTH_INTERVAL"
       if ! kill -0 "$srv" 2>/dev/null; then
         log "servidor saiu sozinho"
         break
       fi
-      if curl -sf -m 10 "http://127.0.0.1:$PORT/api/status" > /dev/null 2>&1; then
+      # localhost, não 127.0.0.1: o servidor pode escutar só em IPv6 ([::1])
+      if curl -sf -m 10 "http://localhost:$PORT/api/status" > /dev/null 2>&1; then
         failures=0
         # 5 min saudável zera o backoff de restart
         [ $(( $(date +%s) - started )) -ge 300 ] && backoff=5
@@ -88,9 +81,10 @@ while true; do
         log "health check falhou ($failures/$MAX_FAILURES)"
         [ "$failures" -ge "$MAX_FAILURES" ] && break
       fi
-      if [ $(( $(date +%s) - last_update )) -ge "$UPDATE_INTERVAL" ]; then
-        last_update=$(date +%s)
-        if check_update; then
+      if [ -f "$UPDATE_FLAG" ]; then
+        rm -f "$UPDATE_FLAG"
+        log "atualização autorizada pelo usuário — aplicando"
+        if apply_update; then
           log "reiniciando para aplicar atualização"
           break
         fi

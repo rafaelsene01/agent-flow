@@ -17,6 +17,7 @@ Orquestrador de agentes Claude sobre boards do GitHub Projects. API Express (`ap
 | Skills | `/api/skills*` | [routes/skills.md](docs/routes/skills.md) | [skills](docs/modules/skills.md) |
 | Uso (limites do plano + estatísticas) | `/api/usage`, `/api/usage-stats` | [routes/usage.md](docs/routes/usage.md) | [usage](docs/modules/usage.md) |
 | Integrações (Telegram) | `/api/integrations/*` | [routes/integrations.md](docs/routes/integrations.md) | [integrations](docs/modules/integrations.md) |
+| Update (versão nova + autorização) | `/api/update` | [routes/update.md](docs/routes/update.md) | [update](docs/modules/update.md) |
 
 ## Infra compartilhada
 

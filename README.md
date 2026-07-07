@@ -24,9 +24,9 @@ npm uninstall -g agent-flow
 
 Mantém o servidor rodando em background: o supervisor (`daemon.ps1`/`daemon.sh`) instala dependências/build se faltarem, monitora `GET /api/status` e, em caso de crash ou health check falhando, mata o servidor e todos os `claude` disparados por ele (`kill-all.ps1`/`kill-all.sh`) e reinicia com backoff.
 
-**Auto-update:** a cada 10 min o supervisor faz `git fetch` e compara a `version` do `package.json` local com a do remoto; se diferir, faz `git pull --ff-only` + `npm install` + build, reinicia o servidor na versão nova (matando também os claudes em execução). Requer que a instalação seja um clone git com upstream — o instalador de uma linha já garante isso. A remoção mata todos os processos do Agent Flow, incluindo claudes órfãos dos runs (identificados por `--output-format stream-json` + `--dangerously-skip-permissions`; sessões `claude` interativas não são afetadas).
+**Atualização (com autorização):** o servidor detecta versão nova no remoto e mostra um badge na sidebar; nada atualiza sozinho. Ao clicar, um diálogo pede confirmação — e avisa se houver execuções do Claude em andamento, pois elas serão encerradas. Só após confirmar o daemon faz `git pull --ff-only` + `npm install` + build e reinicia o servidor na versão nova. Requer que a instalação seja um clone git com upstream (o instalador de uma linha já garante isso) e o daemon rodando. A remoção mata todos os processos do Agent Flow, incluindo claudes órfãos dos runs (identificados por `--output-format stream-json` + `--dangerously-skip-permissions`; sessões `claude` interativas não são afetadas).
 
-Logs em `~/.agent-flow/daemon.log` (+ `server.out.log` / `server.err.log`).
+Depois de instalado, acesse **http://localhost:5522** (porta default `5522`; muda se você instalou com porta customizada). Logs em `~/.agent-flow/daemon.log` (+ `server.out.log` / `server.err.log`).
 
 ### Instalação em uma linha
 
