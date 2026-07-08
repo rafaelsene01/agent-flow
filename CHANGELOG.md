@@ -1,3 +1,10 @@
+## [1.49.1](https://github.com/rafaelsene01/agent-flow/compare/v1.49.0...v1.49.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* update sendFile usage in server to handle dotfiles correctly ([ecfb140](https://github.com/rafaelsene01/agent-flow/commit/ecfb14017d3091ce5553319ff420d7ab9331039a))
+
 # [1.49.0](https://github.com/rafaelsene01/agent-flow/compare/v1.48.0...v1.49.0) (2026-07-08)
 
 
