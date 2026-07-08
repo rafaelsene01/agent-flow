@@ -15,6 +15,7 @@ import LogView from "@/components/board/LogView.jsx";
 import { useI18n } from "@/lib/i18nContext";
 import { useToast } from "@/lib/toast";
 import { collapseLogLines } from "@/lib/logFormat";
+import { copyToClipboard } from "@/lib/clipboard";
 
 // Em dev conecta direto no backend (5522) para evitar o buffering do proxy
 // do next dev, que segura o stream SSE. Em produção é mesma origem.
@@ -139,7 +140,8 @@ function ResultBlock({ text }) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
-    navigator.clipboard?.writeText(text).then(() => {
+    copyToClipboard(text).then((ok) => {
+      if (!ok) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });

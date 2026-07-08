@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button.jsx";
 import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export default function CopyCmd({ cmd }) {
   const [copied, setCopied] = useState(false);
@@ -11,15 +12,15 @@ export default function CopyCmd({ cmd }) {
   const inputRef = useRef(null);
 
   function handleCopy() {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(cmd).then(() => {
+    copyToClipboard(cmd).then((ok) => {
+      if (ok) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
-      });
-    } else {
-      setShowSelect(true);
-      setTimeout(() => inputRef.current?.select(), 0);
-    }
+      } else {
+        setShowSelect(true);
+        setTimeout(() => inputRef.current?.select(), 0);
+      }
+    });
   }
 
   return (

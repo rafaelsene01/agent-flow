@@ -119,6 +119,8 @@ export const dictionaries = {
     "confirm.cleanup.board": "Limpar repositório",
 
     // Settings
+    "settings.title": "Configurações",
+    "settings.configureToContinue": "Configure os requisitos abaixo para continuar.",
     "settings.language": "Idioma",
     "settings.sound.label": "Efeitos sonoros",
     "settings.sound.volume": "Volume",
@@ -443,6 +445,8 @@ export const dictionaries = {
     "confirm.cleanup.board": "Clean repository",
 
     // Settings
+    "settings.title": "Settings",
+    "settings.configureToContinue": "Configure the requirements below to continue.",
     "settings.language": "Language",
     "settings.sound.label": "Sound effects",
     "settings.sound.volume": "Volume",

@@ -5,6 +5,7 @@ import { useI18n } from "@/lib/i18nContext";
 import { Copy, Check, GripVertical, X, LayoutGrid } from "lucide-react";
 import { boardSlug } from "@/lib/boardSlug.js";
 import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/lib/clipboard";
 import {
   Dialog,
   DialogContent,
@@ -145,9 +146,11 @@ export default function InitBoardModal({ onClose, onSaved }) {
   }
 
   function copyScope() {
-    navigator.clipboard?.writeText("gh auth refresh -s read:project");
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    copyToClipboard("gh auth refresh -s read:project").then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   const available = allCols.filter((apiCol) =>

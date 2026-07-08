@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getSoundPrefs, setSoundPrefs, playWaiting } from "@/lib/sound";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const GH_INSTALL = {
   win32:  { label: "Instalar (winget)",   cmd: "winget install --id GitHub.cli" },
@@ -30,25 +31,11 @@ function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
 
   function copy() {
-    function flash() {
+    copyToClipboard(text).then((ok) => {
+      if (!ok) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }
-    function fallback() {
-      const el = document.createElement("textarea");
-      el.value = text;
-      el.style.cssText = "position:fixed;opacity:0";
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-      flash();
-    }
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).then(flash).catch(fallback);
-    } else {
-      fallback();
-    }
+    });
   }
 
   return (
@@ -309,7 +296,7 @@ export default function SettingsModal({ onClose }) {
         <div className="flex items-center justify-between px-5 py-3.5 border-b shrink-0">
           <div className="flex items-center gap-2">
             <Settings className="size-4 text-muted-foreground" />
-            <DialogTitle className="text-base leading-none">Integrações</DialogTitle>
+            <DialogTitle className="text-base leading-none">{t("settings.title")}</DialogTitle>
           </div>
           <div className="flex items-center gap-2">
             <LangSwitch value={language} onChange={saveLanguage} />
@@ -330,7 +317,7 @@ export default function SettingsModal({ onClose }) {
         {/* Lock message */}
         {isLocked && !loading && (
           <p className="text-xs text-muted-foreground text-center px-5 pt-3">
-            Configure as integrações abaixo para continuar.
+            {t("settings.configureToContinue")}
           </p>
         )}
 
