@@ -1,3 +1,10 @@
+# [1.49.0](https://github.com/rafaelsene01/agent-flow/compare/v1.48.0...v1.49.0) (2026-07-08)
+
+
+### Features
+
+* improve update service and daemon scripts for better version handling ([a2a28b7](https://github.com/rafaelsene01/agent-flow/commit/a2a28b7b3bd9d8c2e3d34df846bc672289b6d74c))
+
 # [1.48.0](https://github.com/rafaelsene01/agent-flow/compare/v1.47.0...v1.48.0) (2026-07-08)
 
 
