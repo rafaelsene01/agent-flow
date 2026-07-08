@@ -1,3 +1,10 @@
+# [1.47.0](https://github.com/rafaelsene01/agent-flow/compare/v1.46.0...v1.47.0) (2026-07-08)
+
+
+### Features
+
+* update scheduled task action to use conhost for headless execution ([113b8c8](https://github.com/rafaelsene01/agent-flow/commit/113b8c86d3180404e08d77fb5daa850cdf8cc056))
+
 # [1.46.0](https://github.com/rafaelsene01/agent-flow/compare/v1.45.0...v1.46.0) (2026-07-07)
 
 
