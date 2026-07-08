@@ -83,7 +83,7 @@ agent-flow -p 8080  # porta customizada
 
 ## Pré-requisitos
 
-- **GitHub:** `gh auth login` ou `GH_TOKEN`/`GITHUB_TOKEN` no ambiente
+- **GitHub:** `gh auth login -s read:project` ou `GH_TOKEN`/`GITHUB_TOKEN` no ambiente (token precisa do scope `read:project` para listar boards do Projects). Já logado sem o scope? `gh auth refresh -s read:project`
 - **Claude:** `claude` CLI instalado e autenticado
 
 Config em `~/.agent-flow/config.json` (criado automaticamente na primeira execução).

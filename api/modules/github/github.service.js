@@ -6,7 +6,7 @@ export async function getStatus() {
   const token = getToken();
 
   if (!token) {
-    return { connected: false, error: "gh CLI não autenticado. Execute 'gh auth login' ou configure GH_TOKEN." };
+    return { connected: false, error: "gh CLI não autenticado. Execute 'gh auth login -s read:project' ou configure GH_TOKEN." };
   }
 
   try {

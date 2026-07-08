@@ -18,9 +18,12 @@ need() {
 need git
 need curl
 
+# Precisa casar com "engines" do package.json (>= 22.5, node:sqlite)
 node_ok() {
   command -v node > /dev/null 2>&1 || return 1
-  [ "$(node -v | sed 's/^v\([0-9]*\).*/\1/')" -ge 22 ]
+  major="$(node -v | sed 's/^v\([0-9]*\).*/\1/')"
+  minor="$(node -v | sed 's/^v[0-9]*\.\([0-9]*\).*/\1/')"
+  [ "$major" -gt 22 ] || { [ "$major" -eq 22 ] && [ "$minor" -ge 5 ]; }
 }
 
 # Instala uma cópia local do Node (tarball oficial) em ~/.agent-flow/node —

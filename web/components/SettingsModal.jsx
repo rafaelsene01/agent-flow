@@ -280,7 +280,7 @@ export default function SettingsModal({ onClose }) {
   const platform       = status?.platform ?? "linux";
   const installCmd     = GH_INSTALL[platform] ?? GH_INSTALL.linux;
   const githubCommands = !loading && !status?.github?.connected
-    ? [installCmd, { label: "Autenticar", cmd: "gh auth login" }]
+    ? [installCmd, { label: "Autenticar", cmd: "gh auth login -s read:project" }]
     : [];
   const claudeCommands = !loading && !status?.claude?.connected
     ? CLAUDE_COMMANDS

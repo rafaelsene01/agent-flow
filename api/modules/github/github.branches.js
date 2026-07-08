@@ -27,7 +27,7 @@ const BRANCHES_QUERY = `
 
 function requireToken() {
   const token = getToken();
-  if (!token) throw new Error("GitHub não autenticado. Configure GH_TOKEN ou execute 'gh auth login'.");
+  if (!token) throw new Error("GitHub não autenticado. Configure GH_TOKEN ou execute 'gh auth login -s read:project'.");
   return token;
 }
 

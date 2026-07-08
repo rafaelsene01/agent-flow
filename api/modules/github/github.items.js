@@ -115,7 +115,7 @@ async function fetchPage(token, variables, attempt = 0) {
 
 async function fetchAllPages(projectId) {
   const token = getToken();
-  if (!token) throw new Error("GitHub não autenticado. Configure GH_TOKEN ou execute 'gh auth login'.");
+  if (!token) throw new Error("GitHub não autenticado. Configure GH_TOKEN ou execute 'gh auth login -s read:project'.");
   const all = [];
   let after = null, hasMore = true, pages = 0;
   while (hasMore && pages < FETCH_MAX_PAGES) {

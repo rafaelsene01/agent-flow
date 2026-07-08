@@ -13,9 +13,11 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
   throw "'git' não encontrado - instale antes."
 }
 
+# Precisa casar com "engines" do package.json (>= 22.5, node:sqlite)
 function Test-NodeOk {
   if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return $false }
-  return [int]((node -v) -replace '^v(\d+).*', '$1') -ge 22
+  $v = (node -v) -replace '^v', ''
+  return [version]$v -ge [version]"22.5.0"
 }
 
 if (-not (Test-NodeOk)) {
@@ -23,12 +25,17 @@ if (-not (Test-NodeOk)) {
   if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     throw "winget não disponível - instale Node >= 22 manualmente: https://nodejs.org"
   }
+  # Catálogo desatualizado do winget entrega LTS antiga (< 22.5) — atualiza antes
+  winget source update | Out-Null
   winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
   if ($LASTEXITCODE -ne 0) { throw "winget install do Node falhou (exit $LASTEXITCODE)" }
   # recarrega o PATH da sessão atual para enxergar o node recém-instalado
   $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
     [Environment]::GetEnvironmentVariable("Path", "User")
   if (-not (Test-NodeOk)) {
+    if (Get-Command node -ErrorAction SilentlyContinue) {
+      throw "winget instalou Node $(node -v), mas o projeto exige >= 22.5 - instale manualmente: https://nodejs.org"
+    }
     throw "Node instalado mas não encontrado no PATH - abra um novo terminal e rode o comando de novo."
   }
 }
