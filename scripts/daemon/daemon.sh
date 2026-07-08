@@ -49,6 +49,10 @@ ensure_install() {
 apply_update() {
   cd "$PROJECT_DIR" || return 1
   git rev-parse --git-dir > /dev/null 2>&1 || { log "não é um clone git — update indisponível"; return 1; }
+  # O clone instalado é artefato, não checkout de dev: o npm install do próprio
+  # daemon pode regenerar o package-lock.json e qualquer sujeira local aborta
+  # todos os pulls seguintes. Descarta antes de atualizar.
+  git checkout -- . >> "$LOG" 2>&1
   git pull --ff-only >> "$LOG" 2>&1 || { log "git pull falhou"; return 1; }
   npm install >> "$LOG" 2>&1 || { log "npm install da atualização falhou"; return 1; }
   npm run build >> "$LOG" 2>&1 || { log "build da atualização falhou"; return 1; }

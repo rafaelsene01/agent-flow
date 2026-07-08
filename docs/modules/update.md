@@ -8,7 +8,7 @@ Atualização do próprio Agent Flow com autorização do usuário. O servidor s
 
 ## update.service.js
 
-- `getUpdateInfo({ refresh })` — lê a `version` do `package.json` local (`PACKAGE_ROOT`) e a do upstream (`git fetch` + `git show <upstream>:package.json`, cache de 10 min; `refresh: true` força). Retorna `{ current, latest, updateAvailable, activeRuns, updateRequested }`. `activeRuns` vem de `claude.concurrency.getActiveCount()`. Sem clone git, sem upstream ou sem rede → `updateAvailable: false`.
+- `getUpdateInfo({ refresh })` — lê a `version` do `package.json` local (`PACKAGE_ROOT`; cacheada por processo — `current` é a versão do servidor em execução, não do disco, senão o `git pull` do update faria a UI recarregar antes do restart, com `dist/` ainda em rebuild) e a do upstream (`git fetch` + `git show <upstream>:package.json`, cache de 10 min; `refresh: true` força). Retorna `{ current, latest, updateAvailable, activeRuns, updateRequested }`. `activeRuns` vem de `claude.concurrency.getActiveCount()`. Sem clone git, sem upstream ou sem rede → `updateAvailable: false`.
 - `requestUpdate()` — revalida com `refresh` e grava a flag `~/.agent-flow/update-requested` (conteúdo: versão alvo). Lança erro `409` se não há atualização.
 
 ## Fluxo completo

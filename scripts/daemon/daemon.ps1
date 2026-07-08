@@ -57,6 +57,10 @@ function Apply-Update {
   Push-Location $ProjectDir
   try {
     if (-not (Test-Path ".git")) { Log "nao e um clone git - update indisponivel"; return $false }
+    # O clone instalado é artefato, não checkout de dev: o npm install do próprio
+    # daemon pode regenerar o package-lock.json e qualquer sujeira local aborta
+    # todos os pulls seguintes. Descarta antes de atualizar.
+    cmd /c "git checkout -- . >> ""$LogFile"" 2>&1"
     cmd /c "git pull --ff-only >> ""$LogFile"" 2>&1"
     if ($LASTEXITCODE -ne 0) { Log "git pull falhou"; return $false }
     cmd /c "npm install >> ""$LogFile"" 2>&1"

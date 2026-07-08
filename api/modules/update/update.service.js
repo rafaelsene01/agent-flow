@@ -18,10 +18,17 @@ const FETCH_TTL_MS = 10 * 60 * 1000;
 let cachedLatest = null;
 let lastFetch = 0;
 
+// Lida uma única vez por processo: `current` é a versão do servidor em
+// execução, não a dos arquivos no disco. Durante o update o git pull troca o
+// package.json antes do restart — reler do disco faria a UI recarregar cedo
+// demais, com o dist/ ainda sendo reconstruído (página 404).
+let currentVersion = null;
+
 function localVersion() {
-  return JSON.parse(
+  currentVersion ??= JSON.parse(
     fs.readFileSync(path.join(PACKAGE_ROOT, "package.json"), "utf-8"),
   ).version;
+  return currentVersion;
 }
 
 async function git(...args) {
