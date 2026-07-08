@@ -16,6 +16,7 @@ import { useI18n } from "@/lib/i18nContext";
 import { useToast } from "@/lib/toast";
 import { collapseLogLines } from "@/lib/logFormat";
 import { copyToClipboard } from "@/lib/clipboard";
+import { withAuthQs } from "@/lib/auth";
 
 // Em dev conecta direto no backend (5522) para evitar o buffering do proxy
 // do next dev, que segura o stream SSE. Em produção é mesma origem.
@@ -75,7 +76,7 @@ function RunLogOverlay({ segment, onClose }) {
     if (!isActive) return;
     setLogText("");
     loadedStatic.current = false;
-    const es = new EventSource(`${SSE_BASE}/api/agent-runs/${encodeURIComponent(runId)}/log/stream`);
+    const es = new EventSource(withAuthQs(`${SSE_BASE}/api/agent-runs/${encodeURIComponent(runId)}/log/stream`));
     es.onmessage = (e) => setLogText((prev) => prev + e.data + "\n");
     es.addEventListener("done", () => es.close());
     return () => es.close();

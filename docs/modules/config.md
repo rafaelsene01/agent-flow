@@ -23,6 +23,7 @@ Persiste a config global em `~/.agent-flow/config.json`. Escritas passam por uma
 | `runTimeoutMinutes` | `30` | Timeout de run |
 | `language` | `"en"` | Idioma das instruções aos agentes (`"pt"` \| `"en"`) |
 | `githubMethod` | — | Auth detectada: `"env"` \| `"gh-cli"` |
+| `authHash` | — | Hash (sha256) da senha de acesso ao site. Nunca vai ao cliente; `GET /api/config` expõe só `authEnabled`. Ver [modules/auth.md](auth.md) |
 | `worktrees` | — | Worktrees registradas (cards) |
 | `integrations.telegram` | — | `{ botToken, chatId }` |
 

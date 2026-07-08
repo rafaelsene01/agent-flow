@@ -9,6 +9,7 @@ Orquestrador de agentes Claude sobre boards do GitHub Projects. API Express (`ap
 | Domínio | Prefixo | Rotas | Módulos |
 |---------|---------|-------|---------|
 | Status/instalação | `/api/status*` | [routes/status.md](docs/routes/status.md) | [status](docs/modules/status.md) |
+| Auth (senha de acesso) | `/api/auth/*` | [routes/auth.md](docs/routes/auth.md) | [auth](docs/modules/auth.md) |
 | Config, worktrees, overlay | `/api/config*` | [routes/config.md](docs/routes/config.md) | [config](docs/modules/config.md) |
 | GitHub (repos, boards, branches) | `/api/github/*` | [routes/github.md](docs/routes/github.md) | [github](docs/modules/github.md), [git](docs/modules/git.md) |
 | Agents (CRUD, criador de prompt) | `/api/agents*` | [routes/agents.md](docs/routes/agents.md) | [agents](docs/modules/agents.md) |

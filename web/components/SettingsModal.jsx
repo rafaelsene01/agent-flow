@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18nContext";
-import { Settings, Copy, Check, FolderOpen, AlertTriangle, RefreshCw, X, GitBranch, Bot } from "lucide-react";
+import { Settings, Copy, Check, FolderOpen, AlertTriangle, RefreshCw, X, GitBranch, Bot, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -14,6 +14,12 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getSoundPrefs, setSoundPrefs, playWaiting } from "@/lib/sound";
 import { copyToClipboard } from "@/lib/clipboard";
+import { setToken, clearToken } from "@/lib/auth";
+
+// Prefill do campo de senha quando já há uma configurada — o valor real (hash)
+// nunca chega ao front, então mostramos essa máscara ofuscada. Apagá-la e salvar
+// desativa a senha.
+const PW_MASK = "········";
 
 const GH_INSTALL = {
   win32:  { label: "Instalar (winget)",   cmd: "winget install --id GitHub.cli" },
@@ -200,6 +206,10 @@ export default function SettingsModal({ onClose }) {
   const [language, setLanguage]         = useState(ctxLang);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [soundVolume, setSoundVolume]   = useState(0.5);
+  const [pwInput, setPwInput]           = useState("");
+  const [pwDirty, setPwDirty]           = useState(false);
+  const [pwSaving, setPwSaving]         = useState(false);
+  const [pwSaved, setPwSaved]           = useState(false);
 
   const fetchStatus = useCallback((force = false) => {
     setLoading(true);
@@ -216,6 +226,8 @@ export default function SettingsModal({ onClose }) {
         setProjectsPath(c.projectsPath ?? "");
         setPathInput(c.projectsPath ?? "");
         setLanguage(c.language ?? "en");
+        setPwInput(c.authEnabled ? PW_MASK : "");
+        setPwDirty(false);
       })
       .catch(() => {});
   }, []);
@@ -266,6 +278,41 @@ export default function SettingsModal({ onClose }) {
       })
       .catch(() => {})
       .finally(() => setPathSaving(false));
+  }
+
+  async function saveAuth() {
+    if (!pwDirty) return;
+    setPwSaving(true);
+    const password = pwInput; // "" limpa a senha; não-vazia define uma nova
+    try {
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authPassword: password }),
+      });
+      if (!res.ok) return;
+      // Mantém a sessão válida: ao definir/alterar a senha o token antigo expira,
+      // então re-loga com a nova senha; ao limpar, descarta o token.
+      if (password) {
+        const login = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        });
+        if (login.ok) setToken((await login.json()).token);
+        setPwInput(PW_MASK);
+      } else {
+        clearToken();
+        setPwInput("");
+      }
+      setPwDirty(false);
+      setPwSaved(true);
+      setTimeout(() => setPwSaved(false), 2000);
+    } catch {
+      /* ignore */
+    } finally {
+      setPwSaving(false);
+    }
   }
 
   function browsePath() {
@@ -386,6 +433,40 @@ export default function SettingsModal({ onClose }) {
                 )}
               >
                 {pathSaved ? <><Check className="size-3.5" /> Salvo</> : pathSaving ? "…" : "Salvar"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Access password card */}
+          <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center size-9 rounded-lg border text-lg shrink-0 text-muted-foreground bg-muted border-border">
+                <Lock className="size-5" />
+              </div>
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                <span className="text-sm font-semibold leading-tight">{t("settings.auth.label")}</span>
+                <span className="text-xs text-muted-foreground">{t("settings.auth.desc")}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 border-t pt-3">
+              <Input
+                type="password"
+                className="font-mono text-xs h-8 flex-1"
+                value={pwInput}
+                onChange={(e) => { setPwInput(e.target.value); setPwDirty(true); }}
+                placeholder={t("settings.auth.placeholder")}
+                spellCheck={false}
+                autoComplete="new-password"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                disabled={pwSaving || !pwDirty}
+                onClick={saveAuth}
+                className={cn("shrink-0", pwSaved && "text-state-completed border-state-completed")}
+              >
+                {pwSaved ? <><Check className="size-3.5" /> Salvo</> : pwSaving ? "…" : "Salvar"}
               </Button>
             </div>
           </div>

@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import express from "express";
 import statusRoutes from "./routes/status.js";
+import authRoutes from "./routes/auth.js";
+import { authGuard } from "./modules/auth/auth.guard.js";
 import configRoutes from "./routes/config.js";
 import sourcesRoutes from "./routes/sources.js";
 import reposRoutes from "./routes/repos.js";
@@ -59,6 +61,11 @@ export async function startServer({ port, host, apiOnly = false }) {
 
   const app = express();
   app.use(express.json());
+
+  // Rotas de auth (status/login) ficam antes do guard — são as únicas liberadas
+  // quando há senha ativa. Depois delas, o guard protege todo o /api restante.
+  authRoutes(app);
+  app.use(authGuard);
 
   statusRoutes(app);
   configRoutes(app);

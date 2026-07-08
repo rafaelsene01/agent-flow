@@ -124,6 +124,15 @@ export const dictionaries = {
     "settings.language": "Idioma",
     "settings.sound.label": "Efeitos sonoros",
     "settings.sound.volume": "Volume",
+    "settings.auth.label": "Senha de acesso",
+    "settings.auth.desc": "Protege o acesso ao site. Deixe em branco para desativar.",
+    "settings.auth.placeholder": "Digite uma senha",
+    "settings.auth.enabled": "Senha ativada",
+    "auth.title": "Acesso protegido",
+    "auth.desc": "Digite a senha para acessar este site.",
+    "auth.placeholder": "Senha",
+    "auth.error": "Senha incorreta.",
+    "auth.submit": "Entrar",
 
     // Git tab
     "git.advanced": "Avançado",
@@ -450,6 +459,15 @@ export const dictionaries = {
     "settings.language": "Language",
     "settings.sound.label": "Sound effects",
     "settings.sound.volume": "Volume",
+    "settings.auth.label": "Access password",
+    "settings.auth.desc": "Protects access to the site. Leave empty to disable.",
+    "settings.auth.placeholder": "Enter a password",
+    "settings.auth.enabled": "Password enabled",
+    "auth.title": "Protected access",
+    "auth.desc": "Enter the password to access this site.",
+    "auth.placeholder": "Password",
+    "auth.error": "Incorrect password.",
+    "auth.submit": "Sign in",
 
     // Git tab
     "git.advanced": "Advanced",

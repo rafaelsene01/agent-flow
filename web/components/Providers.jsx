@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { I18nProvider, useI18n } from "@/lib/i18nContext"
 import { ToastProvider } from "@/lib/toast"
 import { Toaster } from "@/components/ui/toast"
+import AuthGate from "@/components/AuthGate"
 
 function LangSync() {
   const { lang } = useI18n()
@@ -18,7 +19,7 @@ export default function Providers({ children }) {
     <I18nProvider>
       <LangSync />
       <ToastProvider>
-        {children}
+        <AuthGate>{children}</AuthGate>
         <Toaster />
       </ToastProvider>
     </I18nProvider>

@@ -47,6 +47,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip.jsx";
 import { cn } from "@/lib/utils";
+import { withAuthQs } from "@/lib/auth";
 import { collapseLogLines } from "@/lib/logFormat";
 import { statusColor, statusLabel, fileIcon } from "@/lib/fileVisuals";
 import { useToast } from "@/lib/toast";
@@ -399,7 +400,7 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     const base =
       process.env.NODE_ENV === "development" ? "http://localhost:5522" : "";
     const es = new EventSource(
-      `${base}/api/config/worktrees/${encodeURIComponent(worktreeId)}/log/stream`,
+      withAuthQs(`${base}/api/config/worktrees/${encodeURIComponent(worktreeId)}/log/stream`),
     );
     es.onmessage = (e) => {
       setLogText((prev) => prev + e.data + "\n");
