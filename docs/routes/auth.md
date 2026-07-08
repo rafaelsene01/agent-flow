@@ -26,6 +26,12 @@ front passam livres (senão o modal de senha não carregaria). Sem `authHash` �
 tudo (feature desativada). Com hash → exige token válido no header ou query `?_auth=`
 (EventSource não manda header); senão `401 { error: "Unauthorized" }`.
 
+**Leitura de config/status é sempre livre** (mesmo com senha): `/api/status` (GET+POST
+recheck) e `GET /api/config*`. O boot precisa delas pra saber se GitHub/Claude estão OK
+e decidir mostrar o modal de senha — se protegidas, o 401 abriria a tela de Settings no
+lugar. Só a **escrita** de config (`POST/PUT/DELETE`) exige estar logado. O resto do
+conteúdo (boards, agents, runs, usage…) segue protegido — é o que dispara o modal.
+
 ## Setar/limpar senha
 
 Não há endpoint dedicado — vai por `POST /api/config` (ver [routes/config.md](config.md)),

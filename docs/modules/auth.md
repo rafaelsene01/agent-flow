@@ -24,9 +24,10 @@ puro nunca persiste. O hash funciona como bearer token. Rotas: [routes/auth.md](
 
 ## auth.guard.js
 
-- `authGuard(req, res, next)` — só atua em `/api/*`; libera `/api/auth/status` e
-  `/api/auth/login`; sem `authHash` passa tudo. Token no header `AUTH_HEADER`
-  (`x-agent-flow-auth`) ou query `AUTH_QS` (`_auth`, para SSE). Inválido → `401`.
+- `authGuard(req, res, next)` — só atua em `/api/*`; sem `authHash` passa tudo. Token
+  no header `AUTH_HEADER` (`x-agent-flow-auth`) ou query `AUTH_QS` (`_auth`, para SSE).
+  Inválido → `401`. Livre mesmo com senha: `/api/auth/*`, `/api/status` (GET+POST) e
+  `GET /api/config*` (leitura de config/status pro boot); só a escrita de config exige login.
 - Exports: `AUTH_HEADER`, `AUTH_QS`.
 
 ## Front

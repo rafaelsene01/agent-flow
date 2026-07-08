@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { boardFromPath } from "@/lib/boardSlug.js";
 import { useApp } from "@/lib/appContext";
@@ -13,7 +14,20 @@ export default function BoardRoute() {
   const pathname = usePathname();
   const { t } = useI18n();
   const app = useApp();
-  const board = boardFromPath(app.boards, pathname);
+  // Vindo de outra rota, montamos no shell /board/_ com o slug real pendente. Usa
+  // o pendente pra resolver o board já no 1º render (sem flash de "não encontrado")
+  // e, num efeito, corrige a URL pro slug real.
+  const effectivePath = pathname === "/board/_" && app.pendingBoardPath
+    ? app.pendingBoardPath
+    : pathname;
+  const board = boardFromPath(app.boards, effectivePath);
+
+  useEffect(() => {
+    if (app.pendingBoardPath && window.location.pathname === "/board/_") {
+      window.history.replaceState(null, "", app.pendingBoardPath);
+      app.clearPendingBoardPath();
+    }
+  }, [app.pendingBoardPath, app.clearPendingBoardPath]);
 
   if (!board) {
     return (

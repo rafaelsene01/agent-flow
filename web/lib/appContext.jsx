@@ -32,6 +32,9 @@ export function AppProvider({ children }) {
   // Incrementado após limpar dados do board — força o Board a recarregar as
   // worktrees (senão os cards ficam com bordas/status obsoletos).
   const [worktreeRefresh, setWorktreeRefresh] = useState(0);
+  // Slug de board escolhido vindo de outra rota: soft-nav vai pro shell /board/_
+  // e o BoardRoute corrige a URL pra este path (evita reload no export). Ver selectBoard.
+  const [pendingBoardPath, setPendingBoardPath] = useState(null);
 
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
@@ -71,15 +74,21 @@ export function AppProvider({ children }) {
 
   // Abre um board. Já estando em /board/*, usa pushState para trocar de board sem
   // recarregar (a rota [slug] permanece montada e lê o novo slug do pathname).
-  // Vindo de outra rota, navega de verdade para a rota do board.
+  // Vindo de outra rota, soft-nav pro shell estático /board/_ (único slug pré-
+  // renderizado no export) e deixa o BoardRoute corrigir a URL pro slug real —
+  // router.push(slug real) forçaria navegação MPA (reload), pois o export não tem
+  // o RSC daquele slug.
   const selectBoard = useCallback((board) => {
     const path = `/board/${boardSlug(board)}`;
     if (window.location.pathname.startsWith("/board/")) {
       window.history.pushState(null, "", path);
     } else {
-      router.push(path);
+      setPendingBoardPath(path);
+      router.push("/board/_");
     }
   }, [router]);
+
+  const clearPendingBoardPath = useCallback(() => setPendingBoardPath(null), []);
 
   const openSettings   = useCallback(() => setShowSettings(true), []);
   const closeSettings  = useCallback(() => setShowSettings(false), []);
@@ -134,6 +143,7 @@ export function AppProvider({ children }) {
 
   const value = {
     initializing, boards, theme, worktreeRefresh,
+    pendingBoardPath, clearPendingBoardPath,
     toggleTheme, goTo, selectBoard,
     openSettings, closeSettings, showSettings,
     openInitBoard, closeInitBoard, showInitBoard, handleBoardSaved,
