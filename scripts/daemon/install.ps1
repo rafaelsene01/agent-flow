@@ -9,8 +9,10 @@ param(
 $ErrorActionPreference = "Stop"
 $daemon = Join-Path $PSScriptRoot "daemon.ps1"
 
-$action = New-ScheduledTaskAction -Execute "powershell.exe" `
-  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$daemon`" -Port $Port"
+# conhost --headless: sem janela e sem delegar pro Windows Terminal, que ignora
+# o -WindowStyle Hidden de tarefas agendadas e deixaria um terminal aberto no logon.
+$action = New-ScheduledTaskAction -Execute "$env:windir\System32\conhost.exe" `
+  -Argument "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$daemon`" -Port $Port"
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet `
   -ExecutionTimeLimit ([TimeSpan]::Zero) `
