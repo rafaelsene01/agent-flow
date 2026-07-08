@@ -1,3 +1,10 @@
+# [1.48.0](https://github.com/rafaelsene01/agent-flow/compare/v1.47.0...v1.48.0) (2026-07-08)
+
+
+### Features
+
+* implement copyToClipboard utility across multiple components ([749e540](https://github.com/rafaelsene01/agent-flow/commit/749e540cf54c82253880300b7d4f0d5103dc4893))
+
 # [1.47.0](https://github.com/rafaelsene01/agent-flow/compare/v1.46.0...v1.47.0) (2026-07-08)
 
 
