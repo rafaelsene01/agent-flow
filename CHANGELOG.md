@@ -1,3 +1,10 @@
+# [1.51.0](https://github.com/rafaelsene01/agent-flow/compare/v1.50.0...v1.51.0) (2026-07-08)
+
+
+### Features
+
+* implement authentication feature with password protection ([5a175f3](https://github.com/rafaelsene01/agent-flow/commit/5a175f307da165e657a1584cb5fb7c63624c6836))
+
 # [1.50.0](https://github.com/rafaelsene01/agent-flow/compare/v1.49.2...v1.50.0) (2026-07-08)
 
 
