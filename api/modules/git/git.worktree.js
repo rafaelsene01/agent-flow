@@ -3,7 +3,6 @@ import { promisify } from "util";
 import fs from "fs";
 import path from "path";
 import { getConfig, registerWorktree, getOverlayDir } from "../config/config.service.js";
-import { getToken } from "../github/github.client.js";
 
 const execFileP = promisify(execFile);
 
@@ -46,7 +45,9 @@ async function findExistingClone(projectsPath, owner, repo) {
   return null;
 }
 
-export async function setupWorktree({ owner, repo, newBranch, originBranch, cardNumber }) {
+// host-agnóstico (REQ-8): a clone URL autenticada e o host vêm do caller
+// (resolvidos via RepoProvider). Este módulo não importa nenhum provider.
+export async function setupWorktree({ host = "github", owner, repo, cloneUrl, newBranch, originBranch, cardNumber }) {
   const { projectsPath } = getConfig();
   const worktreeDir = path.join(projectsPath, `${repo}-${cardNumber}`);
   let cloned = false;
@@ -55,11 +56,8 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
   let repoDir = await findExistingClone(projectsPath, owner, repo);
 
   if (!repoDir) {
+    if (!cloneUrl) throw new Error("cloneUrl é obrigatório para clonar o repositório (injete via RepoProvider).");
     repoDir = path.join(projectsPath, repo);
-    const token    = getToken();
-    const cloneUrl = token
-      ? `https://x-access-token:${token}@github.com/${owner}/${repo}.git`
-      : `https://github.com/${owner}/${repo}.git`;
     fs.mkdirSync(projectsPath, { recursive: true });
     await execFileP("git", ["clone", cloneUrl, repoDir], { timeout: 300_000 });
     cloned = true;
@@ -147,7 +145,7 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
     if (toAdd.length) fs.appendFileSync(excludeFile, "\n" + toAdd.join("\n") + "\n");
   } catch (_) {}
 
-  const { helpersDir } = registerWorktree({ owner, repo, branch: newBranch, originBranch, cardNumber, repoDir, worktreeDir });
+  const { helpersDir } = registerWorktree({ host, owner, repo, branch: newBranch, originBranch, cardNumber, repoDir, worktreeDir });
 
   applyOverlays(`${owner}/${repo}`, worktreeDir);
 
@@ -158,18 +156,15 @@ export async function setupWorktree({ owner, repo, newBranch, originBranch, card
 // remota) num diretório derivado do id do board. Difere de setupWorktree por não
 // criar branch nova — e usa -f porque a branch pode já estar em checkout no clone
 // principal (ex: a branch default).
-export async function setupChatWorktree({ owner, repo, branch, boardId }) {
+export async function setupChatWorktree({ host = "github", owner, repo, cloneUrl, branch, boardId }) {
   const { projectsPath } = getConfig();
   const cardNumber  = `chat-${boardId}`;
   const worktreeDir = path.join(projectsPath, `${repo}-${cardNumber}`);
 
   let repoDir = await findExistingClone(projectsPath, owner, repo);
   if (!repoDir) {
+    if (!cloneUrl) throw new Error("cloneUrl é obrigatório para clonar o repositório (injete via RepoProvider).");
     repoDir = path.join(projectsPath, repo);
-    const token    = getToken();
-    const cloneUrl = token
-      ? `https://x-access-token:${token}@github.com/${owner}/${repo}.git`
-      : `https://github.com/${owner}/${repo}.git`;
     fs.mkdirSync(projectsPath, { recursive: true });
     await execFileP("git", ["clone", cloneUrl, repoDir], { timeout: 300_000 });
   }
@@ -193,7 +188,7 @@ export async function setupChatWorktree({ owner, repo, branch, boardId }) {
   }
 
   const entry = registerWorktree({
-    owner, repo, branch, originBranch: branch, cardNumber, repoDir, worktreeDir,
+    host, owner, repo, branch, originBranch: branch, cardNumber, repoDir, worktreeDir,
   });
 
   applyOverlays(`${owner}/${repo}`, worktreeDir);

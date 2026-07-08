@@ -44,9 +44,21 @@ function enqueueWrite(fn) {
   return p;
 }
 
+// Back-compat de provider (REQ-9): aplica defaults na LEITURA, sem migrar o disco.
+// board sem `source` ⇒ "github-board"; `repos` normalizado para array (derivação
+// lazy a partir do source acontece na camada de rotas, não aqui).
+export function normalizeBoard(board) {
+  return {
+    ...board,
+    source: board.source ?? "github-board",
+    repos:  Array.isArray(board.repos) ? board.repos : [],
+  };
+}
+
 export function getConfig() {
   ensureDirs();
-  return _readSync();
+  const cfg = _readSync();
+  return { ...cfg, boards: (cfg.boards ?? []).map(normalizeBoard) };
 }
 
 export function getLanguage() {
@@ -60,15 +72,20 @@ export function setConfig(updates) {
 // ── Worktrees ──────────────────────────────────────────────────────────────────
 
 export function getWorktrees() {
-  return getConfig().worktrees ?? [];
+  // Entradas antigas não têm `host` — default "github" na leitura (REQ-9).
+  return (getConfig().worktrees ?? []).map((w) => ({ host: "github", ...w }));
 }
 
-export function registerWorktree({ owner, repo, branch, originBranch, cardNumber, repoDir, worktreeDir }) {
-  const id         = `${owner}/${repo}#${cardNumber}`;
+export function registerWorktree({ host = "github", owner, repo, branch, originBranch, cardNumber, repoDir, worktreeDir }) {
+  // Prefixa o host só quando ≠ github, mantendo ids github existentes estáveis
+  // (sem churn de dados). github ⇒ owner/repo#card; outro ⇒ host:owner/repo#card.
+  const slug       = `${owner}/${repo}#${cardNumber}`;
+  const id         = host && host !== "github" ? `${host}:${slug}` : slug;
   const helpersDir = worktreeDir + "-helpers";
   fs.mkdirSync(helpersDir, { recursive: true });
   const entry = {
     id,
+    host,
     cardNumber,
     repo: `${owner}/${repo}`,
     branch,

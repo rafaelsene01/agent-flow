@@ -6,6 +6,7 @@ import { getDb } from "../agent-runs/agent-runs.db.js";
 import { runClaude, resumeClaude, failureDetail } from "../claude/claude.runner.js";
 import { extractFinalText } from "../skills/skill-creator.js";
 import { setupChatWorktree } from "../git/git.worktree.js";
+import { get as getRepoProvider } from "../repos/repos.registry.js";
 import { getLanguage, getWorktrees, removeWorktree } from "../config/config.service.js";
 
 const execFileP = promisify(execFile);
@@ -153,7 +154,8 @@ export async function startChat({ boardId, repo, branch, model, effort, prompt }
   `).run(boardId, sessionId, repo, branch, model || "sonnet", effort || "medium", null, JSON.stringify(thread), now, now);
 
   try {
-    const { worktreeDir } = await setupChatWorktree({ owner, repo: repoName, branch, boardId });
+    const cloneUrl = getRepoProvider("github").getCloneUrl({ owner, repo: repoName });
+    const { worktreeDir } = await setupChatWorktree({ host: "github", owner, repo: repoName, cloneUrl, branch, boardId });
     db().prepare(`UPDATE board_chats SET worktree_path = ? WHERE board_id = ?`).run(worktreeDir, boardId);
 
     const fullPrompt = buildPreamble(repo, branch) + "\n\nMensagem do usuário:\n" + prompt.trim();

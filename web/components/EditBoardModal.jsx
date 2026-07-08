@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import * as sourcesApi from "@/lib/api/sources.js";
+import * as reposApi from "@/lib/api/repos.js";
 
 // Normaliza string legada para { id: null, name } ou mantém { id, name }.
 function normalizeCol(c) {
@@ -64,8 +66,7 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   ])];
 
   useEffect(() => {
-    fetch(`/api/github/boards/${encodeURIComponent(board.id)}/columns`)
-      .then((r) => r.json())
+    sourcesApi.columns(board.id)
       .then((data) => {
         if (!data.error) {
           const apiCols = data.map((c) => ({ id: c.id, name: c.name }));
@@ -121,8 +122,16 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   );
 
   function save() {
+    // Mantém o vínculo repo↔board (REQ-6) em sincronia com o repo selecionado;
+    // preserva o source do board (default via back-compat se ausente).
+    const [lrOwner, lrRepo] = (originRepo || "").split("/");
+    const linkedRepos = lrOwner && lrRepo
+      ? [{ host: reposApi.DEFAULT_HOST, owner: lrOwner, repo: lrRepo }]
+      : [];
     onSaved({
       ...board,
+      source:     board.source ?? sourcesApi.DEFAULT_SOURCE,
+      repos:      linkedRepos,
       columns:    activeCols,
       originRepo: originRepo || null,
       viewFilter: viewFilter.trim(),

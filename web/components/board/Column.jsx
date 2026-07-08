@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton.jsx";
 import { RefreshCw, Inbox, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { columnAccent } from "@/lib/columnColors.js";
+import * as sourcesApi from "@/lib/api/sources.js";
 import { useI18n } from "@/lib/i18nContext";
 
 // Intervalo do auto-refresh silencioso. Com o stale-while-revalidate do backend,
@@ -94,10 +95,7 @@ export default function Column({
         // Refresh manual: força o backend a revalidar na API do GitHub (ignora cache).
         if (force) qs.set("refresh", "1");
 
-        const res = await fetch(
-          `/api/github/boards/${encodeURIComponent(boardId)}/items?${qs}`,
-        );
-        const data = await res.json();
+        const data = await sourcesApi.items(boardId, qs);
         if (data.error) throw new Error(data.error);
 
         setItems((prev) => (isFirst ? data.items : [...prev, ...data.items]));
@@ -127,10 +125,7 @@ export default function Column({
       else qs.set("columnName", columnName);
       if (viewFilter) qs.set("viewFilter", viewFilter);
 
-      const res = await fetch(
-        `/api/github/boards/${encodeURIComponent(boardId)}/items?${qs}`,
-      );
-      const data = await res.json();
+      const data = await sourcesApi.items(boardId, qs);
       if (data.error) return; // refresh silencioso não mostra erro
       setItems(data.items);
       pageRef.current = { hasNextPage: data.hasNextPage, cursor: data.endCursor };

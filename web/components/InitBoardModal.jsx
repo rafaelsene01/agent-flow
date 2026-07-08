@@ -6,6 +6,8 @@ import { Copy, Check, GripVertical, X, LayoutGrid } from "lucide-react";
 import { boardSlug } from "@/lib/boardSlug.js";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
+import * as sourcesApi from "@/lib/api/sources.js";
+import * as reposApi from "@/lib/api/repos.js";
 import {
   Dialog,
   DialogContent,
@@ -49,8 +51,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
 
 
   useEffect(() => {
-    fetch("/api/github/boards")
-      .then((r) => r.json())
+    sourcesApi.boards()
       .then((data) => {
         if (data.error) {
           if (data.error.includes("MISSING_SCOPE:read:project")) {
@@ -83,8 +84,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
     const opts = repoOptions(board, null);
     setOriginRepo(opts.length === 1 ? opts[0] : "");
     setViewsLoading(true);
-    fetch(`/api/github/boards/${encodeURIComponent(board.id)}/views`)
-      .then((r) => r.json())
+    sourcesApi.views(board.id)
       .then((data) => {
         if (!data.error) {
           setViews(data);
@@ -106,8 +106,7 @@ export default function InitBoardModal({ onClose, onSaved }) {
       return opts.length === 1 ? opts[0] : "";
     });
     setColumnsLoading(true);
-    fetch(`/api/github/boards/${encodeURIComponent(board.id)}/columns`)
-      .then((r) => r.json())
+    sourcesApi.columns(board.id)
       .then((data) => {
         if (!data.error) {
           setAllCols(data);
@@ -171,8 +170,18 @@ export default function InitBoardModal({ onClose, onSaved }) {
 
       const name     = boardName || selected.title;
       const vf       = viewFilter.trim();
+      // Vínculo explícito repo↔board (REQ-6). Deriva do repo selecionado
+      // (originRepo = "owner/repo"). host default enquanto só há RepoProvider github.
+      const [lrOwner, lrRepo] = (originRepo || "").split("/");
+      const linkedRepos = lrOwner && lrRepo
+        ? [{ host: reposApi.DEFAULT_HOST, owner: lrOwner, repo: lrRepo }]
+        : [];
       const newBoard = {
         id:         selected.id,
+        // Source do board (REQ-6). Só há github-board hoje; gravado explicitamente
+        // para que a leitura não dependa do default de back-compat.
+        source:     sourcesApi.DEFAULT_SOURCE,
+        repos:      linkedRepos,
         viewId:     selectedView?.id ?? null,
         viewNumber: selectedView?.number ?? null,
         viewName:   selectedView?.name ?? null,

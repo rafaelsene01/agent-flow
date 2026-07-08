@@ -7,6 +7,7 @@ import {
   failureDetail,
 } from "../claude/claude.runner.js";
 import { setupWorktree } from "../git/git.worktree.js";
+import { get as getRepoProvider } from "../repos/repos.registry.js";
 import { buildAgentPrompt, getAgent } from "../agents/agents.service.js";
 import { getConfig, getLanguage } from "../config/config.service.js";
 import {
@@ -372,9 +373,14 @@ function buildResumeReminder(run, { allowGit, noAsk } = {}) {
 async function ensureWorktree(run) {
   if (run.worktree_path) return run;
   const [owner, repo] = run.repo.split("/");
+  // host default "github" (back-compat); clone URL resolvida pelo RepoProvider.
+  const host = run.repo_host ?? "github";
+  const cloneUrl = getRepoProvider(host).getCloneUrl({ owner, repo });
   const { worktreeDir, helpersDir } = await setupWorktree({
+    host,
     owner,
     repo,
+    cloneUrl,
     newBranch: run.target_branch,
     originBranch: run.origin_branch,
     cardNumber: run.card_number,

@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import * as reposApi from "@/lib/api/repos.js";
 
 // Permite: letras ASCII, dígitos, hífen, underscore, barra, ponto.
 // Rejeita: acentos, ç e qualquer outra pontuação.
@@ -70,8 +71,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
     setLoaded(false);
     setBranchesLoading(true);
     setBranchesError(null);
-    fetch(`/api/github/repos/${owner}/${repo}/branches`)
-      .then((r) => r.json())
+    reposApi.listBranches(owner, repo)
       .then((data) => {
         if (!active) return;
         if (data.error) throw new Error(data.error);
@@ -96,9 +96,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
     const handle = setTimeout(() => {
       setBranchesLoading(true);
       setBranchesError(null);
-      const qs = branchFilter ? `?q=${encodeURIComponent(branchFilter)}` : "";
-      fetch(`/api/github/repos/${owner}/${repo}/branches${qs}`)
-        .then((r) => r.json())
+      reposApi.listBranches(owner, repo, branchFilter)
         .then((data) => {
           if (!active) return;
           if (data.error) throw new Error(data.error);
@@ -132,12 +130,9 @@ export default function CreateBranchModal({ board, item, onClose }) {
     setCreating(true);
     setCreateError(null);
     try {
-      const res  = await fetch(`/api/github/repos/${owner}/${repo}/branches`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ newBranch: effectiveBranch, originBranch, cardNumber }),
+      const data = await reposApi.createBranch(owner, repo, {
+        newBranch: effectiveBranch, originBranch, cardNumber,
       });
-      const data = await res.json();
       if (data.error) throw new Error(data.error);
       setLastCreated(effectiveBranch);
       setWorktreeDir(data.worktreeDir ?? null);

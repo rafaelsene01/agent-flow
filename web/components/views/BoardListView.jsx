@@ -7,6 +7,7 @@ import { columnAccent } from "@/lib/columnColors.js";
 import { FlowerMark } from "@/components/ui/flower-mark";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18nContext";
+import * as sourcesApi from "@/lib/api/sources.js";
 
 // Limite de cards buscados por coluna (espelha o cap do backend). Ao bater o
 // limite mostramos "19+" em vez do número, sinalizando que há mais.
@@ -26,10 +27,9 @@ function BoardColumns({ board }) {
     if (columns.length === 0) return;
     let alive = true;
     const qs = board.viewFilter
-      ? `?viewFilter=${encodeURIComponent(board.viewFilter)}`
+      ? `viewFilter=${encodeURIComponent(board.viewFilter)}`
       : "";
-    fetch(`/api/github/boards/${encodeURIComponent(board.id)}/column-counts${qs}`)
-      .then((r) => r.json())
+    sourcesApi.columnCounts(board.id, qs)
       .then((data) => { if (alive && !data.error) setCounts(data); })
       .catch(() => {});
     return () => { alive = false; };

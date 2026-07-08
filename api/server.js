@@ -3,7 +3,8 @@ import path from "path";
 import express from "express";
 import statusRoutes from "./routes/status.js";
 import configRoutes from "./routes/config.js";
-import githubRoutes from "./routes/github.js";
+import sourcesRoutes from "./routes/sources.js";
+import reposRoutes from "./routes/repos.js";
 import usageRoutes from "./routes/usage.js";
 import usageStatsRoutes from "./routes/usage-stats.js";
 import skillsRoutes from "./routes/skills.js";
@@ -13,7 +14,8 @@ import boardChatRoutes from "./routes/board-chat.js";
 import integrationsRoutes from "./routes/integrations.js";
 import updateRoutes from "./routes/update.js";
 import { warmup } from "./modules/status/status.cache.js";
-import { warmItemsCache, startItemsPolling } from "./modules/github/github.items.js";
+import { registerProviders } from "./modules/providers.bootstrap.js";
+import { get as getSource } from "./modules/sources/sources.registry.js";
 import { WEB_DIST_DIR } from "./paths.js";
 import { getConfig, getWorktrees, updateWorktreeStatus } from "./modules/config/config.service.js";
 import { recoverAndDispatch } from "./modules/agent-runs/agent-runs.queue.js";
@@ -51,12 +53,17 @@ export async function startServer({ port, host, apiOnly = false }) {
 
   recoverInterruptedRuns();
 
+  // Registra os providers (source + repo) antes de montar rotas — único ponto
+  // que nomeia "github" por composição. Ver docs/providers.md.
+  registerProviders();
+
   const app = express();
   app.use(express.json());
 
   statusRoutes(app);
   configRoutes(app);
-  githubRoutes(app);
+  sourcesRoutes(app);
+  reposRoutes(app);
   usageRoutes(app);
   usageStatsRoutes(app);
   skillsRoutes(app);
@@ -117,11 +124,18 @@ export async function startServer({ port, host, apiOnly = false }) {
   server.keepAliveTimeout = 125_000; // > proxyTimeout do Next (120s)
 
   warmup();
-  // Pré-aquece o cache de itens de cada board para o board carregar instantâneo.
-  for (const b of getConfig().boards ?? []) warmItemsCache(b.id);
-  // Mantém os cards frescos: revalida todos os boards em background a cada 60s,
-  // mesmo sem ninguém acessando. Lê a config a cada tick para pegar boards novos.
-  startItemsPolling(() => (getConfig().boards ?? []).map((b) => b.id));
+  // Pré-aquece o cache de cada board via seu SourceProvider (warm é opcional no
+  // contrato). Resolve o source por board — provider-correto para futuras fontes.
+  // Repete a cada 60s para manter os cards frescos, mesmo sem ninguém acessando;
+  // lê a config a cada tick para pegar boards novos.
+  const warmBoards = () => {
+    for (const b of getConfig().boards ?? []) {
+      try { getSource(b.source).warm?.(b.id); }
+      catch (err) { console.error("[warm]", err.message); }
+    }
+  };
+  warmBoards();
+  setInterval(warmBoards, 60_000).unref?.();
 
   return { app, server, url: `http://${bindHost}:${port}` };
 }

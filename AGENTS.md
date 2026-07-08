@@ -27,6 +27,13 @@ Orquestrador de agentes Claude sobre boards do GitHub Projects. API Express (`ap
 | Runner do Claude CLI (spawn, SSE, concorrência) | `api/modules/claude/` | [docs/modules/claude.md](docs/modules/claude.md) |
 | Frontend Next.js | `web/` | [docs/web.md](docs/web.md) |
 | Arquitetura e regras de módulos | — | [docs/architecture.md](docs/architecture.md) |
+| **Providers (Source de cards + Repo de código)** | `api/modules/sources`, `api/modules/repos`, `api/modules/github` | [docs/providers.md](docs/providers.md) |
+
+> **Multi-provider por design.** GitHub é a única implementação, mas board/item/coluna
+> (Source) e repo/branch/clone (Repo) passam por contratos plugáveis. Antes de tocar
+> nesses domínios leia [docs/providers.md](docs/providers.md) e siga as regras duras
+> (nada de `github.com`/`gh`/`graphQL` fora de `modules/github/`; nada de `if provider === "github"`;
+> frontend nunca chama `/api/github/*`). Planejamento do refactor: [.specs/features/provider-abstraction/](.specs/features/provider-abstraction/).
 
 ## Comportamentos intencionais (não tratar como bug)
 
@@ -36,6 +43,10 @@ Orquestrador de agentes Claude sobre boards do GitHub Projects. API Express (`ap
   (ex.: rodar o Feature Planner em `haiku`/`low` mesmo com o default `opus`/`high`).
   É uma escolha deliberada do usuário na tela de configuração do passo — não
   "corrigir" a precedência nem apontar como erro em reviews.
+
+- **Default de provider é `github` na leitura.** `board.source ?? "github-board"` e
+  `host ?? "github"` (worktrees/repos) são back-compat proposital para config antigo —
+  não exigir os campos nem migrar `config.json` em disco. Ver [docs/providers.md](docs/providers.md).
 
 ## Manutenção da doc
 

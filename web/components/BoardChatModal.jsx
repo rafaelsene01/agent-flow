@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import * as reposApi from "@/lib/api/repos.js";
 
 /**
  * Chat do board: conversa com o Claude dentro de uma worktree criada a partir do
@@ -96,8 +97,7 @@ export default function BoardChatModal({ board, onClose }) {
     let active = true;
     setBranchesLoading(true);
     setBranchesError(null);
-    fetch(`/api/github/repos/${owner}/${repoName}/branches`)
-      .then((r) => r.json())
+    reposApi.listBranches(owner, repoName)
       .then((data) => {
         if (!active) return;
         if (data.error) throw new Error(data.error);
