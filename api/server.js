@@ -82,7 +82,10 @@ export async function startServer({ port, host, apiOnly = false }) {
     app.use((req, res) => {
       const htmlPath = path.join(WEB_DIST_DIR, `${req.path}.html`);
       if (req.path !== "/" && htmlPath.startsWith(WEB_DIST_DIR) && fs.existsSync(htmlPath)) {
-        return res.sendFile(htmlPath);
+        // Sempre com { root }: sem ele o send aplica a política de dotfiles ao
+        // caminho absoluto inteiro, e instalações sob ~/.agent-flow (segmento
+        // com ponto) respondem 404 para toda rota que cai aqui.
+        return res.sendFile(`${req.path.slice(1)}.html`, { root: WEB_DIST_DIR });
       }
       res.sendFile("index.html", { root: WEB_DIST_DIR });
     });

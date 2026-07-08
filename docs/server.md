@@ -26,7 +26,7 @@ Lança erro se `web/out/` não existir e `apiOnly` for `false` — execute `npm 
 5. Frontend estático (skip se `apiOnly`):
    - `express.static(web/out, { redirect: false })` — `redirect:false` evita `/agent` → `/agent/`.
    - `GET /board/:slug` → serve `board/_.html` (slug é runtime; cliente resolve pelo pathname).
-   - Catch-all: tenta `<path>.html` (App Router exporta `<rota>.html`), fallback `index.html`.
+   - Catch-all: tenta `<path>.html` (App Router exporta `<rota>.html`), fallback `index.html`. Todo `sendFile` usa `{ root }`: caminho absoluto sem `root` faz o `send` checar dotfiles no caminho inteiro, e instalações sob `~/.agent-flow` (segmento com ponto) responderiam 404.
 6. Error handler final: sempre responde JSON `{ error }`, nunca texto.
 7. Pós-listen: `warmup()` do status, `warmItemsCache()` por board e `startItemsPolling()` (revalida itens a cada 60s em background).
 
