@@ -1,3 +1,10 @@
+## [1.49.2](https://github.com/rafaelsene01/agent-flow/compare/v1.49.1...v1.49.2) (2026-07-08)
+
+
+### Bug Fixes
+
+* update GitHub authentication instructions for clarity ([1199fc8](https://github.com/rafaelsene01/agent-flow/commit/1199fc80d6c66044280367e1397406054a75cf4c))
+
 ## [1.49.1](https://github.com/rafaelsene01/agent-flow/compare/v1.49.0...v1.49.1) (2026-07-08)
 
 
