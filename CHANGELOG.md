@@ -1,3 +1,10 @@
+# [1.50.0](https://github.com/rafaelsene01/agent-flow/compare/v1.49.2...v1.50.0) (2026-07-08)
+
+
+### Features
+
+* implement multi-provider architecture for GitHub integration ([4c7e4c0](https://github.com/rafaelsene01/agent-flow/commit/4c7e4c03abb108b72001db9e2812101291300d0d))
+
 ## [1.49.2](https://github.com/rafaelsene01/agent-flow/compare/v1.49.1...v1.49.2) (2026-07-08)
 
 
