@@ -26,10 +26,17 @@ function forcedLang(type) {
   return type === "TOOL" ? "json" : null;
 }
 
+// Limite de tamanho para destaque de sintaxe. Acima disso renderiza texto puro:
+// hljs.highlightAuto testa ~30 gramáticas por bloco, síncrono na main thread, e
+// um bloco grande (ex.: THINKING/TEXT longo) trava o navegador por segundos e
+// consome memória. Blocos assim não precisam de highlight — cai no texto puro.
+const MAX_HIGHLIGHT_CHARS = 3000;
+
 // Aplica highlight.js. Linguagem forçada → highlight direto.
 // Caso contrário, auto-detecta e só destaca quando a confiança é alta;
 // senão devolve texto puro (logs de "pensamento"/"texto" não são código).
 function highlightContent(content, type) {
+  if (content.length > MAX_HIGHLIGHT_CHARS) return { text: content };
   const lang = forcedLang(type);
   if (lang && hljs.getLanguage(lang)) {
     try {
