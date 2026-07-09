@@ -111,6 +111,12 @@ function SectionContent({ content, type }) {
   );
 }
 
+// content-visibility: auto faz o navegador pular layout/paint dos blocos fora da
+// viewport (virtualização declarativa) — sem isso, rolar um log longo recalcula o
+// layout de milhares de blocos e trava a aba. contain-intrinsic-size dá uma altura
+// estimada aos blocos não renderizados pra a scrollbar não pular.
+const CV_STYLE = { contentVisibility: "auto", containIntrinsicSize: "auto 48px" };
+
 export default function LogView({ text }) {
   const blocks = useMemo(() => parseBlocks(text ?? ""), [text]);
 
@@ -120,7 +126,11 @@ export default function LogView({ text }) {
         if (b.kind === "line") {
           // Linhas avulsas (ex.: eventos colapsados "[tool/x]  ×3")
           return (
-            <div key={idx} className="px-2 text-zinc-500 whitespace-pre-wrap break-all">
+            <div
+              key={idx}
+              className="px-2 text-zinc-500 whitespace-pre-wrap break-all"
+              style={CV_STYLE}
+            >
               {b.text}
             </div>
           );
@@ -131,6 +141,7 @@ export default function LogView({ text }) {
           <div
             key={idx}
             className={cn("border-l-2 pl-3 pr-1 py-0.5", meta.bar)}
+            style={CV_STYLE}
           >
             <div className={cn("font-bold uppercase tracking-wide", meta.color)}>
               [{b.type}]

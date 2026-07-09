@@ -22,6 +22,10 @@ import { withAuthQs } from "@/lib/auth";
 // do next dev, que segura o stream SSE. Em produção é mesma origem.
 const SSE_BASE = process.env.NODE_ENV === "development" ? "http://localhost:5522" : "";
 
+// Máximo de caracteres do log renderizados de uma vez (~200 KB). Acima disso o DOM
+// fica grande demais e o navegador trava ao rolar; mantemos só o final do log.
+const MAX_LOG_CHARS = 200_000;
+
 const STATUS_CLASS = {
   queued: "",
   processing: "border-blue-400 text-blue-600 dark:text-blue-400",
@@ -77,12 +81,27 @@ function RunLogOverlay({ segment, onClose }) {
     setLogText("");
     loadedStatic.current = false;
     const es = new EventSource(withAuthQs(`${SSE_BASE}/api/agent-runs/${encodeURIComponent(runId)}/log/stream`));
-    es.onmessage = (e) => setLogText((prev) => prev + e.data + "\n");
+    es.onmessage = (e) =>
+      setLogText((prev) => {
+        const next = prev + e.data + "\n";
+        // Evita crescimento ilimitado da string em runs longos; guarda folga acima
+        // do teto de render pra o collapse ter contexto.
+        return next.length > MAX_LOG_CHARS * 2 ? next.slice(next.length - MAX_LOG_CHARS * 2) : next;
+      });
     es.addEventListener("done", () => es.close());
     return () => es.close();
   }, [isActive, runId]);
 
-  const display = useMemo(() => collapseLogLines(logText), [logText]);
+  // Teto de tamanho: renderiza só as últimas MAX_LOG_CHARS. Logs grandes (centenas
+  // de KB) montam um DOM enorme que trava o navegador — o começo raramente importa
+  // (o auto-scroll segue o fim). Mostra um aviso quando trunca.
+  const display = useMemo(() => {
+    const collapsed = collapseLogLines(logText);
+    if (collapsed.length <= MAX_LOG_CHARS) return collapsed;
+    const kept = collapsed.slice(collapsed.length - MAX_LOG_CHARS);
+    const dropped = Math.round((collapsed.length - kept.length) / 1024);
+    return `[… ${dropped} KB de log anterior omitidos — abra o arquivo de log completo em disco se precisar …]\n\n${kept}`;
+  }, [logText]);
 
   // A cada conteúdo novo (carga inicial ou linha do SSE), rola até o fim se o
   // follow estiver ativo. O scroll programático dispara onScroll, que recalcula
