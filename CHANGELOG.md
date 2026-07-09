@@ -1,3 +1,10 @@
+## [1.51.1](https://github.com/rafaelsene01/agent-flow/compare/v1.51.0...v1.51.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* prevent memory leak by releasing log buffers after run completion ([2096db1](https://github.com/rafaelsene01/agent-flow/commit/2096db15ac90aa567055d771f130ebce87894629))
+
 # [1.51.0](https://github.com/rafaelsene01/agent-flow/compare/v1.50.0...v1.51.0) (2026-07-08)
 
 
