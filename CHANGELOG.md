@@ -1,3 +1,10 @@
+# [1.52.0](https://github.com/rafaelsene01/agent-flow/compare/v1.51.1...v1.52.0) (2026-07-09)
+
+
+### Features
+
+* add syntax highlighting limit to improve performance ([bc53d6a](https://github.com/rafaelsene01/agent-flow/commit/bc53d6acc5460f83607cb86e1987ca7be021be8c))
+
 ## [1.51.1](https://github.com/rafaelsene01/agent-flow/compare/v1.51.0...v1.51.1) (2026-07-09)
 
 
