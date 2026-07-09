@@ -1,3 +1,10 @@
+# [1.53.0](https://github.com/rafaelsene01/agent-flow/compare/v1.52.0...v1.53.0) (2026-07-09)
+
+
+### Features
+
+* optimize log rendering and memory usage ([9637cc2](https://github.com/rafaelsene01/agent-flow/commit/9637cc25ed90eab3332ec41effdc1717e20a6f49))
+
 # [1.52.0](https://github.com/rafaelsene01/agent-flow/compare/v1.51.1...v1.52.0) (2026-07-09)
 
 
