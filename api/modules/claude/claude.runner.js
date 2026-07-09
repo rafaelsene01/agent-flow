@@ -99,6 +99,10 @@ export function broadcastDone(id) {
     }
   }
   sseClients.delete(id);
+  // Libera o buffer em memória: o histórico de um run finalizado é servido pelo
+  // arquivo persistido (GET /log), não por replay. Sem isso o log completo de
+  // cada run (id único) ficaria retido em RAM para sempre — vazamento.
+  logBuffers.delete(id);
 }
 
 // ── Log streams ────────────────────────────────────────────────────────────────
