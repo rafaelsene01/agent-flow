@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { getConfig } from "../config/config.service.js";
+import { getMaxConcurrent, getActiveCount, reserveSlot, releaseSlot } from "../claude/claude.concurrency.js";
 import { createRun, getRun, patchRun, runsProcessingByAgent, worktreeKey, worktreesOccupied, nextQueuedForFreeAgents, failDependents, resetProcessingToQueued, healOrphanDependencies, promoteReadyBreakpoints, approveBreakpoint as approveBreakpointStore } from "./agent-runs.store.js";
 import { startRun } from "./agent-runs.runner.js";
 
@@ -18,14 +18,19 @@ export function tick() {
   // do usuário — não consomem slot de concorrência nem rodam no Claude.
   promoteReadyBreakpoints();
 
-  const cap = getConfig().maxConcurrentRuns ?? 3;
-  if (active.size >= cap) return;
+  // Teto GLOBAL de processos `claude`: getActiveCount() soma runs da fila + chats
+  // de worktree (contador único em claude.concurrency). Assim a fila recua quando
+  // o chat está ocupando slots, e vice-versa — nunca se estoura o limite.
+  const cap = getMaxConcurrent();
+  const free = cap - getActiveCount();
+  if (free <= 0) return;
 
   const busyAgentIds = new Set([...active, ...runsProcessingByAgent().keys()]);
   const busyWorktrees = new Set([...activeWorktrees, ...worktreesOccupied()]);
-  const candidates = nextQueuedForFreeAgents(busyAgentIds, busyWorktrees).slice(0, cap - active.size);
+  const candidates = nextQueuedForFreeAgents(busyAgentIds, busyWorktrees).slice(0, free);
 
   for (const run of candidates) {
+    reserveSlot();
     active.add(run.agent_id);
     activeWorktrees.add(wtKey(run));
     const started = patchRun(run.id, { status: "processing", started_at: new Date().toISOString() });
@@ -37,7 +42,10 @@ export function tick() {
 }
 
 export function onRunSettled(agentId, runId, worktreeKey) {
-  active.delete(agentId);
+  // Set.delete devolve true só se o agentId estava presente: libera o slot global
+  // exatamente uma vez por run, mesmo que onRunSettled seja chamado em duplicidade
+  // (caminho de erro do startRun + .catch do dispatcher).
+  if (active.delete(agentId)) releaseSlot();
   if (worktreeKey) activeWorktrees.delete(worktreeKey);
   // Se o run terminou em erro, os passos seguintes da pipeline não podem rodar
   // (dependem deste `done`) — falha-os em cascata para não ficarem presos na fila.

@@ -19,7 +19,7 @@ Persiste a config global em `~/.agent-flow/config.json`. Escritas passam por uma
 |-------|--------|-----------|
 | `projectsPath` | `~/.agent-flow/projects` | Base dos projetos |
 | `boards` | `[]` | Boards salvos |
-| `maxConcurrentRuns` | `3` | Slots de execução do Claude |
+| `maxConcurrentRuns` | `null` (auto) | Teto de processos `claude` simultâneos (fila + chat). `null` = adaptativo ao host (`min(⌊núcleos/2⌋, ⌊RAM_GB/4⌋)`, mín. 1); um número sobrepõe. Ver [claude](claude.md). |
 | `runTimeoutMinutes` | `30` | Timeout de run |
 | `language` | `"en"` | Idioma das instruções aos agentes (`"pt"` \| `"en"`) |
 | `githubMethod` | — | Auth detectada: `"env"` \| `"gh-cli"` |

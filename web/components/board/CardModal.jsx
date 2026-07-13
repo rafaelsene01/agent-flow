@@ -54,6 +54,11 @@ import { useToast } from "@/lib/toast";
 import { useI18n } from "@/lib/i18nContext";
 import { Collapsible as CollapsiblePrimitive } from "radix-ui";
 
+// Máximo de caracteres do log renderizados de uma vez (~200 KB). Acima disso o DOM
+// fica grande demais e o navegador trava ao rolar; mantemos só o final do log.
+// Mesmo teto do RunModal — o log ao vivo do worktree também é ilimitado sem isto.
+const MAX_LOG_CHARS = 200_000;
+
 const TYPE_LABEL = {
   Issue: "Issue",
   PullRequest: "Pull request",
@@ -403,7 +408,14 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
       withAuthQs(`${base}/api/config/worktrees/${encodeURIComponent(worktreeId)}/log/stream`),
     );
     es.onmessage = (e) => {
-      setLogText((prev) => prev + e.data + "\n");
+      setLogText((prev) => {
+        const next = prev + e.data + "\n";
+        // Evita crescimento ilimitado da string em runs longos; guarda folga acima
+        // do teto de render pra o collapse ter contexto.
+        return next.length > MAX_LOG_CHARS * 2
+          ? next.slice(next.length - MAX_LOG_CHARS * 2)
+          : next;
+      });
     };
     es.addEventListener("done", () => es.close());
     return () => es.close();
@@ -495,7 +507,16 @@ export default function CardModal({ item, board, onClose, onWorktreeChange }) {
     }
   }
 
-  const displayLogText = useMemo(() => collapseLogLines(logText), [logText]);
+  // Teto de tamanho: renderiza só as últimas MAX_LOG_CHARS. Logs grandes (centenas
+  // de KB) montam um DOM enorme que trava o navegador — o começo raramente importa
+  // (o auto-scroll segue o fim). Mostra um aviso quando trunca.
+  const displayLogText = useMemo(() => {
+    const collapsed = collapseLogLines(logText);
+    if (collapsed.length <= MAX_LOG_CHARS) return collapsed;
+    const kept = collapsed.slice(collapsed.length - MAX_LOG_CHARS);
+    const dropped = Math.round((collapsed.length - kept.length) / 1024);
+    return `[… ${dropped} KB de log anterior omitidos — abra o arquivo de log completo em disco se precisar …]\n\n${kept}`;
+  }, [logText]);
 
   return (
     <Dialog

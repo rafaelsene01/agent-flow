@@ -8,7 +8,9 @@ const CONFIG_FILE = path.join(APP_DIR, "config.json");
 const DEFAULTS = {
   projectsPath:      path.join(APP_DIR, "projects"),
   boards:            [],
-  maxConcurrentRuns: 3,
+  // null = "auto": o teto é derivado do host (núcleos/RAM) em getMaxConcurrent().
+  // Um número no config.json sobrepõe e desliga o cálculo adaptativo.
+  maxConcurrentRuns: null,
   runTimeoutMinutes: 30,
   language:          "en",
 };

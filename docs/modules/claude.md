@@ -13,6 +13,7 @@ Runner do Claude CLI: spawn de processos, logs com SSE e controle de concorrênc
 | `claude.service.js` | `getStatus()` — detecção via `claude --version` (CLI é o único método) |
 | `claude.runner.js` | Spawn/resume do CLI, log persistido + broadcast SSE |
 | `claude.concurrency.js` | Slots de execução simultânea + registro/cancelamento de processos |
+| `claude.kill.js` | `killTree(child)` — mata o `claude` e toda a descendência (grupo de processos) |
 
 ---
 
@@ -26,10 +27,17 @@ Runner do Claude CLI: spawn de processos, logs com SSE e controle de concorrênc
 
 ## claude.concurrency.js
 
-- `acquireSlot()` / `releaseSlot()` — limite de execuções simultâneas (config `maxConcurrentRuns`, default 3). `acquireSlot` lança erro com `status` quando cheio.
+- `getMaxConcurrent()` — teto ÚNICO de processos `claude` simultâneos, compartilhado pela fila de runs (`agent-runs.queue`) e pelo chat de worktree (`routes/config/runner`). Um número em `maxConcurrentRuns` sobrepõe; `null`/ausente cai no cálculo adaptativo ao host: `min(⌊núcleos/2⌋, ⌊RAM_GB/4⌋)`, mínimo 1.
+- `acquireSlot()` / `releaseSlot()` — admissão que **lança** `status: 429` quando cheio (usada pelo chat, que recusa em vez de enfileirar).
+- `reserveSlot()` — reserva sem lançar (usada pelo dispatcher da fila, que já checou `getActiveCount()` contra `getMaxConcurrent()` antes de despachar).
+- `getActiveCount()` — total de processos `claude` vivos (runs + chats); é o valor que ambos os caminhos consultam contra o teto.
 - `registerProcess(id, child)` / `unregisterProcess(id)` — processos ativos por id.
-- `cancelProcess(id)` — mata o processo registrado (cancelamento de run/chat).
+- `cancelProcess(id)` — mata o processo registrado (cancelamento de run/chat) via `killTree`.
 - `getActiveCount()`
+
+## claude.kill.js
+
+- `killTree(child)` — derruba o `claude` e **toda a descendência** (tools, bash, MCP servers), evitando netos órfãos. No Unix os processos são spawnados com `detached: true` (líder de grupo) e o kill usa `process.kill(-pid)` no grupo, com SIGKILL de fallback após ~5s; no Windows usa `taskkill /T /F`. Usado no timeout do runner e no `cancelProcess`.
 
 ## claude.service.js — `getStatus()`
 

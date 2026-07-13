@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import { spawn } from "child_process";
 import { getConfig, getHelpersDir } from "../config/config.service.js";
+import { killTree } from "./claude.kill.js";
 
 const LOGS_DIR = path.join(os.homedir(), ".agent-flow", "logs");
 const isWin = process.platform === "win32";
@@ -302,6 +303,9 @@ export function runClaude(
       shell: isWin,
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
+      // Unix: vira líder do próprio grupo de processos, para o killTree
+      // derrubar o claude e toda a descendência (tools, bash, MCP) de uma vez.
+      detached: !isWin,
     });
 
     logStream.write(
@@ -315,7 +319,7 @@ export function runClaude(
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
-      child.kill("SIGTERM");
+      killTree(child);
       const minutes = getConfig().runTimeoutMinutes ?? 30;
       resolve({
         code: 1,
@@ -383,6 +387,9 @@ export function resumeClaude(
       shell: isWin,
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
+      // Unix: vira líder do próprio grupo de processos, para o killTree
+      // derrubar o claude e toda a descendência (tools, bash, MCP) de uma vez.
+      detached: !isWin,
     });
 
     logStream.write(
@@ -396,7 +403,7 @@ export function resumeClaude(
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
-      child.kill("SIGTERM");
+      killTree(child);
       const minutes = getConfig().runTimeoutMinutes ?? 30;
       resolve({
         code: 1,
