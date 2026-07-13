@@ -1,3 +1,10 @@
+# [1.54.0](https://github.com/rafaelsene01/agent-flow/compare/v1.53.0...v1.54.0) (2026-07-13)
+
+
+### Features
+
+* enhance concurrency management and log handling ([5f35edc](https://github.com/rafaelsene01/agent-flow/commit/5f35edc4f8350a4973e35c9886e4c96cbe46ed62))
+
 # [1.53.0](https://github.com/rafaelsene01/agent-flow/compare/v1.52.0...v1.53.0) (2026-07-09)
 
 
