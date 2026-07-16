@@ -15,7 +15,6 @@ import agentRunsRoutes from "./routes/agent-runs.js";
 import boardChatRoutes from "./routes/board-chat.js";
 import integrationsRoutes from "./routes/integrations.js";
 import updateRoutes from "./routes/update.js";
-import { warmup } from "./modules/status/status.cache.js";
 import { registerProviders } from "./modules/providers.bootstrap.js";
 import { get as getSource } from "./modules/sources/sources.registry.js";
 import { WEB_DIST_DIR } from "./paths.js";
@@ -130,7 +129,6 @@ export async function startServer({ port, host, apiOnly = false }) {
   server.headersTimeout = 185_000; // deve ser > requestTimeout
   server.keepAliveTimeout = 125_000; // > proxyTimeout do Next (120s)
 
-  warmup();
   // Pré-aquece o cache de cada board via seu SourceProvider (warm é opcional no
   // contrato). Resolve o source por board — provider-correto para futuras fontes.
   // Repete a cada 60s para manter os cards frescos, mesmo sem ninguém acessando;
