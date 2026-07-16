@@ -141,6 +141,14 @@ function CardRunsList({ runs, onOpen }) {
           <span className="min-w-0 flex-1 truncate text-xs font-medium">
             {r.agent_name}
           </span>
+          {r.session_index != null && (
+            <span
+              title={t("running.launch.session")}
+              className="shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground"
+            >
+              S{r.session_index}
+            </span>
+          )}
           <span
             className={cn(
               "shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",

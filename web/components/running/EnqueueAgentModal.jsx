@@ -31,7 +31,8 @@ function newStepId() {
 export default function EnqueueAgentModal({ board, item, worktree, onClose, onEnqueued }) {
   const { t } = useI18n();
   const [agents, setAgents] = useState(null);
-  const [steps, setSteps] = useState([]); // [{ id, agentId, name, model, effort }]
+  const [steps, setSteps] = useState([]); // [{ id, agentId, name, model, effort, session: "new"|number }]
+  const [cardSessions, setCardSessions] = useState([]); // [{ index, agentName }] sessões já usadas no card
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [dragIndex, setDragIndex] = useState(null);
@@ -44,20 +45,56 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
       .catch(() => setAgents([]));
   }, []);
 
+  // Sessões do Claude já usadas pelos runs do card (index → último agente):
+  // um passo novo pode retomá-las em vez de abrir sessão própria (economia de
+  // tokens — o contexto que o run anterior construiu é herdado via resume).
+  useEffect(() => {
+    if (worktree?.cardNumber == null) return;
+    fetch(`/api/agent-runs?repo=${encodeURIComponent(worktree.repo)}&card=${worktree.cardNumber}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const byIndex = new Map();
+        for (const r of d.runs ?? []) {
+          if (r.session_index != null) byIndex.set(r.session_index, r.agent_name);
+        }
+        setCardSessions(
+          [...byIndex.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([index, agentName]) => ({ index, agentName })),
+        );
+      })
+      .catch(() => {});
+  }, [worktree]);
+
   function toggleAgent(agent, checked) {
     setError(null);
     if (checked) {
       setSteps((prev) => [
         ...prev,
-        { id: newStepId(), agentId: agent.id, name: agent.name, model: agent.model || "sonnet", effort: agent.effort || "medium" },
+        { id: newStepId(), agentId: agent.id, name: agent.name, model: agent.model || "sonnet", effort: agent.effort || "medium", session: "new" },
       ]);
     } else {
-      setSteps((prev) => prev.filter((s) => s.agentId !== agent.id));
+      setSteps((prev) => normalizeSessions(prev.filter((s) => s.agentId !== agent.id)));
     }
   }
 
   function patchStep(id, patch) {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }
+
+  // Depois de remover/reordenar, um passo pode apontar para a sessão de um passo
+  // que não existe mais ou que agora vem DEPOIS dele (impossível retomar uma
+  // sessão que ainda não começou) — esses voltam para "new".
+  function normalizeSessions(list) {
+    const earlier = new Set();
+    return list.map((s) => {
+      let out = s;
+      if (typeof s.session === "string" && s.session.startsWith("step:") && !earlier.has(s.session.slice(5))) {
+        out = { ...s, session: "new" };
+      }
+      if (s.kind !== "breakpoint") earlier.add(s.id);
+      return out;
+    });
   }
 
   // Ponto de parada: passo que não roda no Claude, só destrava o próximo quando
@@ -73,7 +110,7 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
       const target = index + dir;
       if (target < 0 || target >= next.length) return prev;
       [next[index], next[target]] = [next[target], next[index]];
-      return next;
+      return normalizeSessions(next);
     });
   }
 
@@ -84,7 +121,7 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
       const next = [...prev];
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
-      return next;
+      return normalizeSessions(next);
     });
   }
 
@@ -93,6 +130,23 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
     setDragIndex(null);
     setOverIndex(null);
   }
+
+  // Index de sessão efetivo de cada passo, na ordem da pipeline: "new" ganha o
+  // próximo index livre do card; "card:N" retoma a sessão N já usada no card;
+  // "step:<id>" herda o index (já resolvido) do passo anterior referenciado.
+  // Passos com o mesmo index compartilham a sessão do Claude (resume).
+  const baseIndex = cardSessions.reduce((max, s) => Math.max(max, s.index), 0);
+  const stepSessionIndex = (() => {
+    const map = new Map();
+    let next = baseIndex;
+    for (const s of steps) {
+      if (s.kind === "breakpoint") continue;
+      if (s.session === "new") map.set(s.id, ++next);
+      else if (String(s.session).startsWith("card:")) map.set(s.id, Number(s.session.slice(5)));
+      else if (String(s.session).startsWith("step:")) map.set(s.id, map.get(s.session.slice(5)));
+    }
+    return map;
+  })();
 
   async function handleEnqueue() {
     if (steps.length === 0 || sending) return;
@@ -109,7 +163,7 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
           steps: steps.map((s) =>
             s.kind === "breakpoint"
               ? { id: s.id, kind: "breakpoint" }
-              : { id: s.id, agentId: s.agentId, model: s.model, effort: s.effort },
+              : { id: s.id, agentId: s.agentId, model: s.model, effort: s.effort, sessionIndex: stepSessionIndex.get(s.id) },
           ),
         }),
       });
@@ -201,7 +255,9 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
                   {t("running.launch.addBreakpoint")}
                 </Button>
               </div>
-              <p className="text-[11px] text-muted-foreground">{t("running.launch.orderHint")}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {t("running.launch.orderHint")} {t("running.launch.sessionHint")}
+              </p>
               <div className="flex flex-col gap-1.5">
                 {steps.map((s, i) => (
                   <div
@@ -238,6 +294,30 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
                     ) : (
                       <>
                         <span className="min-w-0 flex-1 truncate text-xs font-medium">{s.name}</span>
+                        <span
+                          title={t("running.launch.session")}
+                          className="shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground"
+                        >
+                          S{stepSessionIndex.get(s.id)}
+                        </span>
+                        <Select value={String(s.session)} onValueChange={(v) => patchStep(s.id, { session: v })}>
+                          <SelectTrigger size="sm" className="h-7 w-[170px] text-[11px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="new">{t("running.launch.session.new")}</SelectItem>
+                            {cardSessions.map((cs) => (
+                              <SelectItem key={`card:${cs.index}`} value={`card:${cs.index}`}>
+                                {`${t("running.launch.session.existing")} ${cs.index} · ${cs.agentName}`}
+                              </SelectItem>
+                            ))}
+                            {steps.slice(0, i).map((p, j) =>
+                              p.kind === "breakpoint" ? null : (
+                                <SelectItem key={`step:${p.id}`} value={`step:${p.id}`}>
+                                  {`${t("running.launch.session.ofStep")} ${j + 1} · ${p.name}`}
+                                </SelectItem>
+                              ),
+                            )}
+                          </SelectContent>
+                        </Select>
                         <Select value={s.model} onValueChange={(v) => patchStep(s.id, { model: v })}>
                           <SelectTrigger size="sm" className="h-7 w-[92px] text-[11px]"><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -278,7 +358,7 @@ export default function EnqueueAgentModal({ board, item, worktree, onClose, onEn
                     </div>
                     <button
                       type="button"
-                      onClick={() => setSteps((prev) => prev.filter((x) => x.id !== s.id))}
+                      onClick={() => setSteps((prev) => normalizeSessions(prev.filter((x) => x.id !== s.id)))}
                       aria-label={t("running.launch.remove")}
                       className="shrink-0 text-muted-foreground hover:text-destructive"
                     >

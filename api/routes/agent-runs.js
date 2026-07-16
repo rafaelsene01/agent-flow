@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { getAgent } from "../modules/agents/agents.service.js";
-import { getRun, getChain, listRuns, listRunsForCard, runsAttentionSummary, patchRun, appendTurn, deleteRun, clearRuns } from "../modules/agent-runs/agent-runs.store.js";
+import { getRun, getChain, listRuns, listRunsForCard, runsAttentionSummary, patchRun, appendTurn, deleteRun, clearRuns, sessionsByIndexForCard } from "../modules/agent-runs/agent-runs.store.js";
+import { randomUUID } from "crypto";
 import { enqueue, enqueueChain, tick, approveBreakpoint } from "../modules/agent-runs/agent-runs.queue.js";
 import { registerSseClient } from "../modules/claude/claude.runner.js";
 import { cancelProcess } from "../modules/claude/claude.concurrency.js";
@@ -50,6 +51,13 @@ export default function agentRunsRoutes(app) {
 
     // Resolve o nome de cada agente (denormalizado, resiliente a delete) e valida.
     // Pontos de parada (kind='breakpoint') não têm agente: passam direto.
+    //
+    // `sessionIndex` (opcional, por passo): índice de sessão do Claude no card.
+    // Índice já usado por um run do card (ou por um passo anterior desta chain)
+    // → o passo RETOMA aquela sessão (mesmo session_id, resume no runner);
+    // índice inédito → sessão nova sob esse índice. Sem índice, createRun
+    // atribui o próximo livre (sessão própria — comportamento antigo).
+    const indexToSession = sessionsByIndexForCard(wt.repo, wt.cardNumber);
     const resolved = [];
     for (const step of steps) {
       if (step.kind === "breakpoint") {
@@ -58,12 +66,25 @@ export default function agentRunsRoutes(app) {
       }
       const agent = getAgent(step.agentId);
       if (!agent) return sendError(res, 400, `Agente não encontrado: ${step.agentId}`);
+      let sessionId;
+      const sessionIndex = Number.isInteger(step.sessionIndex) && step.sessionIndex > 0
+        ? step.sessionIndex
+        : undefined;
+      if (sessionIndex != null) {
+        sessionId = indexToSession.get(sessionIndex);
+        if (!sessionId) {
+          sessionId = randomUUID();
+          indexToSession.set(sessionIndex, sessionId);
+        }
+      }
       resolved.push({
         id: step.id,
         agentId: agent.id,
         agentName: agent.name,
         model: step.model || agent.model,
         effort: step.effort || agent.effort,
+        sessionId,
+        sessionIndex,
       });
     }
 

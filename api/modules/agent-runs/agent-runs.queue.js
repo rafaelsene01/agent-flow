@@ -66,7 +66,8 @@ export function enqueue(fields) {
 
 // Enfileira uma pipeline ordenada de agentes na MESMA worktree: cada passo só roda
 // quando o anterior terminou `done` (depends_on), mesmo entre agentes diferentes.
-// `steps` = [{ id?, agentId, agentName, model, effort }] na ordem de execução.
+// `steps` = [{ id?, agentId, agentName, model, effort, sessionId?, sessionIndex? }]
+// na ordem de execução — sessionId/sessionIndex compartilham sessão entre passos.
 export function enqueueChain({ steps, ...common }) {
   const chainId = randomUUID();
   const runs = [];
@@ -81,6 +82,8 @@ export function enqueueChain({ steps, ...common }) {
       agentName: step.agentName,
       model: step.model,
       effort: step.effort,
+      sessionId: step.sessionId,
+      sessionIndex: step.sessionIndex,
       dependsOn: prevId,
     });
     runs.push(run);

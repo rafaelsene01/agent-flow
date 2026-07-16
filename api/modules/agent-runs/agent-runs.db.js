@@ -30,6 +30,7 @@ export function getDb() {
       log_file      TEXT,
       model         TEXT NOT NULL DEFAULT 'sonnet',
       effort        TEXT NOT NULL DEFAULT 'medium',
+      session_index INTEGER,
       status        TEXT NOT NULL DEFAULT 'queued',
       resume        INTEGER NOT NULL DEFAULT 0,
       depends_on    TEXT,
@@ -53,5 +54,6 @@ export function getDb() {
   if (!cols.includes("resume_message")) db.exec(`ALTER TABLE agent_runs ADD COLUMN resume_message TEXT`);
   if (!cols.includes("turns")) db.exec(`ALTER TABLE agent_runs ADD COLUMN turns TEXT`);
   if (!cols.includes("kind")) db.exec(`ALTER TABLE agent_runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'agent'`);
+  if (!cols.includes("session_index")) db.exec(`ALTER TABLE agent_runs ADD COLUMN session_index INTEGER`);
   return db;
 }

@@ -56,6 +56,21 @@ async function fetchWithTokenRefresh(token, doFetch) {
   return res;
 }
 
+// GitHub 5xx = indisponibilidade do lado deles (a página "Unicorn" vem como HTML
+// gigante): mensagem amigável em vez de despejar o body na UI. Nos demais status
+// mantém o texto do body. `err.status` fica no erro para rotas que repassam
+// (`err.status ?? 500`).
+export function githubApiError(prefix, status, text) {
+  const err =
+    status >= 500
+      ? new Error(
+          `GitHub está fora do ar no momento (HTTP ${status}) — não foi possível validar a operação. Tente novamente em instantes.`,
+        )
+      : new Error(`${prefix} ${status}: ${text}`);
+  err.status = status >= 500 ? 503 : status;
+  return err;
+}
+
 function checkRateLimit(res) {
   const remaining = parseInt(res.headers.get("x-ratelimit-remaining") ?? "999", 10);
   const resetAt   = parseInt(res.headers.get("x-ratelimit-reset")     ?? "0",   10);
@@ -86,7 +101,7 @@ async function request(path, token) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`GitHub API error ${res.status}: ${text}`);
+    throw githubApiError("GitHub API error", res.status, text);
   }
 
   return res.json();
@@ -117,7 +132,7 @@ export async function graphQL(query, token, variables = {}) {
   checkRateLimit(res);
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`GitHub GraphQL error ${res.status}: ${text}`);
+    throw githubApiError("GitHub GraphQL error", res.status, text);
   }
   return res.json();
 }

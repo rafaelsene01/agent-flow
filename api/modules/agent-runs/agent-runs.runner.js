@@ -19,6 +19,7 @@ import {
   patchRun,
   appendTurn,
   updateLastExecTurn,
+  sessionHasStartedRun,
 } from "./agent-runs.store.js";
 import { recordUsage } from "../usage/usage.store.js";
 
@@ -612,6 +613,57 @@ export async function startRun(run, { onSettled } = {}) {
       onSpawn,
       opts,
     );
+    // Sessão anterior não existe mais (ex.: histórico do CLI apagado). Em vez de
+    // falhar o step, recria a sessão sob o MESMO session_id (resumes futuros
+    // voltam a funcionar) com o prompt completo + a mensagem do resume.
+    if (result.resumeNotFound) {
+      logStream.write(
+        "\n=== Sessão anterior não encontrada; reiniciando com prompt completo ===\n",
+      );
+      result = await runClaude(
+        buildPrompt(run, agentPrompt, { allowGit, allowGitRead, noAsk }) +
+          (resumeMessage
+            ? `\n\n## Mensagem do usuário (a sessão anterior foi perdida)\n${resumeMessage}`
+            : ""),
+        run.worktree_path,
+        logStream,
+        null,
+        onSpawn,
+        { ...opts, sessionId: run.session_id },
+      );
+    }
+  } else if (sessionHasStartedRun(run.session_id, run.id)) {
+    // Sessão compartilhada (mesmo índice de sessão do card): outro run já criou
+    // e usou esta sessão — a primeira execução deste run RETOMA a conversa com
+    // o prompt completo do agente como mensagem, herdando todo o contexto que o
+    // passo anterior construiu (economia de re-exploração do repo).
+    const fullPrompt = buildPrompt(run, agentPrompt, { allowGit, allowGitRead, noAsk });
+    logStream.write(
+      `=== Continuando sessão compartilhada (index ${run.session_index ?? "?"}) ===\n`,
+    );
+    result = await resumeClaude(
+      fullPrompt,
+      run.worktree_path,
+      logStream,
+      run.session_id,
+      onSpawn,
+      opts,
+    );
+    // Sessão anterior não existe mais (ex.: histórico do CLI apagado) — cria a
+    // sessão sob o MESMO session_id, como no fallback do resume normal.
+    if (result.resumeNotFound) {
+      logStream.write(
+        "\n=== Sessão anterior não encontrada; iniciando sessão nova com prompt completo ===\n",
+      );
+      result = await runClaude(
+        fullPrompt,
+        run.worktree_path,
+        logStream,
+        null,
+        onSpawn,
+        { ...opts, sessionId: run.session_id },
+      );
+    }
   } else {
     result = await runClaude(
       buildPrompt(run, agentPrompt, { allowGit, allowGitRead, noAsk }),

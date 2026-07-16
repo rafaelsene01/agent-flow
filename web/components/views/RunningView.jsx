@@ -118,6 +118,14 @@ export default function RunningView() {
                     {r.card_number != null ? ` · #${r.card_number}` : ""}
                   </span>
                 </div>
+                {r.session_index != null && (
+                  <span
+                    title={t("running.launch.session")}
+                    className="shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground"
+                  >
+                    S{r.session_index}
+                  </span>
+                )}
                 <StatusBadge status={r.status} />
               </button>
               <button

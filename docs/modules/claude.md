@@ -20,7 +20,12 @@ Runner do Claude CLI: spawn de processos, logs com SSE e controle de concorrênc
 ## claude.runner.js
 
 - `runClaude(prompt, cwd, logStream, sessionId, onSpawn, opts)` — roda o CLI com `{ model, effort }`; `sessionId` nomeia a sessão (permite resume depois). Retorna `{ code, ... }`.
-- `resumeClaude(...)` — mesma assinatura; retoma sessão existente (mesmo session id).
+- `resumeClaude(...)` — mesma assinatura; retoma sessão existente (mesmo session id). Se a sessão não existe mais ("No conversation found"), o resultado traz `resumeNotFound: true` — a fila de runs usa isso para recriar a sessão com o prompt completo sob o mesmo `--session-id` (ver `startRun`).
+- Ambos delegam ao núcleo interno `execClaude` (spawn, log, timeout, parse), que:
+  - filtra do env do filho os marcadores internos de runtime do Claude Code (`CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`/`EXECPATH`/`SESSION_ID`/`SSE_PORT`, prefixo `CLAUDECODE_`) — sem isso o filho se acha sessão aninhada quando o agent-flow foi iniciado de dentro de uma sessão Claude Code. O namespace `CLAUDE_CODE_*` de config do usuário (ex.: `CLAUDE_CODE_GIT_BASH_PATH`) passa intacto;
+  - aplica timeout por **inatividade** (`runTimeoutMinutes` sem output novo), não wall-clock — run que continua emitindo eventos nunca é morto por durar muito;
+  - falha o run (`code: 1`) se um tool result trouxe `status: "async_launched"` (tarefa em background morre com o processo; sucesso seria trabalho incompleto). Detecção estrutural por campo, não por texto;
+  - bloqueia via `--disallowedTools`, além dos comandos de kill por nome, o `AskUserQuestion` (headless: a pergunta não tem onde renderizar e a resposta volta vazia).
 - `createRunLog(wt, name, { append, initialContent })` — stream de log persistido no helpers dir; expõe `persistPath`.
 - `registerSseClient(id, res)` / `unregisterSseClient` / `broadcastDone(id)` — clientes SSE por id (worktree ou run) recebem o log em tempo real.
 - `failureDetail(result, persistPath)` — mensagem de erro amigável a partir do resultado + log.

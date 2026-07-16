@@ -12,11 +12,12 @@ Enfileira um run avulso. **Body:** `{ agentId, repo, cardNumber?, title?, body?,
 
 ## POST /api/agent-runs/chain
 
-Pipeline ordenada na worktree já configurada do card. **Body:** `{ worktreeId, title?, body?, steps: [{ id, agentId, model?, effort? } | { id, kind: "breakpoint" }] }`.
+Pipeline ordenada na worktree já configurada do card. **Body:** `{ worktreeId, title?, body?, steps: [{ id, agentId, model?, effort?, sessionIndex? } | { id, kind: "breakpoint" }] }`.
 
 - Cada passo só roda quando o anterior terminar `done`.
 - `kind: "breakpoint"` = ponto de parada: pipeline pausa até aprovação manual.
 - Nome do agente é denormalizado no run (resiliente a delete do agent).
+- `sessionIndex` (inteiro ≥ 1, opcional): index de sessão do Claude no card. Index já usado por run do card (ou por passo anterior da mesma chain) → passo RETOMA aquela sessão (mesmo `session_id`, resume no runner — herda contexto, economiza tokens). Index inédito → sessão nova sob esse index. Ausente → `createRun` atribui o próximo index livre do card (sessão própria, comportamento antigo).
 
 ## GET /api/agent-runs
 
