@@ -1,3 +1,10 @@
+# [1.55.0](https://github.com/rafaelsene01/agent-flow/compare/v1.54.0...v1.55.0) (2026-07-17)
+
+
+### Features
+
+* implement session management for agent runs ([50d9df1](https://github.com/rafaelsene01/agent-flow/commit/50d9df1a13ebe010c371c185b4775798a6d68c8e))
+
 # [1.54.0](https://github.com/rafaelsene01/agent-flow/compare/v1.53.0...v1.54.0) (2026-07-13)
 
 
