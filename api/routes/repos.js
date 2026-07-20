@@ -3,6 +3,7 @@
 // injetada no git seam (setupWorktree). Nada aqui conhece "github".
 
 import { get as getRepo, list as listRepoHosts } from "../modules/repos/repos.registry.js";
+import { getHostsStatus } from "../modules/providers.status.js";
 import { setupWorktree } from "../modules/git/git.worktree.js";
 
 function sendError(res, err) {
@@ -24,6 +25,18 @@ export default function reposRoutes(app) {
         }
       }
       res.json(all);
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // Hosts de código registrados + status de cada um (para a tela de Conexões).
+  // Espelha GET /api/sources: servido do cache SWR (providers.status), com
+  // `?refresh=1` para revalidar. Registrado antes de /:host senão :host captura "hosts".
+  app.get("/api/repos/hosts", async (req, res) => {
+    try {
+      const refresh = req.query.refresh === "1" || req.query.refresh === "true";
+      res.json(await getHostsStatus({ refresh }));
     } catch (err) {
       sendError(res, err);
     }

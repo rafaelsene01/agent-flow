@@ -287,6 +287,20 @@ const PROCESS_KILL_RULE =
   "Se precisar parar um servidor/processo que você mesmo iniciou, guarde o PID ao iniciá-lo e " +
   "mate SOMENTE esse PID (ex.: `Stop-Process -Id <pid>`).\n";
 
+// Comandos longos (npm install, build, testes) DEVEM rodar em primeiro plano com o
+// timeout do próprio Bash tool. Rodar em background (run_in_background) e ficar
+// pollando o arquivo de output trava o agente em loop de espera — ele queima turns
+// aguardando uma tarefa que nunca conclui de forma acionável, e a carga do install
+// ainda satura a máquina a ponto de derrubar o health check do daemon. Esta regra
+// SOBREPÕE qualquer instrução global de "sempre usar run_in_background".
+const FOREGROUND_RULE =
+  "- Rode instalação/build/lint/testes e qualquer comando demorado SEMPRE em primeiro " +
+  "plano (NUNCA `run_in_background`/background), usando o parâmetro `timeout` do próprio " +
+  "Bash tool. NÃO fique aguardando nem pollando o output de tarefas em background — isso " +
+  "trava a execução em loop. Esta regra tem precedência sobre qualquer instrução global de " +
+  "usar background. Em npm, prefira `npm install --no-audit --no-fund --no-progress` para " +
+  "reduzir ruído de output.\n";
+
 function buildPrompt(run, agentPrompt, { allowGit, allowGitRead, noAsk } = {}) {
   // Agentes git-capazes (ex.: Commit & Push) recebem o contexto das branches e
   // têm liberado o uso de git; agentes allowGitRead (ex.: Code Reviewer) recebem
@@ -340,6 +354,7 @@ function buildPrompt(run, agentPrompt, { allowGit, allowGitRead, noAsk } = {}) {
     "leia os arquivos delas nos caminhos absolutos indicados antes de executar. " +
     "NÃO acione nenhuma outra skill instalada nem inicie fluxos de spec/design/tasks que não tenham sido pedidos.\n" +
     PROCESS_KILL_RULE +
+    FOREGROUND_RULE +
     askRule +
     gitRule +
     "TAREFA (card do board):\n" +
@@ -364,6 +379,7 @@ function buildResumeReminder(run, { allowGit, noAsk } = {}) {
     roleBlock +
     "Lembrete de regras (continuam valendo nesta continuação):\n" +
     PROCESS_KILL_RULE +
+    FOREGROUND_RULE +
     askRuleFor(noAsk) +
     gitRuleFor(allowGit) +
     validationContextFor(run.repo)

@@ -12,5 +12,10 @@ export const GH_COLORS = {
 };
 
 export function columnAccent(color) {
-  return GH_COLORS[color] ?? GH_COLORS.GRAY;
+  if (!color) return GH_COLORS.GRAY;
+  // Nomes do GitHub Projects (ex.: "GREEN") viram hex pelo map. Sources como o
+  // custom-kanban já entregam a cor em CSS (hex #RRGGBB) — usa como está.
+  if (GH_COLORS[color]) return GH_COLORS[color];
+  if (color.startsWith("#")) return color;
+  return GH_COLORS.GRAY;
 }

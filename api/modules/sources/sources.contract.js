@@ -43,6 +43,10 @@
  * @typedef {Object} SourceProvider
  * @property {string} name                                       identificador (ex.: "github-board")
  * @property {() => (SourceStatus|Promise<SourceStatus>)} getStatus
+ * @property {() => Promise<Array<{id:string,name:string}>>} [listOrganizations]  organizações do source (discovery; opcional — só sources que agrupam boards por org)
+ * @property {(organizationId:string) => Promise<Array<{id:string,name:string}>>} [listProjects]  projects de uma organização (discovery; opcional — passo após a org)
+ * @property {(organizationId:string, projectId:string) => Promise<Array<{id:string,name:string}>>} [listProjectBoards]  boards de um project (discovery; opcional — passo após o project)
+ * @property {(organizationId:string, projectId:string, boardId:string) => Promise<Array<{id:string,name:string,color?:string}>>} [listBoardColumns]  colunas de um board (discovery; opcional — passo após o board; color p/ colorir a coluna)
  * @property {() => Promise<Array<{id:string,name:string}>>} listBoards        boards conectáveis
  * @property {(boardId:string) => Promise<Array<{id:string,name:string,color?:string}>>} listColumns
  * @property {(boardId:string) => Promise<Array<{id:string,name:string,number?:number}>>} listViews

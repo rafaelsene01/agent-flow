@@ -45,6 +45,8 @@ export default function BoardChatModal({ board, onClose }) {
   const boardId = board.id;
   const repo = board.originRepo ?? "";
   const [owner, repoName] = repo.split("/");
+  // Host de código do repo vinculado ao board (default github via back-compat).
+  const host = board.repos?.[0]?.host ?? reposApi.DEFAULT_HOST;
 
   const [phase, setPhase] = useState("loading"); // "loading" | "choice" | "chat"
   const [existing, setExisting] = useState(null);
@@ -97,7 +99,7 @@ export default function BoardChatModal({ board, onClose }) {
     let active = true;
     setBranchesLoading(true);
     setBranchesError(null);
-    reposApi.listBranches(owner, repoName)
+    reposApi.listBranches(owner, repoName, "", host)
       .then((data) => {
         if (!active) return;
         if (data.error) throw new Error(data.error);
@@ -106,7 +108,7 @@ export default function BoardChatModal({ board, onClose }) {
       .catch((err) => { if (active) setBranchesError(err.message); })
       .finally(() => { if (active) setBranchesLoading(false); });
     return () => { active = false; };
-  }, [phase, started, owner, repoName]);
+  }, [phase, started, owner, repoName, host]);
 
   // Mantém a conversa rolada para o fim a cada mensagem nova.
   useEffect(() => {

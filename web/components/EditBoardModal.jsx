@@ -33,6 +33,8 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   const [saving]                    = useState(false);
   const [dragOver, setDragOver]     = useState(null);
   const [originRepo, setOriginRepo] = useState(board.originRepo ?? "");
+  const [repoHost, setRepoHost]     = useState(board.repos?.[0]?.host ?? reposApi.DEFAULT_HOST);
+  const [repoHosts, setRepoHosts]   = useState([]); // ids de hosts conectados
   const [viewFilter, setViewFilter] = useState(board.viewFilter ?? "");
   const [cmdInstall, setCmdInstall] = useState(board.validation?.install ?? "");
   const [cmdBuild,   setCmdBuild]   = useState(board.validation?.build   ?? "");
@@ -56,6 +58,18 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
   useEffect(() => {
     if (board.originRepo) fetchOverlayFiles(board.originRepo);
   }, [board.originRepo, fetchOverlayFiles]);
+
+  // Hosts de código conectados (tela de Conexões) para o seletor de Host.
+  useEffect(() => {
+    reposApi.hosts()
+      .then((list) => {
+        const connected = Array.isArray(list)
+          ? list.filter((h) => h.status?.connected).map((h) => h.host)
+          : [];
+        setRepoHosts(connected);
+      })
+      .catch(() => {});
+  }, []);
 
   const repoOptions = [...new Set([
     ...[...(viewFilter ?? "").matchAll(/repo:([^\s]+)/gi)]
@@ -126,7 +140,7 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
     // preserva o source do board (default via back-compat se ausente).
     const [lrOwner, lrRepo] = (originRepo || "").split("/");
     const linkedRepos = lrOwner && lrRepo
-      ? [{ host: reposApi.DEFAULT_HOST, owner: lrOwner, repo: lrRepo }]
+      ? [{ host: repoHost, owner: lrOwner, repo: lrRepo }]
       : [];
     onSaved({
       ...board,
@@ -206,17 +220,31 @@ export default function EditBoardModal({ board, onClose, onSaved }) {
                 Nenhum repositório detectado no filtro desta view.
               </p>
             ) : (
-              <select
-                id="edit-origin-repo"
-                value={originRepo}
-                onChange={(e) => setOriginRepo(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
-              >
-                <option value="">Selecione o repositório…</option>
-                {repoOptions.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                {repoHosts.length > 1 && (
+                  <select
+                    value={repoHost}
+                    onChange={(e) => setRepoHost(e.target.value)}
+                    title="Host do repositório"
+                    className="flex h-9 w-auto shrink-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+                  >
+                    {repoHosts.map((h) => (
+                      <option key={h} value={h}>{h.replace(/[-_]/g, " ")}</option>
+                    ))}
+                  </select>
+                )}
+                <select
+                  id="edit-origin-repo"
+                  value={originRepo}
+                  onChange={(e) => setOriginRepo(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+                >
+                  <option value="">Selecione o repositório…</option>
+                  {repoOptions.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
 

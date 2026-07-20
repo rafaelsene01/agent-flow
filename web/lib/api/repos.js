@@ -7,6 +7,13 @@ export const DEFAULT_HOST = "github";
 
 const json = (r) => r.json();
 
+// Hosts de código registrados + status de cada um (tela de Conexões).
+// [{ host, status: { connected, method, user, name, error?, commands? } }]
+// Servido do cache SWR do backend; `refresh:true` (=> ?refresh=1) revalida.
+export function hosts({ refresh = false } = {}) {
+  return fetch(`/api/repos/hosts${refresh ? "?refresh=1" : ""}`).then(json);
+}
+
 export function listBranches(owner, repo, query = "", host = DEFAULT_HOST) {
   const qs = query ? `?q=${encodeURIComponent(query)}` : "";
   return fetch(`/api/repos/${host}/${owner}/${repo}/branches${qs}`).then(json);

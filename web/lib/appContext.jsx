@@ -56,7 +56,9 @@ export function AppProvider({ children }) {
       fetch("/api/status").then((r) => r.json()).catch(() => null),
       fetch("/api/config").then((r) => r.json()).catch(() => ({})),
     ]).then(([status, config]) => {
-      if (!status?.github?.connected || !status?.claude?.connected) setShowSettings(true);
+      // Só o Claude (motor de execução) trava o boot. A conexão do GitHub é
+      // gerida na tela de Conexões e validada no fluxo de board.
+      if (!status?.claude?.connected) setShowSettings(true);
       dispatch({ type: "INIT_DONE", boards: config.boards ?? [] });
     }).catch(() => {
       dispatch({ type: "INIT_DONE", boards: [] });

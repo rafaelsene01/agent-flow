@@ -152,6 +152,7 @@ export const dictionaries = {
     "sidebar.running": "Running",
     "sidebar.usage": "Usage",
     "sidebar.integrations": "Integrações",
+    "sidebar.connections": "Conexões",
     "sidebar.settings": "Configurações",
     "sidebar.menu.open": "Abrir menu",
     "sidebar.menu.close": "Fechar menu",
@@ -196,6 +197,15 @@ export const dictionaries = {
     // Integrations
     "integrations.title": "Integrações",
     "integrations.subtitle": "Conecte serviços externos ao Agent Flow.",
+
+    // Conexões (Source de cards + Repo de código)
+    "connections.title": "Conexões",
+    "connections.subtitle": "Configure as fontes de cards e os repositórios de código. Elas aparecem ao criar um board e ao configurar a branch/worktree.",
+    "connections.sources": "Fontes de cards",
+    "connections.repos": "Repositórios de código",
+    "connections.loadError": "Falha ao carregar as conexões.",
+    "connections.empty": "Nenhum provedor registrado.",
+    "connections.refresh": "Verificar",
     "integrations.loadError": "Falha ao carregar as integrações.",
     "integrations.save": "Salvar",
     "integrations.saving": "Salvando…",
@@ -487,6 +497,7 @@ export const dictionaries = {
     "sidebar.running": "Running",
     "sidebar.usage": "Usage",
     "sidebar.integrations": "Integrations",
+    "sidebar.connections": "Connections",
     "sidebar.settings": "Settings",
     "sidebar.menu.open": "Open menu",
     "sidebar.menu.close": "Close menu",
@@ -534,6 +545,15 @@ export const dictionaries = {
     // Integrations
     "integrations.title": "Integrations",
     "integrations.subtitle": "Connect external services to Agent Flow.",
+
+    // Connections (card Source + code Repo)
+    "connections.title": "Connections",
+    "connections.subtitle": "Configure your card sources and code repositories. They show up when creating a board and when setting up the branch/worktree.",
+    "connections.sources": "Card sources",
+    "connections.repos": "Code repositories",
+    "connections.loadError": "Failed to load connections.",
+    "connections.empty": "No provider registered.",
+    "connections.refresh": "Check",
     "integrations.loadError": "Failed to load integrations.",
     "integrations.save": "Save",
     "integrations.saving": "Saving…",

@@ -17,6 +17,7 @@ import integrationsRoutes from "./routes/integrations.js";
 import updateRoutes from "./routes/update.js";
 import { warmup } from "./modules/status/status.cache.js";
 import { registerProviders } from "./modules/providers.bootstrap.js";
+import { warmProviderStatus } from "./modules/providers.status.js";
 import { get as getSource } from "./modules/sources/sources.registry.js";
 import { WEB_DIST_DIR } from "./paths.js";
 import { getConfig, getWorktrees, updateWorktreeStatus } from "./modules/config/config.service.js";
@@ -58,6 +59,11 @@ export async function startServer({ port, host, apiOnly = false }) {
   // Registra os providers (source + repo) antes de montar rotas — único ponto
   // que nomeia "github" por composição. Ver docs/providers.md.
   registerProviders();
+
+  // Aquece o cache de status dos providers no boot (fire-and-forget) para o
+  // criar-board / Conexões abrirem sem esperar o getStatus (rede). Ver
+  // providers.status.js.
+  warmProviderStatus();
 
   const app = express();
   app.use(express.json());

@@ -35,6 +35,8 @@ function validateBranchName(name) {
 
 export default function CreateBranchModal({ board, item, onClose }) {
   const [owner, repo] = (board.originRepo ?? "").split("/");
+  // Host de código do repo vinculado ao board (default github via back-compat).
+  const host = board.repos?.[0]?.host ?? reposApi.DEFAULT_HOST;
   const cardNumber = item?.number ?? null;
 
   const [branches, setBranches]               = useState([]);
@@ -71,7 +73,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
     setLoaded(false);
     setBranchesLoading(true);
     setBranchesError(null);
-    reposApi.listBranches(owner, repo)
+    reposApi.listBranches(owner, repo, "", host)
       .then((data) => {
         if (!active) return;
         if (data.error) throw new Error(data.error);
@@ -81,7 +83,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
       .catch((err) => { if (active) setBranchesError(err.message); })
       .finally(() => { if (active) { setBranchesLoading(false); setLoaded(true); } });
     return () => { active = false; };
-  }, [owner, repo]);
+  }, [owner, repo, host]);
 
   // Busca server-side com debounce (500ms): só quando o repo tem mais branches
   // que o limite carregado. Caso contrário, o filtro é resolvido no cliente.
@@ -96,7 +98,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
     const handle = setTimeout(() => {
       setBranchesLoading(true);
       setBranchesError(null);
-      reposApi.listBranches(owner, repo, branchFilter)
+      reposApi.listBranches(owner, repo, branchFilter, host)
         .then((data) => {
           if (!active) return;
           if (data.error) throw new Error(data.error);
@@ -106,7 +108,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
         .finally(() => { if (active) setBranchesLoading(false); });
     }, 500);
     return () => { active = false; clearTimeout(handle); };
-  }, [branchFilter, hasMore, owner, repo]);
+  }, [branchFilter, hasMore, owner, repo, host]);
 
   function handleNameChange(e) {
     const val = e.target.value;
@@ -132,7 +134,7 @@ export default function CreateBranchModal({ board, item, onClose }) {
     try {
       const data = await reposApi.createBranch(owner, repo, {
         newBranch: effectiveBranch, originBranch, cardNumber,
-      });
+      }, host);
       if (data.error) throw new Error(data.error);
       setLastCreated(effectiveBranch);
       setWorktreeDir(data.worktreeDir ?? null);

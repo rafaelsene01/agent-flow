@@ -3,7 +3,8 @@
 // `/api/sources/:id/*` resolve o source do board pela config; discovery usa
 // `:source` explícito. Ver docs/providers.md e design.md#rotas-neutras-req-4.
 
-import { get as getSource, list as listSources } from "../modules/sources/sources.registry.js";
+import { get as getSource } from "../modules/sources/sources.registry.js";
+import { getSourcesStatus } from "../modules/providers.status.js";
 import { getConfig } from "../modules/config/config.service.js";
 
 function sendError(res, err) {
@@ -30,18 +31,66 @@ function providerForBoard(boardId) {
 }
 
 export default function sourcesRoutes(app) {
-  // Providers disponíveis + status de cada um.
-  app.get("/api/sources", async (_req, res) => {
+  // Providers disponíveis + status de cada um. Servido do cache SWR
+  // (providers.status): sem `refresh` devolve o snapshot em memória na hora;
+  // `?refresh=1` revalida (usado ao abrir criar-board / Conexões).
+  app.get("/api/sources", async (req, res) => {
     try {
-      const out = [];
-      for (const name of listSources()) {
-        let status;
-        try { status = await getSource(name).getStatus(); }
-        catch (err) { status = { connected: false, error: err.message }; }
-        out.push({ source: name, status });
-      }
-      res.json(out);
+      const refresh = req.query.refresh === "1" || req.query.refresh === "true";
+      res.json(await getSourcesStatus({ refresh }));
     } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // Discovery: organizações de um source específico (:source explícito).
+  // Opcional no contrato — sources sem listOrganizations retornam lista vazia.
+  app.get("/api/sources/:source/organizations", async (req, res) => {
+    try {
+      const provider = getSource(req.params.source);
+      if (typeof provider.listOrganizations !== "function") { res.json([]); return; }
+      res.json(await provider.listOrganizations());
+    } catch (err) {
+      console.error("[sources/organizations]", err.message);
+      sendError(res, err);
+    }
+  });
+
+  // Discovery: projects de uma organização de um source (:source explícito).
+  // Opcional no contrato — sources sem listProjects retornam lista vazia.
+  app.get("/api/sources/:source/organizations/:organizationId/projects", async (req, res) => {
+    try {
+      const provider = getSource(req.params.source);
+      if (typeof provider.listProjects !== "function") { res.json([]); return; }
+      res.json(await provider.listProjects(req.params.organizationId));
+    } catch (err) {
+      console.error("[sources/projects]", err.message);
+      sendError(res, err);
+    }
+  });
+
+  // Discovery: boards de um project de uma organização (:source explícito).
+  // Opcional no contrato — sources sem listProjectBoards retornam lista vazia.
+  app.get("/api/sources/:source/organizations/:organizationId/projects/:projectId/boards", async (req, res) => {
+    try {
+      const provider = getSource(req.params.source);
+      if (typeof provider.listProjectBoards !== "function") { res.json([]); return; }
+      res.json(await provider.listProjectBoards(req.params.organizationId, req.params.projectId));
+    } catch (err) {
+      console.error("[sources/project-boards]", err.message);
+      sendError(res, err);
+    }
+  });
+
+  // Discovery: colunas de um board (:source explícito). Opcional no contrato —
+  // sources sem listBoardColumns retornam lista vazia.
+  app.get("/api/sources/:source/organizations/:organizationId/projects/:projectId/boards/:boardId/columns", async (req, res) => {
+    try {
+      const provider = getSource(req.params.source);
+      if (typeof provider.listBoardColumns !== "function") { res.json([]); return; }
+      res.json(await provider.listBoardColumns(req.params.organizationId, req.params.projectId, req.params.boardId));
+    } catch (err) {
+      console.error("[sources/board-columns]", err.message);
       sendError(res, err);
     }
   });

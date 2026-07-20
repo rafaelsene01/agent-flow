@@ -9,7 +9,7 @@
 
 | Eixo | O quê | Contrato | Implementado | Futuro |
 |------|-------|----------|--------------|--------|
-| **Source** | de onde vêm os cards (boards, colunas, items, views) | `SourceProvider` | `github-board` | `linear`, ... |
+| **Source** | de onde vêm os cards (boards, colunas, items, views) | `SourceProvider` | `github-board`, `custom-kanban` | `linear`, ... |
 | **Repo** | onde vive o código (repos, branches, clone) | `RepoProvider` | `github` | `bitbucket`, ... |
 
 Source e Repo são **independentes**. Um board declara seu `source` **e** vincula
@@ -29,10 +29,13 @@ api/modules/
   github/                 client REST/GraphQL + token (plumbing compartilhado)
     github.source.js      monta o SourceProvider "github-board"
     github.repo.js        monta o RepoProvider "github"
-  providers.bootstrap.js  registra github nos 2 registries (único ponto que nomeia "github")
+  custom-kanban/          Source externo próprio, auth via token na env
+    custom-kanban.client.js  base URL + token (CUSTOM_KANBAN_URL/_TOKEN)
+    custom-kanban.source.js  monta o SourceProvider "custom-kanban"
+  providers.bootstrap.js  registra os providers (único ponto que os nomeia)
 api/routes/
-  sources.js              /api/sources/*
-  repos.js                /api/repos/*
+  sources.js              /api/sources/*   (GET /api/sources = providers + status)
+  repos.js                /api/repos/*     (GET /api/repos/hosts = hosts + status)
 web/lib/api/
   sources.js, repos.js    client neutro do frontend
 ```
@@ -42,8 +45,25 @@ web/lib/api/
 ```js
 { name, getStatus, listBoards, listColumns, listViews,
   listItems, listItemsByColumn, listColumnCounts,
-  listLinkableRepos, resolveRepoRef }
+  listLinkableRepos, resolveRepoRef,
+  listOrganizations?, listProjects?, listProjectBoards?, listBoardColumns? }  // opcionais: cadeia org → project → board → colunas (custom-kanban)
 ```
+
+- **`listOrganizations()` (opcional)** — sources cujo discovery começa escolhendo uma
+  organização (ex.: `custom-kanban`). Exposto pela rota neutra
+  `GET /api/sources/:source/organizations`; sources sem o método retornam `[]`.
+  Retorno normalizado: `Array<{ id, name }>`.
+- **`listProjects(organizationId)` (opcional)** — 2º passo da cadeia: projects de uma
+  organização. Exposto por `GET /api/sources/:source/organizations/:organizationId/projects`;
+  sources sem o método retornam `[]`. Retorno normalizado: `Array<{ id, name }>`.
+- **`listProjectBoards(organizationId, projectId)` (opcional)** — 3º passo: boards de um
+  project. Exposto por
+  `GET /api/sources/:source/organizations/:organizationId/projects/:projectId/boards`;
+  sources sem o método retornam `[]`. Retorno normalizado: `Array<{ id, name }>`.
+- **`listBoardColumns(organizationId, projectId, boardId)` (opcional)** — 4º passo: colunas
+  de um board (para escolher quais exibir, como no github). Exposto por
+  `…/boards/:boardId/columns`; sources sem o método retornam `[]`. Retorno normalizado:
+  `Array<{ id, name, color }>` — `color` (headerColor) é preservado p/ colorir a coluna.
 
 - **Card normalizado** (única saída permitida p/ fora do provider):
   `{ id, type, itemType, title, number, body, assignees, labels, columnId, columnName }`.
@@ -91,6 +111,24 @@ Leitura sempre aplica default github quando o campo novo falta:
    ou núcleo p/ adicionar um provider, a abstração vazou — corrigir a abstração, não remendar.
 8. **Novo método no contrato** ⇒ atualizar `*.contract.js` **e** este doc **e** todas as
    implementações. Contrato e implementações não divergem.
+
+## Source por env (ex: custom-kanban)
+
+`custom-kanban` é **sempre registrado** para aparecer na tela de Conexões mesmo
+sem env — nesse caso o `getStatus` retorna `connected:false` + `commands` listando
+as variáveis faltantes (`CUSTOM_KANBAN_URL`/`CUSTOM_KANBAN_TOKEN`), e o card mostra
+como configurar. Como o `InitBoardModal` só oferece sources `connected`, um custom
+sem env não polui a criação de board. Configurado, usa `CUSTOM_KANBAN_URL` como base
+URL e o token no header `Authorization: Bearer`; status via `GET {baseURL}/api/health`.
+A env não vaza para fora do `custom-kanban.client.js`. Boards/colunas/items ainda
+serão implementados por tipo de source (hoje lançam `CUSTOM_KANBAN_NOT_IMPLEMENTED:<método>`);
+a cadeia de discovery já existe: `listOrganizations` (`GET {baseURL}/api/organizations`)
+→ `listProjects` (`GET {baseURL}/api/organizations/{organizationId}/projects`)
+→ `listProjectBoards` (`GET {baseURL}/api/organizations/{organizationId}/projects/{projectId}/boards`)
+→ `listBoardColumns` (`GET {baseURL}/…/boards/{boardId}/columns`, com `headerColor` p/ cor da coluna).
+
+> **Env só é lida no start do processo.** Alterar `.zshrc`/env exige reiniciar o
+> servidor (dev server ou daemon) — o processo em execução não recarrega env.
 
 ## Ao adicionar um provider novo (ex: linear, bitbucket)
 

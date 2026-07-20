@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18nContext";
-import { Settings, Copy, Check, FolderOpen, AlertTriangle, RefreshCw, X, GitBranch, Bot, Lock } from "lucide-react";
+import { Settings, Check, FolderOpen, RefreshCw, X, Bot, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -13,162 +13,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getSoundPrefs, setSoundPrefs, playWaiting } from "@/lib/sound";
-import { copyToClipboard } from "@/lib/clipboard";
 import { setToken, clearToken } from "@/lib/auth";
+import { IntegrationCard, StatusChip } from "@/components/connections/ConnectionCard.jsx";
 
 // Prefill do campo de senha quando já há uma configurada — o valor real (hash)
 // nunca chega ao front, então mostramos essa máscara ofuscada. Apagá-la e salvar
 // desativa a senha.
 const PW_MASK = "········";
 
-const GH_INSTALL = {
-  win32:  { label: "Instalar (winget)",   cmd: "winget install --id GitHub.cli" },
-  darwin: { label: "Instalar (Homebrew)", cmd: "brew install gh" },
-  linux:  { label: "Instalar (apt)",      cmd: "sudo apt install gh" },
-};
-
 const CLAUDE_COMMANDS = [
   { label: "Instalar globalmente (npm)", cmd: "npm install -g @anthropic-ai/claude-code" },
   { label: "Autenticar",                 cmd: "claude" },
 ];
-
-/* ── CopyButton ─────────────────────────────────────────────────────────── */
-function CopyButton({ text }) {
-  const [copied, setCopied] = useState(false);
-
-  function copy() {
-    copyToClipboard(text).then((ok) => {
-      if (!ok) return;
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }
-
-  return (
-    <Button
-      variant="outline"
-      size="icon-sm"
-      type="button"
-      title={copied ? "Copiado!" : "Copiar"}
-      onClick={copy}
-      className={cn(
-        "shrink-0",
-        copied && "text-state-completed border-state-completed"
-      )}
-    >
-      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-    </Button>
-  );
-}
-
-/* ── CommandBlock ────────────────────────────────────────────────────────── */
-function CommandBlock({ label, cmd }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
-      <div className="flex items-center gap-2">
-        <code className="font-mono text-xs bg-background border rounded-lg px-2.5 py-1.5 truncate flex-1">
-          {cmd}
-        </code>
-        <CopyButton text={cmd} />
-      </div>
-    </div>
-  );
-}
-
-/* ── StatusChip ──────────────────────────────────────────────────────────── */
-function StatusChip({ loading, connected }) {
-  if (loading) {
-    return (
-      <span className="inline-flex items-center justify-center size-6 rounded-full text-xs font-medium animate-pulse text-muted-foreground bg-muted border border-border">
-        …
-      </span>
-    );
-  }
-  if (connected) {
-    return (
-      <span className="inline-flex items-center justify-center size-6 rounded-full text-xs font-medium bg-state-completed/15 text-state-completed border border-state-completed/40">
-        <Check className="size-3.5" />
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center justify-center size-6 rounded-full text-xs font-medium bg-destructive/15 text-destructive border border-destructive/40">
-      <X className="size-3.5" />
-    </span>
-  );
-}
-
-/* ── IntegrationCard ─────────────────────────────────────────────────────── */
-function IntegrationCard({ name, logo, loading, data, commands }) {
-  const connected = !loading && !!data?.connected;
-  const failed    = !loading && !data?.connected;
-
-  const logoStatus = loading ? "" : connected ? "ok" : "err";
-  const logoClass = cn(
-    "flex items-center justify-center size-9 rounded-lg border text-lg shrink-0",
-    logoStatus === "ok"  && "text-state-completed bg-state-completed/10 border-state-completed/40",
-    logoStatus === "err" && "text-destructive bg-destructive/10 border-destructive/40",
-    logoStatus === ""    && "text-muted-foreground bg-muted border-border"
-  );
-
-  return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
-      {/* top row */}
-      <div className="flex items-start gap-3">
-        <div className={logoClass}>{logo}</div>
-
-        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-          <span className="text-sm font-semibold leading-tight">{name}</span>
-
-          {loading && (
-            <span className="text-xs text-muted-foreground">Verificando…</span>
-          )}
-
-          {connected && (
-            <>
-              {data.user && (
-                <span className="text-xs text-state-completed">
-                  @{data.user}{data.name ? ` — ${data.name}` : ""}
-                </span>
-              )}
-              {data.version && (
-                <span className="text-xs text-state-completed">{data.version}</span>
-              )}
-              {!data.user && !data.version && (
-                <span className="text-xs text-state-completed">Conectado</span>
-              )}
-              <span className="text-xs text-muted-foreground">
-                {data.method === "env"        ? "via variável de ambiente" :
-                 data.method === "gh-cli"     ? "via gh CLI"               :
-                 data.method === "claude-cli" ? "via claude CLI"           : data.method}
-              </span>
-            </>
-          )}
-
-          {failed && (
-            <span className="text-xs text-destructive">
-              {data?.error || "Não configurado"}
-            </span>
-          )}
-        </div>
-
-        <StatusChip loading={loading} connected={connected} />
-      </div>
-
-      {/* commands when failed */}
-      {failed && commands?.length > 0 && (
-        <div className="flex flex-col gap-2 border-t pt-3">
-          {commands.map((c) => (
-            <CommandBlock key={c.cmd} label={c.label} cmd={c.cmd} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ── LangSwitch ──────────────────────────────────────────────────────────── */
 function LangSwitch({ value, onChange }) {
@@ -322,13 +178,10 @@ export default function SettingsModal({ onClose }) {
       .catch(() => {});
   }
 
-  const isLocked = loading || !status?.github?.connected || !status?.claude?.connected;
+  // Claude é o motor de execução — sem ele o app não roda, então o modal fica
+  // travado até conectar. GitHub deixou de travar: é gerido na tela de Conexões.
+  const isLocked = loading || !status?.claude?.connected;
 
-  const platform       = status?.platform ?? "linux";
-  const installCmd     = GH_INSTALL[platform] ?? GH_INSTALL.linux;
-  const githubCommands = !loading && !status?.github?.connected
-    ? [installCmd, { label: "Autenticar", cmd: "gh auth login -s read:project" }]
-    : [];
   const claudeCommands = !loading && !status?.claude?.connected
     ? CLAUDE_COMMANDS
     : [];
@@ -370,13 +223,6 @@ export default function SettingsModal({ onClose }) {
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
-          <IntegrationCard
-            name="GitHub"
-            logo={<GitBranch className="size-5" />}
-            loading={loading}
-            data={status?.github}
-            commands={githubCommands}
-          />
           <IntegrationCard
             name="Claude"
             logo={<Bot className="size-5" />}
