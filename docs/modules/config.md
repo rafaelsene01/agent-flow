@@ -20,7 +20,7 @@ Persiste a config global em `~/.agent-flow/config.json`. Escritas passam por uma
 | `projectsPath` | `~/.agent-flow/projects` | Base dos projetos |
 | `boards` | `[]` | Boards salvos |
 | `maxConcurrentRuns` | `null` (auto) | Teto de processos `claude` simultâneos (fila + chat). `null` = adaptativo ao host (`min(⌊núcleos/2⌋, ⌊RAM_GB/4⌋)`, mín. 1); um número sobrepõe. Ver [claude](claude.md). |
-| `runTimeoutMinutes` | `30` | Timeout de run |
+| `runTimeoutMinutes` | `30` | Timeout de **inatividade** do run (minutos sem output novo do CLI; run que segue emitindo eventos não é morto) |
 | `language` | `"en"` | Idioma das instruções aos agentes (`"pt"` \| `"en"`) |
 | `githubMethod` | — | Auth detectada: `"env"` \| `"gh-cli"` |
 | `authHash` | — | Hash (sha256) da senha de acesso ao site. Nunca vai ao cliente; `GET /api/config` expõe só `authEnabled`. Ver [modules/auth.md](auth.md) |

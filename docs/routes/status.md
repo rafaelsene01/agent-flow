@@ -2,13 +2,13 @@
 
 Fonte: `api/routes/status.js`
 
-Status agregado (github + claude) vem do cache em [modules/status.md](../modules/status.md). Também instala skills no Claude global.
+Status agregado (github + claude) via [modules/status.md](../modules/status.md) — sem cache: cada GET revalida. Também instala skills no Claude global.
 
 ---
 
 ## GET /api/status
 
-Retorna o cache; se o warmup ainda não terminou, faz a primeira leitura real.
+Revalida e retorna o status na hora (sem cache — erro transitório não fica congelado).
 
 ```json
 {
@@ -20,7 +20,7 @@ Retorna o cache; se o warmup ainda não terminou, faz a primeira leitura real.
 
 ## POST /api/status
 
-Força `refresh()` do cache e retorna o status atualizado.
+Mesmo `refresh()` do GET (mantido por compatibilidade — botão "revalidar" da UI).
 
 ## POST /api/status/install-skill
 

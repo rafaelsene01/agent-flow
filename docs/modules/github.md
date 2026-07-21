@@ -25,6 +25,7 @@ Requisições com `Bearer` token e `X-GitHub-Api-Version: 2022-11-28`.
 - `validateToken(token)` — `GET /user`
 - `getRepositories(token)` — `GET /user/repos?per_page=100&sort=updated`
 - `graphQL(query, token, variables)` — `POST /graphql`, resposta bruta
+- `githubApiError(prefix, status, text)` — monta o erro das respostas não-ok. 5xx (GitHub fora do ar, body é a página "Unicorn" em HTML) → mensagem amigável "GitHub está fora do ar… não foi possível validar", `err.status = 503`, sem despejar o HTML na UI. Demais status: `prefix status: body`. Usado também por `github.branches.js`.
 
 ## github.service.js — `getStatus()`
 

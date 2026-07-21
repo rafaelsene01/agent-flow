@@ -34,23 +34,31 @@ export function createRun({
   dependsOn,
   model,
   effort,
+  sessionId,
+  sessionIndex,
 }) {
   const db = getDb();
   const runId = id || randomUUID();
-  const sessionId = randomUUID();
   const now = new Date().toISOString();
   // Ponto de parada não roda no Claude: é uma linha na chain que só destrava o
   // próximo passo quando o usuário a aprova. Usa sentinelas nas colunas NOT NULL.
   const isBreakpoint = kind === "breakpoint";
+  // Sessão compartilhada: `sessionId` vindo de fora reusa a sessão de outro run
+  // (o runner detecta e faz resume em vez de criar). `sessionIndex` é o número
+  // exibido na UI — sem um explícito, runs de card ganham o próximo índice livre.
+  const sid = sessionId || randomUUID();
+  const sidx = isBreakpoint
+    ? null
+    : sessionIndex ?? (cardNumber != null ? nextSessionIndexForCard(repo, cardNumber) : null);
   db.prepare(
     `INSERT INTO agent_runs (
       id, session_id, kind, agent_id, agent_name, repo, card_number, card_title, card_body,
       origin_branch, target_branch, worktree_path, helpers_dir, depends_on, chain_id,
-      model, effort, status, resume, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?)`,
+      model, effort, session_index, status, resume, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 0, ?, ?)`,
   ).run(
     runId,
-    sessionId,
+    sid,
     isBreakpoint ? "breakpoint" : "agent",
     isBreakpoint ? "__breakpoint__" : agentId,
     isBreakpoint ? "Ponto de parada" : agentName,
@@ -66,10 +74,50 @@ export function createRun({
     chainId ?? null,
     model || "sonnet",
     effort || "medium",
+    sidx,
     now,
     now,
   );
   return getRun(runId);
+}
+
+// Próximo índice de sessão livre do card (1-based). O índice numera as sessões
+// do Claude usadas pelos runs do card — passos com o mesmo índice compartilham
+// a sessão (resume) em vez de criar uma nova.
+export function nextSessionIndexForCard(repo, cardNumber) {
+  const row = getDb()
+    .prepare(
+      `SELECT COALESCE(MAX(session_index), 0) + 1 AS next
+       FROM agent_runs WHERE repo = ? AND card_number = ?`,
+    )
+    .get(repo, cardNumber);
+  return row.next;
+}
+
+// Mapa índice → session_id das sessões já usadas pelos runs do card (o run mais
+// recente de cada índice vence — todos compartilham o mesmo session_id de toda
+// forma). Usado pela rota de chain para resolver `sessionIndex` em `sessionId`.
+export function sessionsByIndexForCard(repo, cardNumber) {
+  const rows = getDb()
+    .prepare(
+      `SELECT session_index, session_id FROM agent_runs
+       WHERE repo = ? AND card_number = ? AND session_index IS NOT NULL
+       ORDER BY created_at ASC`,
+    )
+    .all(repo, cardNumber);
+  return new Map(rows.map((r) => [r.session_index, r.session_id]));
+}
+
+// Outro run desta sessão já chegou a executar? Se sim, a primeira execução deste
+// run deve RETOMAR a sessão (resume) em vez de criá-la com --session-id — criar
+// de novo falharia (sessão duplicada) e perderia o contexto acumulado.
+export function sessionHasStartedRun(sessionId, excludeRunId) {
+  return !!getDb()
+    .prepare(
+      `SELECT 1 FROM agent_runs
+       WHERE session_id = ? AND id != ? AND started_at IS NOT NULL LIMIT 1`,
+    )
+    .get(sessionId, excludeRunId);
 }
 
 // Todos os runs da mesma pipeline (chain), em ordem de criação. Se o run não

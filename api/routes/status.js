@@ -2,15 +2,14 @@ import { cpSync, existsSync, mkdtempSync, rmSync } from "fs";
 import { execSync } from "child_process";
 import { join } from "path";
 import { homedir, tmpdir } from "os";
-import { getCache, refresh } from "../modules/status/status.cache.js";
+import { refresh } from "../modules/status/status.cache.js";
 import { INSTALLABLE_SKILLS } from "../modules/skills/installable.js";
 import { PACKAGE_ROOT } from "../paths.js";
 
 export default function statusRoutes(app) {
   app.get("/api/status", (_req, res) => {
-    const cached = getCache();
-    if (cached) return res.json(cached);
-    // Ainda não terminou o warmup — aguarda a primeira leitura real.
+    // Sempre revalida: a tela consulta uma vez ao abrir, e um snapshot cacheado
+    // congelava erros transitórios (GitHub 503 no boot ficava para sempre).
     refresh()
       .then((data) => res.json(data))
       .catch((err) => res.status(500).json({ error: err.message }));

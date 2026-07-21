@@ -19,7 +19,9 @@ Fila e execução de runs de agentes. Persistência: SQLite nativo (`node:sqlite
 
 ## Modelo
 
-Run: `{ id, session_id, kind: 'agent'|'breakpoint', agent_id, status, turns, resume, resume_message, pending_question, last_error, log_file, helpers_dir, ... }`. Chain liga runs em pipeline; cada passo só roda quando o anterior termina `done`. `turns` é o histórico (exec/question/answer) em JSON.
+Run: `{ id, session_id, session_index, kind: 'agent'|'breakpoint', agent_id, status, turns, resume, resume_message, pending_question, last_error, log_file, helpers_dir, ... }`. Chain liga runs em pipeline; cada passo só roda quando o anterior termina `done`. `turns` é o histórico (exec/question/answer) em JSON.
+
+**Sessões compartilhadas por card.** `session_index` numera as sessões do Claude por card (1-based; badge `S<n>` na UI). Runs com o mesmo index compartilham o `session_id`: o primeiro cria a sessão; os seguintes RETOMAM (resume com prompt completo do agente como mensagem — herdam contexto, economizam re-exploração). Serialização por worktree garante que dois runs nunca usem a sessão ao mesmo tempo. Breakpoints e runs sem card: `session_index` nulo. Runs antigos (pré-migração): nulo, badge não aparece.
 
 ## agent-runs.queue.js
 
@@ -32,6 +34,7 @@ Run: `{ id, session_id, kind: 'agent'|'breakpoint', agent_id, status, turns, res
 ## agent-runs.store.js (principais)
 
 - `createRun`, `getRun`, `getChain`, `listRuns`, `listRunsForCard`, `patchRun`, `deleteRun`, `clearRuns`
+- `nextSessionIndexForCard(repo, cardNumber)` / `sessionsByIndexForCard(repo, cardNumber)` / `sessionHasStartedRun(sessionId, excludeRunId)` — sessões compartilhadas: próximo index livre, mapa index→session_id (resolução na rota de chain) e detecção "sessão já iniciada por outro run" (runner decide resume vs create)
 - `runsAttentionSummary()` — resumo waiting/active por card (badge no board)
 - `appendTurn(id, turn)` / `updateLastExecTurn(id, patch)`
 - `promoteReadyBreakpoints()` / `approveBreakpoint(id)` / `failDependents(runId, reason)` — passo falhou → dependentes da chain falham juntos
@@ -42,3 +45,5 @@ Run: `{ id, session_id, kind: 'agent'|'breakpoint', agent_id, status, turns, res
 ## agent-runs.runner.js
 
 `startRun(run, { onSettled })` — monta o prompt do agente (via `buildAgentPrompt`), roda/resume o Claude CLI na worktree do card, grava log no helpers dir, registra turns e uso ([usage.md](usage.md)), e notifica eventos no Telegram ([integrations.md](integrations.md)).
+
+Primeira execução com sessão compartilhada (`sessionHasStartedRun` → true): `resumeClaude` com o prompt completo do agente como mensagem, em vez de `runClaude`. Fallback `resumeNotFound` (histórico do CLI apagado) → recria com `runClaude` sob o mesmo `session_id`, igual ao resume normal.

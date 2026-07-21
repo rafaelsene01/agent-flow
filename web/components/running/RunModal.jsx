@@ -269,6 +269,14 @@ function RunChatCard({ run, onOpenLog, onSend, sending }) {
       <div className="flex items-center gap-2">
         <Bot className="size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{run.agent_name}</span>
+        {run.session_index != null && (
+          <span
+            title={t("running.launch.session")}
+            className="shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground"
+          >
+            S{run.session_index}
+          </span>
+        )}
         {isActive && <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />}
         <StatusBadge status={run.status} />
       </div>

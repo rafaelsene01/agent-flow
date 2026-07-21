@@ -1,25 +1,20 @@
 import { getStatus as getGithubStatus } from "../github/github.service.js";
 import { getStatus as getClaudeStatus } from "../claude/claude.service.js";
 
-let cache = null;
-let refreshing = false;
-
-export function getCache() {
-  return cache;
-}
+// Sem cache persistente: a rota /api/status é consultada uma vez por abertura de
+// tela, e cachear congelava erros transitórios (ex.: GitHub 503 no boot ficava
+// "fora do ar" para sempre). Só deduplica chamadas concorrentes em voo.
+let inflight = null;
 
 export async function refresh() {
-  if (refreshing) return;
-  refreshing = true;
-  try {
-    const [github, claude] = await Promise.all([getGithubStatus(), getClaudeStatus()]);
-    cache = { platform: process.platform, github, claude, cachedAt: Date.now() };
-  } finally {
-    refreshing = false;
-  }
-  return cache;
-}
-
-export function warmup() {
-  refresh().catch((err) => console.error("[status] warmup error:", err));
+  if (inflight) return inflight;
+  inflight = (async () => {
+    try {
+      const [github, claude] = await Promise.all([getGithubStatus(), getClaudeStatus()]);
+      return { platform: process.platform, github, claude, cachedAt: Date.now() };
+    } finally {
+      inflight = null;
+    }
+  })();
+  return inflight;
 }

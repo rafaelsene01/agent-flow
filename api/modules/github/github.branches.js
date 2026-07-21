@@ -1,4 +1,4 @@
-import { getToken, graphQL } from "./github.client.js";
+import { getToken, graphQL, githubApiError } from "./github.client.js";
 
 const BASE_URL = "https://api.github.com";
 
@@ -42,6 +42,7 @@ async function ghFetch(path, token, options = {}) {
     ...options,
   });
   if (!res.ok) {
+    if (res.status >= 500) throw githubApiError("GitHub API error", res.status, "");
     const body = await res.json().catch(() => ({}));
     throw new Error(body.message ?? `GitHub API error ${res.status}`);
   }
